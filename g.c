@@ -1,0 +1,41 @@
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdint.h>
+
+const char* magic = "FFT"; // fast fuzzer test
+const int magic_len = 4;
+char* dcontent = "THIS IS A G-FUZZING TEST BEWARE";
+
+
+void writefile(uint8_t *buf, uint32_t size){
+	FILE* fout;
+	fout = fopen("fuzztest", "w"); // output file
+
+	fwrite(buf, size, 1, fout);
+}
+
+int main(int argc, char **argv)
+{
+	char *content;
+
+	if (argc > 1){
+		content = argv[1];
+	} else {
+		content = dcontent;
+	}
+	
+	uint32_t len = strlen(content);
+	uint32_t fsize = 2*sizeof(uint32_t)+len;
+	uint8_t *obuf, *buf;
+
+	obuf = buf = malloc(fsize);
+	
+	memcpy(obuf, magic, sizeof(uint32_t));
+	obuf += sizeof(uint32_t);
+	memcpy(obuf, &len, sizeof(uint32_t));
+	obuf += sizeof(uint32_t);
+	memcpy(obuf, content, len);
+
+	writefile(buf, fsize);
+}
