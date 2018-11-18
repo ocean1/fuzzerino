@@ -45,7 +45,7 @@ void writefile(fmt h) {
 	// and another were we instead select manually with PRAGMA what should 
 	// be fuzzed(?) not really convincing.... :P
 	FILE* fd;
-	fd = fopen("fuzztest", "w"); // output file
+	fd = fopen("/dev/shm/fuzztest", "w"); // output file
 	chunk *c;
 
 	fwrite(&h.magic, sizeof(uint32_t), 1, fd);

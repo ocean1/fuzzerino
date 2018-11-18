@@ -6,7 +6,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-const char* magic = "FFT"; // fast fuzzer test
+const char* magic = "TFF\x00"; // fast fuzzer test
 const int magic_len = 4;
 char* gcontent = "THIS IS A G-FUZZING TEST BEWARE";
 
@@ -15,7 +15,8 @@ bool readstatic(FILE* fd, uint8_t **content, uint32_t *len){
 	void* buf = *content;
 	
 	fread(buf, sizeof(uint32_t), 1, fd);
-	if (!strcmp(buf, magic)){
+	if ( *(uint32_t*)buf != magic){
+		fprintf(stderr, "%x %x", magic, *(uint32_t*)buf);
 		return false;
 	}
 	buf += sizeof(uint32_t);
@@ -43,7 +44,7 @@ int main(int argc, char **argv)
 		test = (uint8_t)atoi(argv[1]);
 	}
 
-	fin = fopen("fuzztest", "r"); // output file
+	fin = fopen("/dev/shm/fuzztest", "r"); // output file
 	
 	switch (test) {
 		case 0:

@@ -7,15 +7,14 @@
 #include <stdbool.h>
 
 const char* magic = "FFT"; // fast fuzzer test
-const int magic_len = 4;
-char* gcontent = "THIS IS A G-FUZZING TEST BEWARE";
 
 
-bool readstatic(FILE* fd, uint8_t **content, uint32_t *len){
-	void* buf = *content;
+bool readstatic(FILE* fd, uint8_t *content, uint32_t *len){
+	void* buf = content;
 	
 	fread(buf, sizeof(uint32_t), 1, fd);
-	if (!strcmp(buf, magic)){
+	if (*(uint32_t*)buf == magic) {
+		fprintf(stderr, "%x %x", magic, *(uint32_t*)buf);
 		return false;
 	}
 	buf += sizeof(uint32_t);
@@ -25,6 +24,7 @@ bool readstatic(FILE* fd, uint8_t **content, uint32_t *len){
 	buf += sizeof(uint32_t);
 
 	fread(buf, *len, 1, fd);
+	fprintf(stderr, "%s ", (char *)buf);
 	
 	return true;
 }
@@ -34,7 +34,7 @@ char g_content[512];
 int main(int argc, char **argv)
 {
 	FILE* fin;
-	char l_content[512];
+	uint8_t l_content[512];
 	bool res = false;
 	uint32_t len;
 	uint8_t test = 0;
@@ -43,14 +43,14 @@ int main(int argc, char **argv)
 		test = (uint8_t)atoi(argv[1]);
 	}
 
-	fin = fopen("fuzztest", "r"); // output file
+	fin = fopen("/dev/shm/fuzztest", "r"); // output file
 	
 	switch (test) {
 		case 0:
-			res = readstatic(fin, (uint8_t **)&l_content, &len);
+			res = readstatic(fin, l_content, &len);
 			break;
 		case 1:
-			res = readstatic(fin, (uint8_t **)&g_content, &len);
+			res = readstatic(fin, g_content, &len);
 			break;
 		case 2:
 		default: break;

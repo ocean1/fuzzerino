@@ -16,7 +16,7 @@ char* dcontent = "THIS IS A G-FUZZING TEST BEWARE";
 
 void writefile(uint8_t *buf, uint32_t size){
 	FILE* fout;
-	fout = fopen("fuzztest", "w"); // output file
+	fout = fopen("/dev/shm/fuzztest", "w"); // output file
 
 	fwrite(buf, size, 1, fout);
 }
