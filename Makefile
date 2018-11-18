@@ -1,20 +1,11 @@
-# Makefile
 .PHONY: FORCE all clean
 
+test%: t% FORCE
+	make -C $<
 
-CC = gcc
+all: test1 test2
 
+clean%: t%
+	make -C $< clean
 
-all: generator parser
-
-
-generator:
-	$(CC) -c g.c -o g.o -Wall
-	$(CC) g.o -o generator -Wall
-
-parser:
-	@echo "not quite there"
-
-clean:
-	rm -f generator
-	rm -f *.o
+clean: clean1 clean2

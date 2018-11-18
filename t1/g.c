@@ -1,3 +1,7 @@
+/* basic example of generator 1
+ * more complex example will build on this
+ * to "simulate" a basic binary file */
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -5,6 +9,8 @@
 
 const char* magic = "FFT"; // fast fuzzer test
 const int magic_len = 4;
+
+// default content if string hasn't been passed via cmdline
 char* dcontent = "THIS IS A G-FUZZING TEST BEWARE";
 
 
@@ -26,7 +32,7 @@ int main(int argc, char **argv)
 	}
 	
 	uint32_t len = strlen(content);
-	uint32_t fsize = 2*sizeof(uint32_t)+len;
+	uint32_t fsize = 2 * sizeof(uint32_t) + len;
 	uint8_t *obuf, *buf;
 
 	obuf = buf = malloc(fsize);

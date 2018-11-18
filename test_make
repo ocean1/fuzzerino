@@ -1,0 +1,24 @@
+# Makefile
+.PHONY: FORCE all clean
+
+
+CC = gcc
+
+
+all: g p
+
+g: g.o
+	$(CC) g.o -o g -Wall
+
+p: p.o
+	$(CC) p.o -o p -Wall
+
+g.c:
+	$(CC) -c g.c -o g.o -Wall
+
+p.c:
+	$(CC) -c p.c -o p.o -Wall
+
+clean:
+	rm -f g p
+	rm -f *.o
