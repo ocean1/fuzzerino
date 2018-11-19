@@ -1,0 +1,46 @@
+# Makefile
+.PHONY: FORCE all clean
+
+DEBUG ?= 0
+EMIT_LLVM ?= 0
+
+CC = clang
+CFLAGS = -Wall
+LLVMFLAGS =
+ifeq ($(DEBUG), 1)
+	CFLAGS  += -g
+endif
+
+ifeq ($(EMIT_LLVM), 1)
+	CFLAGS += -emit-llvm -S
+endif
+
+
+ifeq ($(EMIT_LLVM), 1)
+%.ll:
+	$(CC) $(CFLAGS) g.c -o $@
+
+all: g.ll p.ll
+
+else
+
+all: g.c p.c
+
+g: g.o
+	$(CC) $< -o $@ $(CFLAGS)
+
+p: p.o
+	$(CC) $< -o $@ $(CFLAGS)
+
+g.c:
+	$(CC) $(CFLAGS) -c $@
+
+p.c:
+	$(CC) $(CFLAGS) -c $@
+
+endif
+
+clean:
+	rm -f g p
+	rm -f *.o
+	rm -f *.ll

@@ -1,8 +1,10 @@
 .PHONY: FORCE all clean
 
 DEBUG = 1
+EMIT_LLVM = 1
 
 export DEBUG
+export EMIT_LLVM
 
 test%: t% FORCE
 	make -C $<

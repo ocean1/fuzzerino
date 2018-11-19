@@ -1,1 +1,1 @@
-../test_make
+../maketests
