@@ -64,3 +64,7 @@ fuzztest
 
 t*/g
 t*/p
+
+#CLANG LLVM IR
+*.ll
+*.bc

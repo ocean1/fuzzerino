@@ -1,6 +1,6 @@
 .PHONY: FORCE all clean
 
-DEBUG ?= 1
+DEBUG ?= 0
 EMIT_LLVM ?= 0
 
 export DEBUG
@@ -17,7 +17,9 @@ clean%: t%
 clean: clean1 clean2
 
 extest%: t% FORCE
-	$</g
-	$</p
+	@echo "testing t$*"
+	@$</g
+	@$</p
+	@echo ""
 
 do_tests: extest1 extest2
