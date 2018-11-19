@@ -13,8 +13,8 @@ bool readstatic(FILE* fd, uint8_t *content, uint32_t *len){
 	void* buf = content;
 	
 	fread(buf, sizeof(uint32_t), 1, fd);
-	if (*(uint32_t*)buf == magic) {
-		fprintf(stderr, "%x %x", magic, *(uint32_t*)buf);
+	if (*(uint32_t*)buf != *(uint32_t*)magic) {
+		fprintf(stderr, "%x %x", *(uint32_t*)magic, *(uint32_t*)buf);
 		return false;
 	}
 	buf += sizeof(uint32_t);
@@ -29,7 +29,7 @@ bool readstatic(FILE* fd, uint8_t *content, uint32_t *len){
 	return true;
 }
 
-char g_content[512];
+unsigned char g_content[512];
 
 int main(int argc, char **argv)
 {

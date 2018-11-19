@@ -11,11 +11,11 @@
 
 #define SEED time(0)
 
-const unsigned char* magic = "FFT"; // fast fuzzer test
+const unsigned char* magic = (unsigned char*)"FFT"; // fast fuzzer test
 const int magic_len = 4;
 
 // default content if string hasn't been passed via cmdline
-uint8_t* dcontent = (uint8_t*)"THIS IS A G-FUZZING TEST BEWARE";
+uint8_t* dcontent = (uint8_t*)"THIS IS A G-FUZZING TEST BEWARE\x00";
 
 int randrange(int min, int max){
    return min + rand() / (RAND_MAX / (max - min + 1) + 1);
@@ -52,7 +52,7 @@ void writefile(fmt h) {
 	fwrite(&h.cmtlen, sizeof(uint32_t), 1, fd);
 	fwrite(&h.chunksnum, sizeof(uint32_t), 1, fd);
 	fwrite(h.cmt, h.cmtlen, 1, fd);
-	for (c = h.chunks, c!=NULL; c=c->next;) {
+	for (c = h.chunks; c!=NULL; (c=c->next)) {
 		fwrite(c->buf, c->size, 1, fd);
 	}
 
@@ -66,7 +66,7 @@ int main(int argc, char **argv)
 	chunk tc, *hc, *nc;
 	tc.next = NULL;
 	hc = &tc;
-	h.cmt = (uint8_t*)dcontent;
+	h.cmt = dcontent;
 
 	srand(SEED);
 	cnum = randrange(0, 10);

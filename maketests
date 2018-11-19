@@ -1,43 +1,36 @@
 # Makefile
-.PHONY: FORCE all clean
+.PHONY: FORCE all clean emitllvm
 
 DEBUG ?= 0
 EMIT_LLVM ?= 0
 
 CC = clang
 CFLAGS = -Wall
+LLVMFLAGS=-emit-llvm -S
 
 ifeq ($(DEBUG), 1)
 	CFLAGS  += -g
 endif
 
-ifeq ($(EMIT_LLVM), 1)
-	CFLAGS += -emit-llvm -S
-endif
 
+all: gtest ptest
 
-ifeq ($(EMIT_LLVM), 1)
+emitllvm: g.ll p.ll
+
 %.ll:
-	$(CC) $(CFLAGS) g.c -o $@
+	$(CC) $(CFLAGS) $(LLVMFLAGS) g.c -o $@
 
-all: g.ll p.ll
+%test: %.o
+	$(CC) $< -o $@ $(CFLAGS)
 
-else
-
-all: t_g t_p
-
-t_%: %.o
-	$(CC) $< -o $* $(CFLAGS)
-
-g.o: g.c
-p.o: p.c
+#g.o: g.c
+#p.o: p.c
 
 %.c:
-	$(CC) $(CFLAGS) -c $@
+	$(CC) $(CFLAGS) $@
 
-endif
 
 clean:
-	rm -f g p
+	rm -f gtest ptest
 	rm -f *.o
 	rm -f *.ll

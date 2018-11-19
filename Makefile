@@ -1,10 +1,8 @@
 .PHONY: FORCE all clean
 
 DEBUG ?= 0
-EMIT_LLVM ?= 0
 
 export DEBUG
-export EMIT_LLVM
 
 test%: t% FORCE
 	make -C $<
@@ -18,8 +16,13 @@ clean: clean1 clean2
 
 extest%: t% FORCE
 	@echo "testing t$*"
-	@$</g
-	@$</p
+	@$</gtest
+	@$</ptest
 	@echo ""
 
 do_tests: extest1 extest2
+
+emit%: t%
+	make -C $< emitllvm
+
+emit_all: emit1 emit2
