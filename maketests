@@ -9,7 +9,7 @@ CFLAGS = -Wall
 CFLAGS += -I ../
 LLVMFLAGS=-emit-llvm -S
 
-LDFLAGS += ../ldscript.x -v
+LDFLAGS += ../ldscript.x
 ifeq ($(DEBUG), 1)
 	CFLAGS  += -g
 endif
