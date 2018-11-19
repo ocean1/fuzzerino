@@ -6,8 +6,10 @@ EMIT_LLVM ?= 0
 
 CC = clang
 CFLAGS = -Wall
+CFLAGS += -I ../
 LLVMFLAGS=-emit-llvm -S
 
+LDFLAGS += ../ldscript.x -v
 ifeq ($(DEBUG), 1)
 	CFLAGS  += -g
 endif
@@ -21,7 +23,7 @@ emitllvm: g.ll p.ll
 	$(CC) $(CFLAGS) $(LLVMFLAGS) g.c -o $@
 
 %test: %.o
-	$(CC) $< -o $@ $(CFLAGS)
+	$(CC) $(CFLAGS) $(LDFLAGS) $< -o $@
 
 #g.o: g.c
 #p.o: p.c
