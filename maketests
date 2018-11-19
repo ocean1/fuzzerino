@@ -6,7 +6,7 @@ EMIT_LLVM ?= 0
 
 CC = clang
 CFLAGS = -Wall
-LLVMFLAGS =
+
 ifeq ($(DEBUG), 1)
 	CFLAGS  += -g
 endif
@@ -24,18 +24,15 @@ all: g.ll p.ll
 
 else
 
-all: g.c p.c
+all: t_g t_p
 
-g: g.o
-	$(CC) $< -o $@ $(CFLAGS)
+t_%: %.o
+	$(CC) $< -o $* $(CFLAGS)
 
-p: p.o
-	$(CC) $< -o $@ $(CFLAGS)
+g.o: g.c
+p.o: p.c
 
-g.c:
-	$(CC) $(CFLAGS) -c $@
-
-p.c:
+%.c:
 	$(CC) $(CFLAGS) -c $@
 
 endif
