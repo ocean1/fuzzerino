@@ -620,13 +620,13 @@ static char** get_qemu_argv(u8* own_loc, char** argv, int argc) {
 int main(int argc, char** argv) {
 
   s32 opt;
-  u8  mem_limit_given = 0, timeout_given = 0, qemu_mode = 0;
+  u8  mem_limit_given = 0, timeout_given = 0, qemu_mode = 0, gfuzz_mode = 0;
   u32 tcnt;
   char** use_argv;
 
   doc_path = access(DOC_PATH, F_OK) ? "docs" : DOC_PATH;
 
-  while ((opt = getopt(argc,argv,"+o:m:t:A:eqZQbc")) > 0)
+  while ((opt = getopt(argc,argv,"+o:m:t:A:eqZQGbc")) > 0)
 
     switch (opt) {
 
@@ -721,6 +721,14 @@ int main(int argc, char** argv) {
         if (!mem_limit_given) mem_limit = MEM_LIMIT_QEMU;
 
         qemu_mode = 1;
+        break;
+
+      case 'G':
+
+        if (gfuzz_mode) FATAL("Multiple -G options not supported");
+        if (qemu_mode) FATAL("-G is not compatbile with -Q");
+
+        gfuzz_mode = 1;
         break;
 
       case 'b':
