@@ -21,10 +21,13 @@ BIN_PATH    = $(PREFIX)/bin
 HELPER_PATH = $(PREFIX)/lib/afl
 DOC_PATH    = $(PREFIX)/share/doc/afl
 MISC_PATH   = $(PREFIX)/share/afl
+OUTDIR      = bin
 
 # PROGS intentionally omit afl-as, which gets installed elsewhere.
 
-PROGS       = afl-gcc afl-fuzz afl-showmap afl-tmin afl-gotcpu afl-analyze
+EXECS       = afl-gcc afl-fuzz afl-showmap afl-tmin afl-gotcpu afl-analyze
+SOURCES     = $(patsubst %, %.c, $(EXECS))
+PROGS 		= $(patsubst %, $(OUTDIR)/%, $(EXECS))
 SH_PROGS    = afl-plot afl-cmin afl-whatsup
 
 CFLAGS     ?= -O3 -funroll-loops
@@ -33,18 +36,18 @@ CFLAGS     += -Wall -D_FORTIFY_SOURCE=2 -g -Wno-pointer-sign \
 	      -DBIN_PATH=\"$(BIN_PATH)\"
 
 ifneq "$(filter Linux GNU%,$(shell uname))" ""
-  LDFLAGS  += -ldl
+  LDLIBS  += -ldl
 endif
 
 ifeq "$(findstring clang, $(shell $(CC) --version 2>/dev/null))" ""
-  TEST_CC   = afl-gcc
+  TEST_CC   = $(OUTDIR)/afl-gcc
 else
-  TEST_CC   = afl-clang
+  TEST_CC   = $(OUTDIR)/afl-clang
 endif
 
 COMM_HDR    = alloc-inl.h config.h debug.h types.h
 
-all: test_x86 $(PROGS) afl-as test_build all_done
+all: test_x86 $(PROGS) $(OUTDIR)/afl-as setup_links test_build all_done
 
 ifndef AFL_NO_X86
 
@@ -61,43 +64,30 @@ test_x86:
 
 endif
 
-afl-gcc: afl-gcc.c $(COMM_HDR) | test_x86
-	$(CC) $(CFLAGS) $@.c -o $@ $(LDFLAGS)
-	set -e; for i in afl-g++ afl-clang afl-clang++; do ln -sf afl-gcc $$i; done
+$(PROGS): $(SOURCES) $(COMM_HDR) | test_x86
+	$(CC) $(CFLAGS) $(@F).c -o $@ $(LDLIBS)
 
-afl-as: afl-as.c afl-as.h $(COMM_HDR) | test_x86
-	$(CC) $(CFLAGS) $@.c -o $@ $(LDFLAGS)
-	ln -sf afl-as as
+setup_links:
+	set -e; for i in afl-g++ afl-clang afl-clang++; do ln -sf afl-gcc $(OUTDIR)/$$i; done
 
-afl-fuzz: afl-fuzz.c $(COMM_HDR) | test_x86
-	$(CC) $(CFLAGS) $@.c -o $@ $(LDFLAGS)
-
-afl-showmap: afl-showmap.c $(COMM_HDR) | test_x86
-	$(CC) $(CFLAGS) $@.c -o $@ $(LDFLAGS)
-
-afl-tmin: afl-tmin.c $(COMM_HDR) | test_x86
-	$(CC) $(CFLAGS) $@.c -o $@ $(LDFLAGS)
-
-afl-analyze: afl-analyze.c $(COMM_HDR) | test_x86
-	$(CC) $(CFLAGS) $@.c -o $@ $(LDFLAGS)
-
-afl-gotcpu: afl-gotcpu.c $(COMM_HDR) | test_x86
-	$(CC) $(CFLAGS) $@.c -o $@ $(LDFLAGS)
+$(OUTDIR)/afl-as: afl-as.c afl-as.h $(COMM_HDR) | test_x86
+	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS)
+	ln -sf afl-as $(OUTDIR)/as
 
 ifndef AFL_NO_X86
 
-test_build: afl-gcc afl-as afl-showmap
+test_build: $(OUTDIR)/afl-gcc $(OUTDIR)/afl-as $(OUTDIR)/afl-showmap
 	@echo "[*] Testing the CC wrapper and instrumentation output..."
-	unset AFL_USE_ASAN AFL_USE_MSAN; AFL_QUIET=1 AFL_INST_RATIO=100 AFL_PATH=. ./$(TEST_CC) $(CFLAGS) test-instr.c -o test-instr $(LDFLAGS)
-	echo 0 | ./afl-showmap -m none -q -o .test-instr0 ./test-instr
-	echo 1 | ./afl-showmap -m none -q -o .test-instr1 ./test-instr
+	unset AFL_USE_ASAN AFL_USE_MSAN; AFL_QUIET=1 AFL_INST_RATIO=100 AFL_PATH=$(OUTDIR) ./$(TEST_CC) $(CFLAGS) test-instr.c -o test-instr $(LDFLAGS)
+	echo 0 | ./$(OUTDIR)/afl-showmap -m none -q -o .test-instr0 ./test-instr
+	echo 1 | ./$(OUTDIR)/afl-showmap -m none -q -o .test-instr1 ./test-instr
 	@rm -f test-instr
 	@cmp -s .test-instr0 .test-instr1; DR="$$?"; rm -f .test-instr0 .test-instr1; if [ "$$DR" = "0" ]; then echo; echo "Oops, the instrumentation does not seem to be behaving correctly!"; echo; echo "Please ping <lcamtuf@google.com> to troubleshoot the issue."; echo; exit 1; fi
 	@echo "[+] All right, the instrumentation seems to be working!"
 
 else
 
-test_build: afl-gcc afl-as afl-showmap
+test_build: $(OUTDIR)/afl-gcc $(OUTDIR)/afl-as $(OUTDIR)/afl-showmap
 	@echo "[!] Note: skipping build tests (you may need to use LLVM or QEMU mode)."
 
 endif
@@ -111,7 +101,7 @@ all_done: test_build
 .NOTPARALLEL: clean
 
 clean:
-	rm -f $(PROGS) afl-as as afl-g++ afl-clang afl-clang++ *.o *~ a.out core core.[1-9][0-9]* *.stackdump test .test test-instr .test-instr0 .test-instr1 qemu_mode/qemu-2.10.0.tar.bz2 afl-qemu-trace
+	rm -f $(OUTDIR)/* *.o *~ a.out core core.[1-9][0-9]* *.stackdump test .test test-instr .test-instr0 .test-instr1 qemu_mode/qemu-2.10.0.tar.bz2 afl-qemu-trace
 	rm -rf out_dir qemu_mode/qemu-2.10.0
 	$(MAKE) -C llvm_mode clean
 	$(MAKE) -C libdislocator clean

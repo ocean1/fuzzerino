@@ -11,3 +11,5 @@ afl-gotcpu
 afl-showmap
 afl-tmin
 as
+
+bin/*
