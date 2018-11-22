@@ -4,7 +4,8 @@
 DEBUG ?= 0
 EMIT_LLVM ?= 0
 
-CC = clang
+CC ?= gfz-clang-fast
+
 CFLAGS = -Wall
 CFLAGS += -I ../
 LLVMFLAGS=-emit-llvm -S

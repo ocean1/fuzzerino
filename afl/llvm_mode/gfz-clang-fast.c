@@ -16,7 +16,7 @@
      http://www.apache.org/licenses/LICENSE-2.0
 
    This program is a drop-in replacement for clang, similar in most respects
-   to ../afl-gcc. It tries to figure out compilation mode, adds a bunch
+   to ../gfz-gcc. It tries to figure out compilation mode, adds a bunch
    of flags, and then calls the real compiler.
 
  */
@@ -42,15 +42,15 @@ static u32  cc_par_cnt = 1;         /* Param count, including argv0      */
 
 static void find_obj(u8* argv0) {
 
-  u8 *afl_path = getenv("AFL_PATH");
+  u8 *gfz_path = getenv("AFL_PATH");
   u8 *slash, *tmp;
 
-  if (afl_path) {
+  if (gfz_path) {
 
-    tmp = alloc_printf("%s/afl-llvm-rt.o", afl_path);
+    tmp = alloc_printf("%s/gfz-llvm-rt.o", gfz_path);
 
     if (!access(tmp, R_OK)) {
-      obj_path = afl_path;
+      obj_path = gfz_path;
       ck_free(tmp);
       return;
     }
@@ -69,7 +69,7 @@ static void find_obj(u8* argv0) {
     dir = ck_strdup(argv0);
     *slash = '/';
 
-    tmp = alloc_printf("%s/afl-llvm-rt.o", dir);
+    tmp = alloc_printf("%s/gfz-llvm-rt.o", dir);
 
     if (!access(tmp, R_OK)) {
       obj_path = dir;
@@ -82,12 +82,12 @@ static void find_obj(u8* argv0) {
 
   }
 
-  if (!access(AFL_PATH "/afl-llvm-rt.o", R_OK)) {
+  if (!access(AFL_PATH "/gfz-llvm-rt.o", R_OK)) {
     obj_path = AFL_PATH;
     return;
   }
 
-  FATAL("Unable to find 'afl-llvm-rt.o' or 'afl-llvm-pass.so'. Please set AFL_PATH");
+  FATAL("Unable to find 'gfz-llvm-rt.o' or 'gfz-llvm-pass.so'. Please set AFL_PATH");
  
 }
 
@@ -104,7 +104,7 @@ static void edit_params(u32 argc, char** argv) {
   name = strrchr(argv[0], '/');
   if (!name) name = argv[0]; else name++;
 
-  if (!strcmp(name, "afl-clang-fast++")) {
+  if (!strcmp(name, "gfz-clang-fast++")) {
     u8* alt_cxx = getenv("AFL_CXX");
     cc_params[0] = alt_cxx ? alt_cxx : (u8*)"clang++";
   } else {
@@ -112,8 +112,8 @@ static void edit_params(u32 argc, char** argv) {
     cc_params[0] = alt_cc ? alt_cc : (u8*)"clang";
   }
 
-  /* There are two ways to compile afl-clang-fast. In the traditional mode, we
-     use afl-llvm-pass.so to inject instrumentation. In the experimental
+  /* There are two ways to compile gfz-clang-fast. In the traditional mode, we
+     use gfz-llvm-pass.so to inject instrumentation. In the experimental
      'trace-pc-guard' mode, we use native LLVM instrumentation callbacks
      instead. The latter is a very recent addition - see:
 
@@ -127,7 +127,7 @@ static void edit_params(u32 argc, char** argv) {
   cc_params[cc_par_cnt++] = "-Xclang";
   cc_params[cc_par_cnt++] = "-load";
   cc_params[cc_par_cnt++] = "-Xclang";
-  cc_params[cc_par_cnt++] = alloc_printf("%s/afl-llvm-pass.so", obj_path);
+  cc_params[cc_par_cnt++] = alloc_printf("%s/gfz-llvm-pass.so", obj_path);
 #endif /* ^USE_TRACE_PC */
 
   cc_params[cc_par_cnt++] = "-Qunused-arguments";
@@ -229,7 +229,7 @@ static void edit_params(u32 argc, char** argv) {
 
   /* When the user tries to use persistent or deferred forkserver modes by
      appending a single line to the program, we want to reliably inject a
-     signature into the binary (to be picked up by afl-fuzz) and we want
+     signature into the binary (to be picked up by gfz-fuzz) and we want
      to call a function from the runtime .o file. This is unnecessarily
      painful for three reasons:
 
@@ -240,7 +240,7 @@ static void edit_params(u32 argc, char** argv) {
         not to do the same. This is done by forcing an assignment to a
         'volatile' pointer.
 
-     3) We need to declare __afl_persistent_loop() in the global namespace,
+     3) We need to declare __gfz_persistent_loop() in the global namespace,
         but doing this within a method in a class is hard - :: and extern "C"
         are forbidden and __attribute__((alias(...))) doesn't work. Hence the
         __asm__ aliasing trick.
@@ -252,10 +252,10 @@ static void edit_params(u32 argc, char** argv) {
     " _B = (char*)\"" PERSIST_SIG "\"; "
 #ifdef __APPLE__
     "__attribute__((visibility(\"default\"))) "
-    "int _L(unsigned int) __asm__(\"___afl_persistent_loop\"); "
+    "int _L(unsigned int) __asm__(\"___gfz_persistent_loop\"); "
 #else
     "__attribute__((visibility(\"default\"))) "
-    "int _L(unsigned int) __asm__(\"__afl_persistent_loop\"); "
+    "int _L(unsigned int) __asm__(\"__gfz_persistent_loop\"); "
 #endif /* ^__APPLE__ */
     "_L(_A); })";
 
@@ -264,10 +264,10 @@ static void edit_params(u32 argc, char** argv) {
     " _A = (char*)\"" DEFER_SIG "\"; "
 #ifdef __APPLE__
     "__attribute__((visibility(\"default\"))) "
-    "void _I(void) __asm__(\"___afl_manual_init\"); "
+    "void _I(void) __asm__(\"___gfz_manual_init\"); "
 #else
     "__attribute__((visibility(\"default\"))) "
-    "void _I(void) __asm__(\"__afl_manual_init\"); "
+    "void _I(void) __asm__(\"__gfz_manual_init\"); "
 #endif /* ^__APPLE__ */
     "_I(); } while (0)";
 
@@ -281,11 +281,11 @@ static void edit_params(u32 argc, char** argv) {
     switch (bit_mode) {
 
       case 0:
-        cc_params[cc_par_cnt++] = alloc_printf("%s/afl-llvm-rt.o", obj_path);
+        cc_params[cc_par_cnt++] = alloc_printf("%s/gfz-llvm-rt.o", obj_path);
         break;
 
       case 32:
-        cc_params[cc_par_cnt++] = alloc_printf("%s/afl-llvm-rt-32.o", obj_path);
+        cc_params[cc_par_cnt++] = alloc_printf("%s/gfz-llvm-rt-32.o", obj_path);
 
         if (access(cc_params[cc_par_cnt - 1], R_OK))
           FATAL("-m32 is not supported by your compiler");
@@ -293,7 +293,7 @@ static void edit_params(u32 argc, char** argv) {
         break;
 
       case 64:
-        cc_params[cc_par_cnt++] = alloc_printf("%s/afl-llvm-rt-64.o", obj_path);
+        cc_params[cc_par_cnt++] = alloc_printf("%s/gfz-llvm-rt-64.o", obj_path);
 
         if (access(cc_params[cc_par_cnt - 1], R_OK))
           FATAL("-m64 is not supported by your compiler");
@@ -316,9 +316,9 @@ int main(int argc, char** argv) {
   if (isatty(2) && !getenv("AFL_QUIET")) {
 
 #ifdef USE_TRACE_PC
-    SAYF(cCYA "afl-clang-fast [tpcg] " cBRI VERSION  cRST " by <lszekeres@google.com>\n");
+    SAYF(cCYA "gfz-clang-fast [tpcg] " cBRI VERSION  cRST " by <lszekeres@google.com>\n");
 #else
-    SAYF(cCYA "afl-clang-fast " cBRI VERSION  cRST " by <lszekeres@google.com>\n");
+    SAYF(cCYA "gfz-clang-fast " cBRI VERSION  cRST " by <lszekeres@google.com>\n");
 #endif /* ^USE_TRACE_PC */
 
   }
@@ -326,14 +326,14 @@ int main(int argc, char** argv) {
   if (argc < 2) {
 
     SAYF("\n"
-         "This is a helper application for afl-fuzz. It serves as a drop-in replacement\n"
+         "This is a helper application for gfz-fuzz. It serves as a drop-in replacement\n"
          "for clang, letting you recompile third-party code with the required runtime\n"
          "instrumentation. A common use pattern would be one of the following:\n\n"
 
-         "  CC=%s/afl-clang-fast ./configure\n"
-         "  CXX=%s/afl-clang-fast++ ./configure\n\n"
+         "  CC=%s/gfz-clang-fast ./configure\n"
+         "  CXX=%s/gfz-clang-fast++ ./configure\n\n"
 
-         "In contrast to the traditional afl-clang tool, this version is implemented as\n"
+         "In contrast to the traditional gfz-clang tool, this version is implemented as\n"
          "an LLVM pass and tends to offer improved performance with slow programs.\n\n"
 
          "You can specify custom next-stage toolchain via AFL_CC and AFL_CXX. Setting\n"
