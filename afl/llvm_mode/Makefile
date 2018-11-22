@@ -58,6 +58,7 @@ endif
 
 ifndef AFL_TRACE_PC
   PROGS      = $(OUTDIR)/afl-clang-fast $(OUTDIR)/afl-llvm-pass.so $(OUTDIR)/afl-llvm-rt.o $(OUTDIR)/afl-llvm-rt-32.o $(OUTDIR)/afl-llvm-rt-64.o
+  PROGS      += $(OUTDIR)/gfz-clang-fast $(OUTDIR)/gfz-llvm-pass.so $(OUTDIR)/gfz-llvm-rt.o $(OUTDIR)/gfz-llvm-rt-32.o $(OUTDIR)/gfz-llvm-rt-64.o
 else
   PROGS      = $(OUTDIR)/afl-clang-fast $(OUTDIR)/afl-llvm-rt.o $(OUTDIR)/afl-llvm-rt-32.o $(OUTDIR)/afl-llvm-rt-64.o
 endif
@@ -91,6 +92,24 @@ $(OUTDIR)/afl-llvm-rt-%.o: afl-llvm-rt.o.c | test_deps
 	$(eval BITS := $(basename $*))
 	@printf "[*] Building $(BITS)-bit variant of the runtime (-m32)... "
 	@$(CC) $(CFLAGS) -m$(BITS) -fPIC -c $< -o $@ 2>/dev/null; if [ "$$?" = "0" ]; then echo "success!"; else echo "failed (that's fine)"; fi
+
+# gfuzz fork
+
+$(OUTDIR)/gfz-clang-fast: gfz-clang-fast.c | test_deps
+	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS)
+	ln -sf afl-clang-fast $(OUTDIR)/afl-clang-fast++
+
+$(OUTDIR)/gfz-llvm-pass.so: gfz-llvm-pass.so.cc | test_deps
+	$(CXX) $(CLANG_CFL) -shared $< -o $@ $(CLANG_LFL)
+
+$(OUTDIR)/gfz-llvm-rt.o: gfz-llvm-rt.o.c | test_deps
+	$(CC) $(CFLAGS) -fPIC -c $< -o $@
+
+$(OUTDIR)/gfz-llvm-rt-%.o: gfz-llvm-rt.o.c | test_deps
+	$(eval BITS := $(basename $*))
+	@printf "[*] Building $(BITS)-bit variant of the runtime (-m32)... "
+	@$(CC) $(CFLAGS) -m$(BITS) -fPIC -c $< -o $@ 2>/dev/null; if [ "$$?" = "0" ]; then echo "success!"; else echo "failed (that's fine)"; fi
+
 
 test_build: $(PROGS)
 	@echo "[*] Testing the CC wrapper and instrumentation output..."
