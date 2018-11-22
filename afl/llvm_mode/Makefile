@@ -87,13 +87,10 @@ $(OUTDIR)/afl-llvm-pass.so: afl-llvm-pass.so.cc | test_deps
 $(OUTDIR)/afl-llvm-rt.o: afl-llvm-rt.o.c | test_deps
 	$(CC) $(CFLAGS) -fPIC -c $< -o $@
 
-$(OUTDIR)/afl-llvm-rt-32.o: afl-llvm-rt.o.c | test_deps
-	@printf "[*] Building 32-bit variant of the runtime (-m32)... "
-	@$(CC) $(CFLAGS) -m32 -fPIC -c $< -o $@ 2>/dev/null; if [ "$$?" = "0" ]; then echo "success!"; else echo "failed (that's fine)"; fi
-
-$(OUTDIR)/afl-llvm-rt-64.o: afl-llvm-rt.o.c | test_deps
-	@printf "[*] Building 64-bit variant of the runtime (-m64)... "
-	@$(CC) $(CFLAGS) -m64 -fPIC -c $< -o $@ 2>/dev/null; if [ "$$?" = "0" ]; then echo "success!"; else echo "failed (that's fine)"; fi
+$(OUTDIR)/afl-llvm-rt-%.o: afl-llvm-rt.o.c | test_deps
+	$(eval BITS := $(basename $*))
+	@printf "[*] Building $(BITS)-bit variant of the runtime (-m32)... "
+	@$(CC) $(CFLAGS) -m$(BITS) -fPIC -c $< -o $@ 2>/dev/null; if [ "$$?" = "0" ]; then echo "success!"; else echo "failed (that's fine)"; fi
 
 test_build: $(PROGS)
 	@echo "[*] Testing the CC wrapper and instrumentation output..."
