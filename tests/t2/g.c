@@ -8,6 +8,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <time.h>
+#include <gfuzz.h>
 
 #define SEED time(0)
 
@@ -35,7 +36,7 @@ typedef struct fmtstruct {
 	chunk *chunks;
 } fmt;
 
-void writefile(fmt h) {
+__fuzz void writefile(fmt h) {
 	// we do a pass on the in-memory fmt to "serialize" to output
 	// now that's were we need to start watching out for crazy
 	// crash conditions, also, we'll need to build a format converter
@@ -58,7 +59,7 @@ void writefile(fmt h) {
 
 }
 
-int main(int argc, char **argv)
+__fuzz int main(int argc, char **argv)
 {
 	int i, cnum;
 	uint32_t rsize;
