@@ -202,12 +202,15 @@ bool AFLCoverage::runOnModule(Module &M) {
             continue;
         }
 
+        IRBuilder<> IRB(I);
         // use an id to reference the fuzzable instruction in gfz map
         ConstantInt *InstID = ConstantInt::get(Int32Ty, inst_inst);
 
-        /* load gfz map area ptr*/
-        LoadInst *MapPtr = new LoadInst(GFZMapPtr, "", I);
+        LoadInst *MapPtr = IRB.CreateLoad(GFZMapPtr);
         MapPtr->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
+        //Value *MapPtrIdx =
+        //    IRB.CreateGEP(MapPtr, dyn_cast<Value*>(&InstID));
+
 
         inst_inst++;
       }
@@ -225,8 +228,6 @@ bool AFLCoverage::runOnModule(Module &M) {
       unsigned int cur_loc = AFL_R(MAP_SIZE);
 
       ConstantInt *CurLoc = ConstantInt::get(Int32Ty, cur_loc);
-      LoadInst *MapPtr = IRB.CreateLoad();
-
 
       /* Load prev_loc */
 
