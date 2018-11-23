@@ -39,6 +39,7 @@
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/Type.h"
 
 using namespace llvm;
 
@@ -120,11 +121,30 @@ bool AFLCoverage::runOnModule(Module &M) {
 
       for (auto &I: BB) {
 
+        /* heuristics to skip functions that might crash the target
+         * too easily, will implement some better heuristics later :) */
+
         // skip over alloca
-        if (AllocaInst *Alloca = dyn_cast<AllocaInst>(&I)){
+
+        // TODO smarter heuristics, we might want to change a bunch
+        // of return values, and look at store instructions, GEP
+        // we need to handle arrays, structs, allocations...
+        if (dyn_cast<StoreInst>(&I)         ||
+            dyn_cast<CallInst>(&I)          ||
+            dyn_cast<AllocaInst>(&I)        ||
+            dyn_cast<BranchInst>(&I)        ||
+            dyn_cast<ReturnInst>(&I)        ||
+            dyn_cast<SwitchInst>(&I)        ||
+            dyn_cast<InvokeInst>(&I)        ||
+            dyn_cast<ResumeInst>(&I)        ||
+            dyn_cast<IndirectBrInst>(&I)    ||
+            dyn_cast<UnreachableInst>(&I)   ||
+            dyn_cast<GetElementPtrInst>(&I)
+            ){
           continue;
         }
 
+#ifdef SMARTMALLOCNOSKIP
         // skip over malloc
         if (CallInst *Call = dyn_cast<CallInst>(&I)) {
           if (Function *CF = Call->getCalledFunction() )
@@ -133,10 +153,26 @@ bool AFLCoverage::runOnModule(Module &M) {
               continue;
             }
         }
+#endif
+        if (dyn_cast<LoadInst>(&I)){
+            // specific case we want to change, load of integers
+            // pretty easy as long as it doesn't get to be an
+            // index used by a GEP instruction
+            // TODO: check if we can apply heuristics :)
+            Type *t = I.getType();
+            if (t->isIntegerTy())
+                inst_inst++;
+            // once we find a target, let's get an ID (inst_inst?)
+            // and create a small function to instrument and add
+            // some value depending on RAND_POOL and GFZ_MAP
+            // GFZ_MAP will tell if mutation is active (set by fuzzer)
+        }
 
-        inst_inst++;
       }
 
+      inst_blocks++;
+
+#ifdef NEVERDEF
       BasicBlock::iterator IP = BB.getFirstInsertionPt();
       IRBuilder<> IRB(&(*IP));
 
@@ -176,6 +212,8 @@ bool AFLCoverage::runOnModule(Module &M) {
       Store->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
 
       inst_blocks++;
+
+#endif
 
     }
 
