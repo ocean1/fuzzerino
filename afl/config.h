@@ -316,6 +316,10 @@
 #define MAP_SIZE_POW2       16
 #define MAP_SIZE            (1 << MAP_SIZE_POW2)
 
+/* size for pool containing values to be used in mutations, 4KB seems good */
+#define RAND_POOL_SIZE_POW  12
+#define RAND_POOL_SIZE      (1 << RAND_POOL_SIZE_POW)
+
 /* Maximum allocator request size (keep well under INT_MAX): */
 
 #define MAX_ALLOC           0x40000000
@@ -346,5 +350,7 @@
    measuring coverage that could be attained by a "dumb" fuzzing algorithm: */
 
 // #define IGNORE_FINDS
+
+#define IDTMPFILE "/dev/shm/gfzidfile"
 
 #endif /* ! _HAVE_CONFIG_H */

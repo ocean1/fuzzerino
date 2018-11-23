@@ -21,8 +21,8 @@
    in ../afl-as.h.
 
  */
-
 #define AFL_LLVM_PASS
+#define MESSAGES_TO_STDOUT
 
 #include "../config.h"
 #include "../debug.h"
@@ -30,6 +30,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/IRBuilder.h"
@@ -83,6 +84,13 @@ bool AFLCoverage::runOnModule(Module &M) {
 
   } else be_quiet = 1;
 
+  /* get temporary file to keep ID of fuzzed register to be used as gfz_map idx */
+  struct flock lock;
+  int idfd;
+
+  idfd = open(IDTMPFILE, O_CREAT | O_RDWR | O_NOATIME, S_IRUSR | S_IWUSR | S_IRGRP );
+  memset (&lock, 0, sizeof(lock));
+
   /* Decide instrumentation ratio */
 
   char* inst_ratio_str = getenv("AFL_INST_RATIO");
@@ -107,17 +115,37 @@ bool AFLCoverage::runOnModule(Module &M) {
       M, Int32Ty, false, GlobalValue::ExternalLinkage, 0, "__afl_prev_loc",
       0, GlobalVariable::GeneralDynamicTLSModel, 0, false);
 
+  /* global variables for GFZ */
+  GlobalVariable *GFZMapPtr =
+      new GlobalVariable(M, PointerType::get(Int8Ty, 0), false,
+                         GlobalValue::ExternalLinkage, 0, "__gfz_map_area");
+
+  GlobalVariable *GFZRandPtr =
+      new GlobalVariable(M, PointerType::get(Int8Ty, 0), false,
+                         GlobalValue::ExternalLinkage, 0, "__gfz_rand_area");
+
   /* Instrument all the things! */
 
-  int inst_blocks = 0, inst_inst = 0;
+  int inst_blocks = 0, inst_inst = 0, inst_func = 0;
+
+  // TODO: implement skipping of functions and modules by implementing
+  // a #pragma nofuzz and __attribute(nofuzz)
+
+  // ugly hack, don't want to implement an LTO pass, keep track of current ID in a locked file
+  lock.l_type = F_WRLCK;
+  fcntl(idfd, F_SETLKW, &lock);
+  lseek(idfd, 0, SEEK_SET);
+  if (read(idfd, &inst_inst, sizeof(inst_inst)) != sizeof(inst_inst))
+    inst_inst = 0;
 
   for (auto &F : M) {
-    if (F.getSection() != ".fuzzables"){
+    if (F.getName().startswith("llvm.")){
       continue;
     }
-    OKF("Instrumenting %s", F.getName().str().c_str());
+    //OKF("Instrumenting %s", F.getName().str().c_str());
 
     for (auto &BB : F) {
+        inst_func++;
 
       for (auto &I: BB) {
 
@@ -144,16 +172,15 @@ bool AFLCoverage::runOnModule(Module &M) {
           continue;
         }
 
-#ifdef SMARTMALLOCNOSKIP
-        // skip over malloc
-        if (CallInst *Call = dyn_cast<CallInst>(&I)) {
-          if (Function *CF = Call->getCalledFunction() )
-            // TODO maybe will explode with null ptr, check returned Name
-            if (CF->getName() == "malloc"){
-              continue;
-            }
-        }
-#endif
+        /*
+        * if (CallInst *Call = dyn_cast<CallInst>(&I)) {
+        *  if (Function *CF = Call->getCalledFunction() )
+        *    // TODO maybe will explode with null ptr, check returned Name
+        *    if (CF->getName() == "malloc"){
+        *      continue;
+        *    }
+        *}
+        */
         //if (dyn_cast<LoadInst>(&I)){
         /* TODO: let's just look at Type maybe, if integer instrument,
          * then we'll figure out for pointers or usage as GEP
@@ -161,9 +188,6 @@ bool AFLCoverage::runOnModule(Module &M) {
             // specific case we want to change, load of integers
             // pretty easy as long as it doesn't get to be an
             // index used by a GEP instruction
-            Type *t = I.getType();
-            if (t->isIntegerTy())
-                inst_inst++;
             // once we find a target, let's get an ID (inst_inst?)
             // and create a small function to instrument and add
             // some value depending on RAND_POOL and GFZ_MAP
@@ -171,6 +195,21 @@ bool AFLCoverage::runOnModule(Module &M) {
             // TODO: what about pointers? how should we handle them?:)
         //}
 
+        //TODO: add intra-function data-flow analysis only instrument "leaf-nodes"
+        //or nodes that end up in a store or as a return value :D
+        Type *t = I.getType();
+        if (!(t->isIntegerTy() || t->isFloatingPointTy())) {
+            continue;
+        }
+
+        // use an id to reference the fuzzable instruction in gfz map
+        ConstantInt *InstID = ConstantInt::get(Int32Ty, inst_inst);
+
+        /* load gfz map area ptr*/
+        LoadInst *MapPtr = new LoadInst(GFZMapPtr, "", I);
+        MapPtr->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
+
+        inst_inst++;
       }
 
       inst_blocks++;
@@ -186,6 +225,8 @@ bool AFLCoverage::runOnModule(Module &M) {
       unsigned int cur_loc = AFL_R(MAP_SIZE);
 
       ConstantInt *CurLoc = ConstantInt::get(Int32Ty, cur_loc);
+      LoadInst *MapPtr = IRB.CreateLoad();
+
 
       /* Load prev_loc */
 
@@ -222,13 +263,19 @@ bool AFLCoverage::runOnModule(Module &M) {
 
   }
 
+  lseek(idfd, 0, SEEK_SET);
+  if( write(idfd, &inst_inst, sizeof(inst_inst)) != sizeof(inst_inst)){
+    FATAL("uh oh got a problem while writing current instruction id on %s", IDTMPFILE);
+  }
+  lock.l_type = F_UNLCK;
+  fcntl (idfd, F_SETLKW, &lock);
   /* Say something nice. */
 
   if (!be_quiet) {
 
     if (!inst_blocks) WARNF("No instrumentation targets found.");
-    else OKF("Instrumented %u BB, %u I (%s mode, ratio %u%%).",
-             inst_blocks, inst_inst, getenv("AFL_HARDEN") ? "hardened" :
+    else OKF("Instrumented %u BB, %u I, %u F (%s mode, ratio %u%%).",
+             inst_blocks, inst_inst, inst_func, getenv("AFL_HARDEN") ? "hardened" :
              ((getenv("AFL_USE_ASAN") || getenv("AFL_USE_MSAN")) ?
               "ASAN/MSAN" : "non-hardened"), inst_ratio);
 

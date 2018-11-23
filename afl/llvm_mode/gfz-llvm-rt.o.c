@@ -21,6 +21,7 @@
 
 #include "../config.h"
 #include "../types.h"
+#include "../debug.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -54,6 +55,16 @@ u8* __afl_area_ptr = __afl_area_initial;
 
 __thread u32 __afl_prev_loc;
 
+/* "Rand" area gets filled by the thread itself every time we change fuzz strategy
+ * or when all values have been used, for example filled with low/high values,
+ * or random values */
+u8* __gfz_map_area = NULL;
+u8  __gfz_rand_area[RAND_POOL_SIZE];
+
+/* keep 4MB of map, it's quite a lot of space, and our test targets
+   will happily work with this, we can later optimize by storing inst_inst
+   and merging global vars in a LTO pass (or brutally patched with lief) */
+const ssize_t __gfz_map_size = 4*1024*1024;
 
 /* Running in persistent mode? */
 
@@ -136,7 +147,7 @@ static void __afl_start_forkserver(void) {
         close(FORKSRV_FD);
         close(FORKSRV_FD + 1);
         return;
-  
+
       }
 
     } else {
@@ -226,6 +237,17 @@ int __afl_persistent_loop(unsigned int max_cnt) {
 }
 
 
+void fill_rand_area(void){
+  FILE* rfd;
+
+  rfd = fopen("/dev/urandom", "r");
+  ssize_t rb;
+  if (fread(__gfz_rand_area, RAND_POOL_SIZE, 1, rfd) != 1){
+    FATAL("Unable to get enough rand bytes");
+  }
+  fclose(rfd);
+}
+
 /* This one can be called from user code when deferred forkserver mode
     is enabled. */
 
@@ -235,8 +257,11 @@ void __afl_manual_init(void) {
 
   if (!init_done) {
 
-    __afl_map_shm();
-    __afl_start_forkserver();
+    __gfz_map_area = calloc(__gfz_map_size, 1);
+    fill_rand_area();
+
+    //__afl_map_shm();
+    //__afl_start_forkserver();
     init_done = 1;
 
   }
