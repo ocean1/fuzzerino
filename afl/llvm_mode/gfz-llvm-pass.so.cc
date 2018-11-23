@@ -154,11 +154,13 @@ bool AFLCoverage::runOnModule(Module &M) {
             }
         }
 #endif
-        if (dyn_cast<LoadInst>(&I)){
+        //if (dyn_cast<LoadInst>(&I)){
+        /* TODO: let's just look at Type maybe, if integer instrument,
+         * then we'll figure out for pointers or usage as GEP
+         * index later */
             // specific case we want to change, load of integers
             // pretty easy as long as it doesn't get to be an
             // index used by a GEP instruction
-            // TODO: check if we can apply heuristics :)
             Type *t = I.getType();
             if (t->isIntegerTy())
                 inst_inst++;
@@ -166,7 +168,8 @@ bool AFLCoverage::runOnModule(Module &M) {
             // and create a small function to instrument and add
             // some value depending on RAND_POOL and GFZ_MAP
             // GFZ_MAP will tell if mutation is active (set by fuzzer)
-        }
+            // TODO: what about pointers? how should we handle them?:)
+        //}
 
       }
 
