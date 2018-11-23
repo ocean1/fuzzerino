@@ -97,7 +97,7 @@ $(OUTDIR)/afl-llvm-rt-%.o: afl-llvm-rt.o.c | test_deps
 
 $(OUTDIR)/gfz-clang-fast: gfz-clang-fast.c | test_deps
 	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS)
-	ln -sf afl-clang-fast $(OUTDIR)/afl-clang-fast++
+	ln -sf gfz-clang-fast $(OUTDIR)/gfz-clang-fast++
 
 $(OUTDIR)/gfz-llvm-pass.so: gfz-llvm-pass.so.cc | test_deps
 	$(CXX) $(CLANG_CFL) -shared $< -o $@ $(CLANG_LFL)
@@ -127,4 +127,4 @@ all_done: test_build
 
 clean:
 	rm -f *.o *.so *~ a.out core core.[1-9][0-9]* test-instr .test-instr0 .test-instr1 
-	rm -f $(PROGS) $(OUTDIR)/afl-clang-fast++
+	rm -f $(PROGS) $(OUTDIR)/afl-clang-fast++ $(OUTDIR)/gfz-clang-fast++
