@@ -128,7 +128,7 @@ bool AFLCoverage::runOnModule(Module &M) {
     inst_inst = 0;
 
   for (auto &F : M) {
-    if (F.getName().startswith("llvm.")){
+    if (F.getName().startswith("llvm.") || F.getSection() != ".fuzzables"){
       continue;
     }
     //OKF("Instrumenting %s", F.getName().str().c_str());
@@ -147,6 +147,7 @@ bool AFLCoverage::runOnModule(Module &M) {
         // of return values, and look at store instructions, GEP
         // we need to handle arrays, structs, allocations...
         if (dyn_cast<StoreInst>(&I)         ||
+            dyn_cast<CmpInst>(&I)           ||
             dyn_cast<CallInst>(&I)          ||
             dyn_cast<AllocaInst>(&I)        ||
             dyn_cast<BranchInst>(&I)        ||
@@ -156,10 +157,12 @@ bool AFLCoverage::runOnModule(Module &M) {
             dyn_cast<ResumeInst>(&I)        ||
             dyn_cast<IndirectBrInst>(&I)    ||
             dyn_cast<UnreachableInst>(&I)   ||
-            dyn_cast<GetElementPtrInst>(&I)
+            dyn_cast<GetElementPtrInst>(&I) ||
+            isa<PHINode>(&I)
             ){
           continue;
         }
+        // TODO: how should we handle Phi instructions? :|
 
         /*
         * if (CallInst *Call = dyn_cast<CallInst>(&I)) {
@@ -199,7 +202,12 @@ bool AFLCoverage::runOnModule(Module &M) {
         MapPtr->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
         Value *MapPtrIdx =
             IRB.CreateGEP(MapPtr, InstID);
+        /* InstStatus is the status of the instruction, tells us if it
+         * should be mutated or not */
+        LoadInst *InstStatus = IRB.CreateLoad(MapPtrIdx);
 
+
+        /* now that we have load the instruction */
 
         inst_inst++;
       }
