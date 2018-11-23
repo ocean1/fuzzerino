@@ -104,17 +104,6 @@ bool AFLCoverage::runOnModule(Module &M) {
 
   }
 
-  /* Get globals for the SHM region and the previous location. Note that
-     __afl_prev_loc is thread-local. */
-
-  GlobalVariable *AFLMapPtr =
-      new GlobalVariable(M, PointerType::get(Int8Ty, 0), false,
-                         GlobalValue::ExternalLinkage, 0, "__afl_area_ptr");
-
-  GlobalVariable *AFLPrevLoc = new GlobalVariable(
-      M, Int32Ty, false, GlobalValue::ExternalLinkage, 0, "__afl_prev_loc",
-      0, GlobalVariable::GeneralDynamicTLSModel, 0, false);
-
   /* global variables for GFZ */
   GlobalVariable *GFZMapPtr =
       new GlobalVariable(M, PointerType::get(Int8Ty, 0), false,
@@ -202,14 +191,14 @@ bool AFLCoverage::runOnModule(Module &M) {
             continue;
         }
 
-        IRBuilder<> IRB(I);
+        IRBuilder<> IRB(&I);
         // use an id to reference the fuzzable instruction in gfz map
         ConstantInt *InstID = ConstantInt::get(Int32Ty, inst_inst);
 
         LoadInst *MapPtr = IRB.CreateLoad(GFZMapPtr);
         MapPtr->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
-        //Value *MapPtrIdx =
-        //    IRB.CreateGEP(MapPtr, dyn_cast<Value*>(&InstID));
+        Value *MapPtrIdx =
+            IRB.CreateGEP(MapPtr, InstID);
 
 
         inst_inst++;
