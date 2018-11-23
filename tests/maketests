@@ -1,7 +1,7 @@
 # Makefile
 .PHONY: FORCE all clean emitllvm
 
-DEBUG ?= 1
+DEBUG ?= 0
 EMIT_LLVM ?= 0
 
 CC ?= gfz-clang-fast
@@ -16,7 +16,7 @@ ifeq ($(DEBUG), 1)
 endif
 
 
-all: cleanids gtest ptest
+all: gtest ptest
 
 cleanids:
 	rm -f /dev/shm/gfzidfile
@@ -24,19 +24,14 @@ cleanids:
 emitllvm: g.ll p.ll
 
 %.ll:
-	$(CC) $(CFLAGS) $(LLVMFLAGS) g.c -o $@
+	rm -f /dev/shm/gfzidfile
+	$(CC) $(CFLAGS) $(LLVMFLAGS) $*.c -o $@
 
-gtest:
+gtest: cleanids
 	$(CC) $(CFLAGS) $(LDFLAGS) g.c -o $@
 
-ptest:
+ptest: cleanids
 	gcc $(CFLAGS) $(LDFLAGS) p.c -o $@
-#g.o: g.c
-#p.o: p.c
-
-%.c:
-	$(CC) $(CFLAGS) $@
-
 
 clean:
 	rm -f gtest ptest
