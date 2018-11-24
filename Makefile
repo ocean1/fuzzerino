@@ -1,4 +1,4 @@
-.PHONY: FORCE all clean
+.PHONY: FORCE all clean tests
 
 all: afl gfz dotests
 
@@ -10,6 +10,9 @@ gfz: afl
 
 dotests:
 	cd tests && ./dotests.sh
+
+tests:
+	cd tests && ./compileall.sh
 
 emit:
 	cd tests && ./emitall.sh

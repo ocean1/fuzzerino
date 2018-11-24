@@ -150,10 +150,8 @@ bool AFLCoverage::runOnModule(Module &M) {
 
         if (dyn_cast<StoreInst>(&I)         ||
             dyn_cast<CmpInst>(&I)           ||
-            dyn_cast<CallInst>(&I)          ||
             dyn_cast<AllocaInst>(&I)        ||
             dyn_cast<BranchInst>(&I)        ||
-            dyn_cast<ReturnInst>(&I)        ||
             dyn_cast<SwitchInst>(&I)        ||
             dyn_cast<InvokeInst>(&I)        ||
             dyn_cast<ResumeInst>(&I)        ||

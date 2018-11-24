@@ -109,27 +109,34 @@ static void __afl_start_forkserver(void) {
   static u8 tmp[4];
   s32 child_pid;
 
+  char *cmdfmt = "mv -f /dev/shm/fuzztest ./outputs/fuzztest_%lu";
+  char cmd[500];
   u8  child_stopped = 0;
 
   /* Phone home and tell the parent that we're OK. If parent isn't there,
      assume we're not running in forkserver mode and just execute program. */
 
-  if (write(FORKSRV_FD + 1, tmp, 4) != 4) return;
+  //if (write(FORKSRV_FD + 1, tmp, 4) != 4) return;
+  int i;
+  for (i=0; i < 50; i++) {
 
-  while (1) {
-
-    u32 was_killed;
+    //u32 was_killed;
     int status;
 
     /* Wait for parent by reading from the pipe. Abort if read fails. */
 
-    if (read(FORKSRV_FD, &was_killed, 4) != 4) _exit(1);
+    //if (read(FORKSRV_FD, &was_killed, 4) != 4) _exit(1);
+
+    // maybe we can have a socat listening and redirect there a specific
+    // FD for input/output of the fuzzer and you can attach with a term
+    // can this be done without breaking term? like redirect immediately
+    // stdio, but using a select on it to wait for input? (asynchronous)
 
     /* If we stopped the child in persistent mode, but there was a race
        condition and afl-fuzz already issued SIGKILL, write off the old
        process. */
 
-    if (child_stopped && was_killed) {
+    if (child_stopped) { // && was_killed) {
       child_stopped = 0;
       if (waitpid(child_pid, &status, 0) < 0) _exit(1);
     }
@@ -138,6 +145,11 @@ static void __afl_start_forkserver(void) {
 
       /* Once woken up, create a clone of our process. */
 
+      __gfz_map_area[i] = 1;
+
+
+      sprintf(cmd, cmdfmt, (unsigned long)time(NULL));
+
       child_pid = fork();
       if (child_pid < 0) _exit(1);
 
@@ -145,11 +157,13 @@ static void __afl_start_forkserver(void) {
 
       if (!child_pid) {
 
-        close(FORKSRV_FD);
-        close(FORKSRV_FD + 1);
+        //close(FORKSRV_FD);
+        //close(FORKSRV_FD + 1);
         return;
 
       }
+
+      __gfz_map_area[i] = 0;
 
     } else {
 
@@ -163,7 +177,7 @@ static void __afl_start_forkserver(void) {
 
     /* In parent process: write PID to pipe, then wait for child. */
 
-    if (write(FORKSRV_FD + 1, &child_pid, 4) != 4) _exit(1);
+    //if (write(FORKSRV_FD + 1, &child_pid, 4) != 4) _exit(1);
 
     if (waitpid(child_pid, &status, is_persistent ? WUNTRACED : 0) < 0)
       _exit(1);
@@ -176,8 +190,9 @@ static void __afl_start_forkserver(void) {
 
     /* Relay wait status to pipe, then loop back. */
 
-    if (write(FORKSRV_FD + 1, &status, 4) != 4) _exit(1);
+    //if (write(FORKSRV_FD + 1, &status, 4) != 4) _exit(1);
 
+    system(cmd);
   }
 
 }
@@ -263,7 +278,7 @@ void __afl_manual_init(void) {
     fill_rand_area();
 
     //__afl_map_shm();
-    //__afl_start_forkserver();
+    __afl_start_forkserver();
     init_done = 1;
 
   }
