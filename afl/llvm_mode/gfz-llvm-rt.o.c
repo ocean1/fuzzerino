@@ -59,7 +59,7 @@ __thread u32 __afl_prev_loc;
  * or when all values have been used, for example filled with low/high values,
  * or random values */
 u8* __gfz_map_area = NULL;
-u8  __gfz_rand_area[RAND_POOL_SIZE];
+u8* __gfz_rand_area = NULL;
 u32 __gfz_rand_idx;
 
 /* keep 4MB of map, it's quite a lot of space, and our test targets
@@ -259,6 +259,7 @@ void __afl_manual_init(void) {
   if (!init_done) {
 
     __gfz_map_area = calloc(__gfz_map_size, 1);
+    __gfz_rand_area = malloc(RAND_POOL_SIZE);
     fill_rand_area();
 
     //__afl_map_shm();

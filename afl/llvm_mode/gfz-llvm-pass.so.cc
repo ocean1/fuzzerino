@@ -160,8 +160,7 @@ bool AFLCoverage::runOnModule(Module &M) {
             dyn_cast<IndirectBrInst>(&I)    ||
             dyn_cast<UnreachableInst>(&I)   ||
             dyn_cast<GetElementPtrInst>(&I) ||
-            isa<PHINode>(&I)                ||
-            !dyn_cast<LoadInst>(&I)
+            isa<PHINode>(&I)
             ){
           continue;
         }
@@ -183,7 +182,6 @@ bool AFLCoverage::runOnModule(Module &M) {
 
         /* InstStatus is the status of the instruction, tells us if it
          * should be mutated or not */
-        LoadInst *InstStatus = IRB.CreateLoad(MapPtrIdx);
 
         LoadInst *RandIdx = IRB.CreateLoad(GFZRandIdx);
         LoadInst *RandPtr = IRB.CreateLoad(GFZRandPtr);
@@ -192,7 +190,6 @@ bool AFLCoverage::runOnModule(Module &M) {
             IRB.CreateGEP(RandPtr, RandIdx);
 
         /* access random pool */
-        //LoadInst *RandVal = IRB.CreateLoad(RandPtrIdx);
 
         /* inc idx to access rand pool */
         Value *Incr = IRB.CreateAdd(RandIdx, ConstantInt::get(Int32Ty, 1));
@@ -203,8 +200,10 @@ bool AFLCoverage::runOnModule(Module &M) {
 
         IRB.Insert(NI);
 
+        LoadInst *InstStatus = IRB.CreateLoad(MapPtrIdx);
+        LoadInst *RandVal = IRB.CreateLoad(RandPtrIdx);
         Value *FuzzVal = IRB.CreateZExt(
-                IRB.CreateAnd(RandPtrIdx, InstStatus),
+                IRB.CreateAnd(InstStatus, RandVal),
                 I.getType());
 
         Value *FuzzedVal = IRB.CreateXor(FuzzVal, NI);

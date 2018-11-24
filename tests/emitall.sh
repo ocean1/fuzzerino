@@ -10,3 +10,7 @@ done
 
 # non-instrumented
 CC=clang-6.0 make emit_all
+
+for f in `find ./ -iname *.ll`; do
+    opt-6.0 -verify $f
+done
