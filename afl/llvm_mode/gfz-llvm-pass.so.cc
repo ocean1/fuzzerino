@@ -189,7 +189,7 @@ bool AFLCoverage::runOnModule(Module &M) {
             IRB.CreateGEP(RandPtr, RandIdx);
 
         /* access random pool */
-        LoadInst *RandVal = IRB.CreateLoad(RandPtrIdx);
+        //LoadInst *RandVal = IRB.CreateLoad(RandPtrIdx);
 
         /* inc idx to access rand pool */
         Value *Incr = IRB.CreateAdd(RandIdx, ConstantInt::get(Int8Ty, 1));
@@ -201,12 +201,13 @@ bool AFLCoverage::runOnModule(Module &M) {
         IRB.Insert(NI);
 
         Value *FuzzVal = IRB.CreateZExt(
-                IRB.CreateAnd(RandVal, InstStatus),
+                IRB.CreateAnd(RandPtrIdx, InstStatus),
                 I.getType());
 
         Value *FuzzedVal = IRB.CreateXor(FuzzVal, NI);
 
         I.replaceAllUsesWith(FuzzedVal);
+        //I.eraseFromParent();
 
         inst_inst++;
       }

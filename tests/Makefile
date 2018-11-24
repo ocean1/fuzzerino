@@ -14,6 +14,11 @@ clean%: t%
 
 clean: clean1 clean2
 
+cleanll%: t%
+	make -C $< cleanll
+
+cleanll: cleanll1 cleanll2
+
 extest%: t% FORCE
 	@echo "testing t$*"
 	@$</gtest

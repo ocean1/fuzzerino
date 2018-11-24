@@ -35,7 +35,9 @@ ptest:
 	rm -f /dev/shm/gfzidfile
 	gcc $(CFLAGS) $(LDFLAGS) p.c -o $@
 
+cleanll:
+	rm -f *.ll
+
 clean:
 	rm -f gtest ptest
 	rm -f *.o
-	rm -f *.ll
