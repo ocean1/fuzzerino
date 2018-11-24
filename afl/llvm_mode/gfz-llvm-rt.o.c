@@ -60,6 +60,7 @@ __thread u32 __afl_prev_loc;
  * or random values */
 u8* __gfz_map_area = NULL;
 u8  __gfz_rand_area[RAND_POOL_SIZE];
+u32 __gfz_rand_idx;
 
 /* keep 4MB of map, it's quite a lot of space, and our test targets
    will happily work with this, we can later optimize by storing inst_inst

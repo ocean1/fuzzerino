@@ -27,10 +27,12 @@ emitllvm: g.ll p.ll
 	rm -f /dev/shm/gfzidfile
 	$(CC) $(CFLAGS) $(LLVMFLAGS) $*.c -o $@
 
-gtest: cleanids
+gtest:
+	rm -f /dev/shm/gfzidfile
 	$(CC) $(CFLAGS) $(LDFLAGS) g.c -o $@
 
-ptest: cleanids
+ptest:
+	rm -f /dev/shm/gfzidfile
 	gcc $(CFLAGS) $(LDFLAGS) p.c -o $@
 
 clean:

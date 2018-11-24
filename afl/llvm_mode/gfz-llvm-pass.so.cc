@@ -113,6 +113,10 @@ bool AFLCoverage::runOnModule(Module &M) {
       new GlobalVariable(M, PointerType::get(Int8Ty, 0), false,
                          GlobalValue::ExternalLinkage, 0, "__gfz_rand_area");
 
+  GlobalVariable *GFZRandIdx = new GlobalVariable(
+      M, Int32Ty, false, GlobalValue::ExternalLinkage, 0, "__gfz_rand_idx");
+      //0, GlobalVariable::GeneralDynamicTLSModel, 0, false);
+
   /* Instrument all the things! */
 
   int inst_blocks = 0, inst_inst = 0, inst_func = 0;
@@ -128,7 +132,8 @@ bool AFLCoverage::runOnModule(Module &M) {
     inst_inst = 0;
 
   for (auto &F : M) {
-    if (F.getName().startswith("llvm.") || F.getSection() != ".fuzzables"){
+    if (F.getName().startswith("llvm.")) {
+    //  || F.getSection() != ".fuzzables") {
       continue;
     }
     //OKF("Instrumenting %s", F.getName().str().c_str());
@@ -206,8 +211,27 @@ bool AFLCoverage::runOnModule(Module &M) {
          * should be mutated or not */
         LoadInst *InstStatus = IRB.CreateLoad(MapPtrIdx);
 
+        LoadInst *RandIdx = IRB.CreateLoad(GFZRandIdx);
+        LoadInst *RandPtr = IRB.CreateLoad(GFZRandPtr);
+        RandPtr->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
+        Value *RandPtrIdx =
+            IRB.CreateGEP(RandPtr, RandIdx);
+        /* InstStatus is the status of the instruction, tells us if it
+         * should be mutated or not */
 
-        /* now that we have load the instruction */
+        /* access random pool */
+        LoadInst *RandVal = IRB.CreateLoad(RandPtrIdx);
+
+        /* inc idx to access rand pool */
+        // TODO: we can also align the pool, then
+        // increment the ptr and have it % RAND_POOL_SIZE
+
+        Value *Incr = IRB.CreateAdd(RandIdx, ConstantInt::get(Int8Ty, 1));
+        IRB.CreateStore(Incr, GFZRandIdx)
+            ->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
+        // TODO: try making increment of randidx atomic, or keep it per thread \o/
+
+        /* */
 
         inst_inst++;
       }
