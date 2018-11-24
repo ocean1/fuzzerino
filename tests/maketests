@@ -19,20 +19,20 @@ endif
 all: gtest ptest
 
 cleanids:
-	rm -f /dev/shm/gfzidfile
+	@rm -f /dev/shm/gfzidfile
 
-emitllvm: g.ll p.ll
+emitllvm: g.ll
 
 %.ll:
-	rm -f /dev/shm/gfzidfile
+	@rm -f /dev/shm/gfzidfile
 	$(CC) $(CFLAGS) $(LLVMFLAGS) $*.c -o $@
 
 gtest:
-	rm -f /dev/shm/gfzidfile
+	@rm -f /dev/shm/gfzidfile
 	$(CC) $(CFLAGS) $(LDFLAGS) g.c -o $@
 
 ptest:
-	rm -f /dev/shm/gfzidfile
+	@rm -f /dev/shm/gfzidfile
 	gcc $(CFLAGS) $(LDFLAGS) p.c -o $@
 
 cleanll:

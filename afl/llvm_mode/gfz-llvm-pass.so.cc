@@ -160,7 +160,8 @@ bool AFLCoverage::runOnModule(Module &M) {
             dyn_cast<IndirectBrInst>(&I)    ||
             dyn_cast<UnreachableInst>(&I)   ||
             dyn_cast<GetElementPtrInst>(&I) ||
-            isa<PHINode>(&I)
+            isa<PHINode>(&I)                ||
+            !dyn_cast<LoadInst>(&I)
             ){
           continue;
         }
@@ -194,7 +195,7 @@ bool AFLCoverage::runOnModule(Module &M) {
         //LoadInst *RandVal = IRB.CreateLoad(RandPtrIdx);
 
         /* inc idx to access rand pool */
-        Value *Incr = IRB.CreateAdd(RandIdx, ConstantInt::get(Int8Ty, 1));
+        Value *Incr = IRB.CreateAdd(RandIdx, ConstantInt::get(Int32Ty, 1));
         IRB.CreateStore(Incr, GFZRandIdx)
             ->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
 
@@ -218,13 +219,13 @@ bool AFLCoverage::runOnModule(Module &M) {
       inst_blocks++;
     }
 
+
   }
 
-    while (RemoveInst.empty()) {
+      while (RemoveInst.empty()) {
         Instruction *RI = RemoveInst.pop_back_val();
         RI->removeFromParent();
-    }
-
+      }
   lseek(idfd, 0, SEEK_SET);
   if( write(idfd, &inst_inst, sizeof(inst_inst)) != sizeof(inst_inst)){
     FATAL("uh oh got a problem while writing current instruction id on %s", IDTMPFILE);

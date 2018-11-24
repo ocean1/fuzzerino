@@ -242,7 +242,7 @@ void fill_rand_area(void){
   FILE* rfd;
 
   rfd = fopen("/dev/urandom", "r");
-  ssize_t rb;
+
   if (fread(__gfz_rand_area, RAND_POOL_SIZE, 1, rfd) != 1){
     FATAL("Unable to get enough rand bytes");
   }
