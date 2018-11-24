@@ -146,11 +146,6 @@ bool AFLCoverage::runOnModule(Module &M) {
         /* heuristics to skip functions that might crash the target
          * too easily, will implement some better heuristics later :) */
 
-        // skip over alloca
-
-        // TODO smarter heuristics, we might want to change a bunch
-        // of return values, and look at store instructions, GEP
-        // we need to handle arrays, structs, allocations...
         if (dyn_cast<StoreInst>(&I)         ||
             dyn_cast<CmpInst>(&I)           ||
             dyn_cast<CallInst>(&I)          ||
@@ -167,33 +162,8 @@ bool AFLCoverage::runOnModule(Module &M) {
             ){
           continue;
         }
-        // TODO: how should we handle Phi instructions? :|
 
-        /*
-        * if (CallInst *Call = dyn_cast<CallInst>(&I)) {
-        *  if (Function *CF = Call->getCalledFunction() )
-        *    // TODO maybe will explode with null ptr, check returned Name
-        *    if (CF->getName() == "malloc"){
-        *      continue;
-        *    }
-        *}
-        */
-        //if (dyn_cast<LoadInst>(&I)){
-        /* TODO: let's just look at Type maybe, if integer instrument,
-         * then we'll figure out for pointers or usage as GEP
-         * index later */
-            // specific case we want to change, load of integers
-            // pretty easy as long as it doesn't get to be an
-            // index used by a GEP instruction
-            // once we find a target, let's get an ID (inst_inst?)
-            // and create a small function to instrument and add
-            // some value depending on RAND_POOL and GFZ_MAP
-            // GFZ_MAP will tell if mutation is active (set by fuzzer)
-            // TODO: what about pointers? how should we handle them?:)
-        //}
 
-        //TODO: add intra-function data-flow analysis only instrument "leaf-nodes"
-        //or nodes that end up in a store or as a return value :D
         Type *t = I.getType();
         if (!(t->isIntegerTy() || t->isFloatingPointTy())) {
             continue;
@@ -207,6 +177,7 @@ bool AFLCoverage::runOnModule(Module &M) {
         MapPtr->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
         Value *MapPtrIdx =
             IRB.CreateGEP(MapPtr, InstID);
+
         /* InstStatus is the status of the instruction, tells us if it
          * should be mutated or not */
         LoadInst *InstStatus = IRB.CreateLoad(MapPtrIdx);
@@ -216,71 +187,31 @@ bool AFLCoverage::runOnModule(Module &M) {
         RandPtr->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
         Value *RandPtrIdx =
             IRB.CreateGEP(RandPtr, RandIdx);
-        /* InstStatus is the status of the instruction, tells us if it
-         * should be mutated or not */
 
         /* access random pool */
         LoadInst *RandVal = IRB.CreateLoad(RandPtrIdx);
 
         /* inc idx to access rand pool */
-        // TODO: we can also align the pool, then
-        // increment the ptr and have it % RAND_POOL_SIZE
-
         Value *Incr = IRB.CreateAdd(RandIdx, ConstantInt::get(Int8Ty, 1));
         IRB.CreateStore(Incr, GFZRandIdx)
             ->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
-        // TODO: try making increment of randidx atomic, or keep it per thread \o/
 
-        /* */
+        auto *NI = (&I)->clone();
+
+        IRB.Insert(NI);
+
+        Value *FuzzVal = IRB.CreateZExt(
+                IRB.CreateAnd(RandVal, InstStatus),
+                I.getType());
+
+        Value *FuzzedVal = IRB.CreateXor(FuzzVal, NI);
+
+        I.replaceAllUsesWith(FuzzedVal);
 
         inst_inst++;
       }
 
       inst_blocks++;
-
-#ifdef NEVERDEF
-      BasicBlock::iterator IP = BB.getFirstInsertionPt();
-      IRBuilder<> IRB(&(*IP));
-
-      if (AFL_R(100) >= inst_ratio) continue;
-
-      /* Make up cur_loc */
-
-      unsigned int cur_loc = AFL_R(MAP_SIZE);
-
-      ConstantInt *CurLoc = ConstantInt::get(Int32Ty, cur_loc);
-
-      /* Load prev_loc */
-
-      LoadInst *PrevLoc = IRB.CreateLoad(AFLPrevLoc);
-      PrevLoc->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
-      Value *PrevLocCasted = IRB.CreateZExt(PrevLoc, IRB.getInt32Ty());
-
-      /* Load SHM pointer */
-
-      LoadInst *MapPtr = IRB.CreateLoad(AFLMapPtr);
-      MapPtr->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
-      Value *MapPtrIdx =
-          IRB.CreateGEP(MapPtr, IRB.CreateXor(PrevLocCasted, CurLoc));
-
-      /* Update bitmap */
-
-      LoadInst *Counter = IRB.CreateLoad(MapPtrIdx);
-      Counter->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
-      Value *Incr = IRB.CreateAdd(Counter, ConstantInt::get(Int8Ty, 1));
-      IRB.CreateStore(Incr, MapPtrIdx)
-          ->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
-
-      /* Set prev_loc to cur_loc >> 1 */
-
-      StoreInst *Store =
-          IRB.CreateStore(ConstantInt::get(Int32Ty, cur_loc >> 1), AFLPrevLoc);
-      Store->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
-
-      inst_blocks++;
-
-#endif
-
     }
 
   }
