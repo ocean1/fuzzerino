@@ -41,6 +41,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Type.h"
+#include "llvm/ADT/SmallVector.h"
 
 using namespace llvm;
 
@@ -131,6 +132,7 @@ bool AFLCoverage::runOnModule(Module &M) {
   if (read(idfd, &inst_inst, sizeof(inst_inst)) != sizeof(inst_inst))
     inst_inst = 0;
 
+  SmallVector<Instruction*, 1000> RemoveInst;
   for (auto &F : M) {
     if (F.getName().startswith("llvm.")) {
     //  || F.getSection() != ".fuzzables") {
@@ -196,7 +198,7 @@ bool AFLCoverage::runOnModule(Module &M) {
         IRB.CreateStore(Incr, GFZRandIdx)
             ->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
 
-        auto *NI = (&I)->clone();
+        auto NI = (&I)->clone();
 
         IRB.Insert(NI);
 
@@ -207,7 +209,8 @@ bool AFLCoverage::runOnModule(Module &M) {
         Value *FuzzedVal = IRB.CreateXor(FuzzVal, NI);
 
         I.replaceAllUsesWith(FuzzedVal);
-        //I.eraseFromParent();
+
+        RemoveInst.push_back(&I);
 
         inst_inst++;
       }
@@ -216,6 +219,11 @@ bool AFLCoverage::runOnModule(Module &M) {
     }
 
   }
+
+    while (RemoveInst.empty()) {
+        Instruction *RI = RemoveInst.pop_back_val();
+        RI->removeFromParent();
+    }
 
   lseek(idfd, 0, SEEK_SET);
   if( write(idfd, &inst_inst, sizeof(inst_inst)) != sizeof(inst_inst)){
