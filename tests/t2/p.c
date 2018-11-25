@@ -40,11 +40,15 @@ int main(int argc, char **argv)
 	uint32_t len;
 	uint8_t test = 0;
 
-	if (argc > 1) {
-		test = (uint8_t)atoi(argv[1]);
+	if (argc > 2) {
+		test = (uint8_t)atoi(argv[2]);
 	}
 
-	fin = fopen("/dev/shm/fuzztest", "r"); // output file
+	if (argc > 1) {
+		fin = fopen(argv[1], "r"); // output file
+	} else {
+		fin = fopen("/dev/shm/fuzztest", "r");
+	}
 	
 	switch (test) {
 		case 0:

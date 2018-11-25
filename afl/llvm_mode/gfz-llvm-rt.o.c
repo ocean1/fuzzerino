@@ -118,7 +118,7 @@ static void __afl_start_forkserver(void) {
 
   //if (write(FORKSRV_FD + 1, tmp, 4) != 4) return;
   int i;
-  for (i=0; i < 50; i++) {
+  for (i=0; i < 4380; i++) {
 
     //u32 was_killed;
     int status;
@@ -148,7 +148,7 @@ static void __afl_start_forkserver(void) {
       __gfz_map_area[i] = 1;
 
 
-      sprintf(cmd, cmdfmt, (unsigned long)time(NULL));
+      sprintf(cmd, cmdfmt, i);
 
       child_pid = fork();
       if (child_pid < 0) _exit(1);

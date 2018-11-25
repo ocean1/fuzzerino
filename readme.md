@@ -35,6 +35,7 @@ libpng  [14549 39535 14549]
 + rand pool must be per thread (meh... not much of it used), or need atomic instructions to update
 + add floats to tests
 + fix rand value, is just 8 bits, instead read a I.getType by casting
++ keep track of coverage in one file per each module under analysis (no locks needed :)) then in makefile just update the last part (or in clang overlay, if linking --can be understood? then we collect the info for each module, and patch the output file with lief or equivalent -- or close to a signature/in a known string/signature -- not a big overhead, should happen only once when executing the father process )
 
         /*
         * if (CallInst *Call = dyn_cast<CallInst>(&I)) {

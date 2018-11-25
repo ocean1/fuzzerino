@@ -154,7 +154,6 @@ bool AFLCoverage::runOnModule(Module &M) {
             dyn_cast<BranchInst>(&I)        ||
             dyn_cast<SwitchInst>(&I)        ||
             dyn_cast<InvokeInst>(&I)        ||
-            dyn_cast<ResumeInst>(&I)        ||
             dyn_cast<IndirectBrInst>(&I)    ||
             dyn_cast<UnreachableInst>(&I)   ||
             dyn_cast<GetElementPtrInst>(&I) ||
