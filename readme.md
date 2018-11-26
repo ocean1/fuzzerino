@@ -36,6 +36,9 @@ libpng  [14549 39535 14549]
 + add floats to tests
 + fix rand value, is just 8 bits, instead read a I.getType by casting
 + keep track of coverage in one file per each module under analysis (no locks needed :)) then in makefile just update the last part (or in clang overlay, if linking --can be understood? then we collect the info for each module, and patch the output file with lief or equivalent -- or close to a signature/in a known string/signature -- not a big overhead, should happen only once when executing the father process )
++ integrate with afl fuzz
++ add called functions to function set and store in xray yaml (if they were not found at runtime)
++ self-disable of status bit? (can I reenable it always?) -- need to add another "field" which is the "probability" changing it? from very low to very high (can we avoid using mul/div/rem is compiler smart to do it for us?)
 
         /*
         * if (CallInst *Call = dyn_cast<CallInst>(&I)) {

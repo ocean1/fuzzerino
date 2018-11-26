@@ -42,6 +42,15 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Type.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/XRay/YAMLXRayRecord.h"
+#include "llvm/ADT/SmallSet.h"
+#include "llvm/ADT/StringSet.h"
+#include <string>
+#include <fstream>
+#include <streambuf>
+
+using llvm::yaml::Input;
+using llvm::xray::YAMLXRayTrace;
 
 using namespace llvm;
 
@@ -75,6 +84,7 @@ bool AFLCoverage::runOnModule(Module &M) {
   IntegerType *Int8Ty  = IntegerType::getInt8Ty(C);
   IntegerType *Int32Ty = IntegerType::getInt32Ty(C);
 
+  StringSet<> WhitelistSet;
   /* Show a banner */
 
   char be_quiet = 0;
@@ -105,6 +115,25 @@ bool AFLCoverage::runOnModule(Module &M) {
 
   }
 
+  /* white list functions */
+  char* whitelist = getenv("GFZ_WHITE_LIST");
+
+  if (whitelist) {
+    std::ifstream t(whitelist);
+    std::string str((std::istreambuf_iterator<char>(t)),
+                 std::istreambuf_iterator<char>());
+    Input y(str);
+    YAMLXRayTrace Wlt;
+
+    y >> Wlt;
+
+    for(auto const& rec: Wlt.Records) {
+        WhitelistSet.insert(rec.Function);
+    }
+
+  }
+
+
   /* global variables for GFZ */
   GlobalVariable *GFZMapPtr =
       new GlobalVariable(M, PointerType::get(Int8Ty, 0), false,
@@ -121,6 +150,7 @@ bool AFLCoverage::runOnModule(Module &M) {
   /* Instrument all the things! */
 
   int inst_blocks = 0, inst_inst = 0, inst_func = 0;
+  unsigned int nope = 0;
 
   // TODO: implement skipping of functions and modules by implementing
   // a #pragma nofuzz and __attribute(nofuzz)
@@ -134,11 +164,13 @@ bool AFLCoverage::runOnModule(Module &M) {
 
   SmallVector<Instruction*, 1000> RemoveInst;
   for (auto &F : M) {
-    if (F.getName().startswith("llvm.")) {
+    if (F.getName().startswith("llvm.") ||
+        (whitelist && (WhitelistSet.find(F.getName()) == WhitelistSet.end()))
+        ) {
     //  || F.getSection() != ".fuzzables") {
       continue;
     }
-    //OKF("Instrumenting %s", F.getName().str().c_str());
+    OKF("Instrumenting %s", F.getName().str().c_str());
 
     for (auto &BB : F) {
         inst_func++;
@@ -216,19 +248,25 @@ bool AFLCoverage::runOnModule(Module &M) {
       inst_blocks++;
     }
 
-
+  while (RemoveInst.empty()) {
+    Instruction *RI = RemoveInst.pop_back_val();
+    RI->removeFromParent();
+    nope = 1;
+  }
   }
 
-      while (RemoveInst.empty()) {
-        Instruction *RI = RemoveInst.pop_back_val();
-        RI->removeFromParent();
-      }
+
+  
+    OKF("Removing stuff %u", nope);
+
   lseek(idfd, 0, SEEK_SET);
   if( write(idfd, &inst_inst, sizeof(inst_inst)) != sizeof(inst_inst)){
     FATAL("uh oh got a problem while writing current instruction id on %s", IDTMPFILE);
   }
   lock.l_type = F_UNLCK;
   fcntl (idfd, F_SETLKW, &lock);
+
+
   /* Say something nice. */
 
   if (!be_quiet) {
