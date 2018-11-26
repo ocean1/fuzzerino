@@ -248,13 +248,17 @@ bool AFLCoverage::runOnModule(Module &M) {
       inst_blocks++;
     }
 
-  while (RemoveInst.empty()) {
-    Instruction *RI = RemoveInst.pop_back_val();
-    RI->removeFromParent();
-    nope = 1;
-  }
+
   }
 
+  while (!RemoveInst.empty()) {
+    Instruction *RI = RemoveInst.pop_back_val();
+    // TODO: find how to remove these... keeps on popping at random...
+    if(!RI) {
+        RI->removeFromParent();
+    }
+    nope = 1;
+  }
 
   
     OKF("Removing stuff %u", nope);

@@ -56,11 +56,11 @@ int main(int argc, char *argv[])
   (void)argc, (void)argv;
 
   // Image resolution
-  const int iXmax = 4096;
-  const int iYmax = 4096;
+  const int iXmax = 1280;
+  const int iYmax = 1280;
 
   // Output filename
-  static const char *pFilename = "mandelbrot.png";
+  static const char *pFilename = "/dev/shm/fuzztest";
 
   int iX, iY;
   const double CxMin = -2.5;

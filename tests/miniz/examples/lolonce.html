@@ -1,0 +1,35 @@
+<html>
+    <head>
+    <script language="javascript">
+
+function getSearchParameters() {
+      var prmstr = window.location.search.substr(1);
+      return prmstr != null && prmstr != "" ? transformToAssocArray(prmstr) : {};
+}
+
+function transformToAssocArray( prmstr ) {
+    var params = {};
+    var prmarr = prmstr.split("&");
+    for ( var i = 0; i < prmarr.length; i++) {
+        var tmparr = prmarr[i].split("=");
+        params[tmparr[0]] = tmparr[1];
+    }
+    return params;
+}
+
+var myidx=1;
+
+    function upF(){
+var interv = setInterval(function() {
+        var payload = document.getElementById('payload');
+        payload.src=("/home/ocean/projects/gfuzz/g/tests/miniz/examples/outputs/fuzztest_"+myidx.toString());
+        myidx += 1;
+    if (myidx > 2000) { clearInterval(interv); }
+}, 15);
+    }
+    </script>
+    </head>
+<body>
+    <img onload="upF();" id="payload" src="/home/ocean/projects/gfuzz/g/tests/miniz/examples/outputs/fuzztest_1"></img>
+</body>
+</html>

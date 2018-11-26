@@ -41,7 +41,8 @@ typedef struct mz_dummy_time_t_tag
 #define MZ_TIME_T time_t
 #endif
 
-#define MZ_ASSERT(x) assert(x)
+//#define MZ_ASSERT(x) assert(x)
+#define MZ_ASSERT(x) {};
 
 #ifdef MINIZ_NO_MALLOC
 #define MZ_MALLOC(x) NULL
