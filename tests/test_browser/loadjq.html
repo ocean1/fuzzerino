@@ -1,5 +1,6 @@
 <html>
     <head>
+    <script src="jquery-3.3.1.min.js"></script>
     <script language="javascript">
 
 function getSearchParameters() {
@@ -21,8 +22,11 @@ var myidx=1;
 
     function upF(){
 var interv = setInterval(function() {
-        var payload = document.getElementById('payload');
-        payload.src=("/home/ocean/projects/gfuzz/g/tests/miniz/examples/outputs/fuzztest_"+myidx.toString());
+    var payloads = $('#payloads');
+    if ((myidx % 200) == 0) {
+        payloads.empty();
+    }
+    payloads.append("<img src=\"/home/ocean/projects/gfuzz/g/tests/miniz/examples/outputs/fuzztest_" + myidx.toString() + "\"></img>");
         myidx += 1;
     if (myidx > 2000) { clearInterval(interv); }
 }, 15);
@@ -30,6 +34,8 @@ var interv = setInterval(function() {
     </script>
     </head>
 <body>
-    <img onload="upF();" id="payload" src="/home/ocean/projects/gfuzz/g/tests/miniz/examples/outputs/fuzztest_1"></img>
+    <div id="payloads">
+    </div>
+    <script>upF();</script>
 </body>
 </html>
