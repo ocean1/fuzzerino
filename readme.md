@@ -39,6 +39,8 @@ libpng  [14549 39535 14549]
 + integrate with afl fuzz
 + add called functions to function set and store in xray yaml (if they were not found at runtime)
 + self-disable of status bit? (can I reenable it always?) -- need to add another "field" which is the "probability" changing it? from very low to very high (can we avoid using mul/div/rem is compiler smart to do it for us?)
++ implement branching setup of instructions, should get a small hit considering that most times branch predictor should say nay (maybe we can even hint it?)
++ https://pdfs.semanticscholar.org/bfca/81c7fbc6b2c32430dc756b936a6b0c2d0585.pdf use tyche-i to generate pseudorand numbers :D
 
         /*
         * if (CallInst *Call = dyn_cast<CallInst>(&I)) {
