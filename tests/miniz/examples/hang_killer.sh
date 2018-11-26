@@ -9,7 +9,10 @@ do
 
     sleep 5
     LPID=`pstree -s -p | grep $EXN | cut -d'(' -f 4 | cut -d')' -f1`
-    if [ "$PID" == "$LPID" ]; then
+
+    if [ -z "$LPID" ]; then
+        echo "meh";
+    elif [ "$PID" == "$LPID" ]; then
         echo "killing $PID";
         kill $PID;
     fi
