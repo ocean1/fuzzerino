@@ -116,16 +116,16 @@ static void __afl_start_forkserver(void) {
   /* Phone home and tell the parent that we're OK. If parent isn't there,
      assume we're not running in forkserver mode and just execute program. */
 
-  //if (write(FORKSRV_FD + 1, tmp, 4) != 4) return;
+  if (write(FORKSRV_FD + 1, tmp, 4) != 4) return;
   int i;
-  for (i=0; i < 4380; i++) {
+  for (i=0; i < 100; i++) {
 
-    //u32 was_killed;
+    u32 was_killed;
     int status;
 
     /* Wait for parent by reading from the pipe. Abort if read fails. */
 
-    //if (read(FORKSRV_FD, &was_killed, 4) != 4) _exit(1);
+    if (read(FORKSRV_FD, &was_killed, 4) != 4) _exit(1);
 
     // maybe we can have a socat listening and redirect there a specific
     // FD for input/output of the fuzzer and you can attach with a term
@@ -136,7 +136,7 @@ static void __afl_start_forkserver(void) {
        condition and afl-fuzz already issued SIGKILL, write off the old
        process. */
 
-    if (child_stopped) { // && was_killed) {
+    if ((child_stopped) && was_killed) {
       child_stopped = 0;
       if (waitpid(child_pid, &status, 0) < 0) _exit(1);
     }
@@ -157,8 +157,8 @@ static void __afl_start_forkserver(void) {
 
       if (!child_pid) {
 
-        //close(FORKSRV_FD);
-        //close(FORKSRV_FD + 1);
+        close(FORKSRV_FD);
+        close(FORKSRV_FD + 1);
         return;
 
       }
@@ -177,7 +177,7 @@ static void __afl_start_forkserver(void) {
 
     /* In parent process: write PID to pipe, then wait for child. */
 
-    //if (write(FORKSRV_FD + 1, &child_pid, 4) != 4) _exit(1);
+    if (write(FORKSRV_FD + 1, &child_pid, 4) != 4) _exit(1);
 
     if (waitpid(child_pid, &status, is_persistent ? WUNTRACED : 0) < 0)
       _exit(1);
@@ -190,7 +190,7 @@ static void __afl_start_forkserver(void) {
 
     /* Relay wait status to pipe, then loop back. */
 
-    //if (write(FORKSRV_FD + 1, &status, 4) != 4) _exit(1);
+    if (write(FORKSRV_FD + 1, &status, 4) != 4) _exit(1);
 
     system(cmd);
   }
@@ -275,6 +275,7 @@ void __afl_manual_init(void) {
 
     __gfz_map_area = calloc(__gfz_map_size, 1);
     __gfz_rand_area = malloc(RAND_POOL_SIZE);
+    __gfz_rand_idx = 0;
     fill_rand_area();
 
     //__afl_map_shm();

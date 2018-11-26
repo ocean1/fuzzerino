@@ -190,6 +190,7 @@ bool AFLCoverage::runOnModule(Module &M) {
 
         /* inc idx to access rand pool */
         Value *Incr = IRB.CreateAdd(RandIdx, ConstantInt::get(Int32Ty, 1));
+        Incr = IRB.CreateURem(Incr, ConstantInt::get(Int32Ty, 4096));
         IRB.CreateStore(Incr, GFZRandIdx)
             ->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
 
