@@ -70,3 +70,5 @@ ptest
 *.bc
 
 scratch
+
+xray-log.*

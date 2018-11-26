@@ -56,8 +56,8 @@ int main(int argc, char *argv[])
   (void)argc, (void)argv;
 
   // Image resolution
-  const int iXmax = 1280;
-  const int iYmax = 1280;
+  const int iXmax = 512;
+  const int iYmax = 512;
 
   // Output filename
   static const char *pFilename = "/dev/shm/fuzztest";
