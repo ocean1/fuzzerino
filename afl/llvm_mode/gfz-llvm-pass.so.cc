@@ -50,6 +50,7 @@
 #include <fstream>
 #include <streambuf>
 
+
 using llvm::yaml::Input;
 using llvm::xray::YAMLXRayTrace;
 
@@ -76,6 +77,35 @@ namespace {
 
 
 char AFLCoverage::ID = 0;
+
+/// shamelessly stolen from lib/Transforms/Scalar/ConstantHoisting.cpp
+/// \brief Updates the operand at Idx in instruction Inst with the result of
+///        instruction Mat. If the instruction is a PHI node then special
+///        handling for duplicate values form the same incoming basic block is
+///        required.
+/// \return The update will always succeed, but the return value indicated if
+///         Mat was used for the update or not.
+static bool updateOperand(Instruction *Inst, unsigned Idx, Instruction *Mat) {
+  if (auto PHI = dyn_cast<PHINode>(Inst)) {
+    // Check if any previous operand of the PHI node has the same incoming basic
+    // block. This is a very odd case that happens when the incoming basic block
+    // has a switch statement. In this case use the same value as the previous
+    // operand(s), otherwise we will fail verification due to different values.
+    // The values are actually the same, but the variable names are different
+    // and the verifier doesn't like that.
+    BasicBlock *IncomingBB = PHI->getIncomingBlock(Idx);
+    for (unsigned i = 0; i < Idx; ++i) {
+      if (PHI->getIncomingBlock(i) == IncomingBB) {
+        Value *IncomingVal = PHI->getIncomingValue(i);
+        Inst->setOperand(Idx, IncomingVal);
+        return false;
+      }
+    }
+  }
+
+  Inst->setOperand(Idx, Mat);
+  return true;
+}
 
 
 bool AFLCoverage::runOnModule(Module &M) {
@@ -181,7 +211,13 @@ bool AFLCoverage::runOnModule(Module &M) {
     for (auto &BB : F) {
         inst_func++;
 
+      Instruction *NI = NULL;
+
       for (auto &I: BB) {
+
+        // skip over inserted instructions
+        if (NI != NULL && &I != NI)
+            continue;
 
         /* heuristics to skip functions that might crash the target
          * too easily, will implement some better heuristics later :) */
@@ -194,17 +230,22 @@ bool AFLCoverage::runOnModule(Module &M) {
             dyn_cast<InvokeInst>(&I)        ||
             dyn_cast<IndirectBrInst>(&I)    ||
             dyn_cast<UnreachableInst>(&I)   ||
+            dyn_cast<GetElementPtrInst>(&I) ||
+            dyn_cast<ReturnInst>(&I)        ||
             isa<PHINode>(&I)
             ){
           continue;
         }
 
+
+        I.setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
         Type *IT = I.getType();
-        if (!(IT->isIntegerTy() || IT->isFloatingPointTy())) {
+        if (!(IT->isIntegerTy() ) || IT->isPointerTy() ) { //|| IT->isFloatingPointTy())) {
             continue;
         }
 
-        IRBuilder<> IRB(&I);
+        NI = (&I)->getNextNode();
+        IRBuilder<> IRB(NI);
         // use an id to reference the fuzzable instruction in gfz map
         ConstantInt *InstID = ConstantInt::get(Int32Ty, inst_inst);
 
@@ -234,21 +275,30 @@ bool AFLCoverage::runOnModule(Module &M) {
         IRB.CreateStore(Incr, GFZRandIdx)
             ->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
 
-        auto NI = (&I)->clone();
+        //auto NI = (&I)->clone();
 
-        IRB.Insert(NI);
+        //IRB.Insert(NI);
 
         LoadInst *InstStatus = IRB.CreateLoad(MapPtrIdx);
         LoadInst *RandVal = IRB.CreateLoad(RandPtrIdx);
-        Value *FuzzVal = IRB.CreateZExt(
-                IRB.CreateAnd(IRB.CreateSExt(InstStatus, IT), RandVal),
-                IT);
+        Value *FuzzVal;
 
-        Value *FuzzedVal = IRB.CreateXor(FuzzVal, NI);
+        if ( IT->getPrimitiveSizeInBits() < InstStatus->getType()->getPrimitiveSizeInBits() ){
+            FuzzVal = IRB.CreateAnd(IRB.CreateTrunc(InstStatus, IT), RandVal);
+        } else {
+            FuzzVal = IRB.CreateAnd(IRB.CreateSExt(InstStatus, IT), RandVal);
+        }
+
+        Value *FuzzedVal = IRB.CreateAdd(FuzzVal, &I);
+
+        dyn_cast<Instruction>(FuzzedVal)->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
 
         I.replaceAllUsesWith(FuzzedVal);
 
-        RemoveInst.push_back(&I);
+        updateOperand(dyn_cast<Instruction>(FuzzedVal), 1, &I);
+
+        //RemoveInst.push_back(&I);
+        nope++;
 
         inst_inst++;
       }
@@ -259,16 +309,15 @@ bool AFLCoverage::runOnModule(Module &M) {
 
   }
 
+ciccio:
   while (!RemoveInst.empty()) {
     Instruction *RI = RemoveInst.pop_back_val();
     // TODO: find how to remove these... keeps on popping at random...
-    if(!RI) {
-        RI->removeFromParent();
-    }
-    nope = 1;
+    RI->removeFromParent();
+    if (nope == 0)
+        nope = 50;
   }
 
-  
     OKF("Removing stuff %u", nope);
 
   lseek(idfd, 0, SEEK_SET);
@@ -302,7 +351,6 @@ static void registerAFLPass(const PassManagerBuilder &,
   PM.add(new AFLCoverage());
 
 }
-
 
 static RegisterStandardPasses RegisterAFLPass(
     PassManagerBuilder::EP_OptimizerLast, registerAFLPass);

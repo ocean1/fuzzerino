@@ -118,7 +118,7 @@ static void __afl_start_forkserver(void) {
 
   //if (write(FORKSRV_FD + 1, tmp, 4) != 4) return;
   int i;
-  for (i=0; i < 2100; i++) {
+  for (i=0; i < 420; i++) {
 
     // u32 was_killed;
     int status;
@@ -145,7 +145,7 @@ static void __afl_start_forkserver(void) {
 
       /* Once woken up, create a clone of our process. */
 
-      __gfz_map_area[i] = 1;
+      __gfz_map_area[i] = 0x01;
 
 
       sprintf(cmd, cmdfmt, i);
@@ -193,9 +193,6 @@ static void __afl_start_forkserver(void) {
     //if (write(FORKSRV_FD + 1, &status, 4) != 4) _exit(1);
 
     system(cmd);
-    if ( !(i % 100) ) {
-      printf("+");
-    }
   }
 
 }
