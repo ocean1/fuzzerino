@@ -45,6 +45,7 @@
 #include "llvm/XRay/YAMLXRayRecord.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/IR/DerivedTypes.h"
 #include <string>
 #include <fstream>
 #include <streambuf>
@@ -118,6 +119,13 @@ bool AFLCoverage::runOnModule(Module &M) {
   /* white list functions */
   char* whitelist = getenv("GFZ_WHITE_LIST");
 
+  /* scan for functions explicitly marked as fuzzable */
+  for (auto &F : M) {
+    if( F.getSection() == ".fuzzables") {
+        WhitelistSet.insert(F.getName());
+    }
+  }
+
   if (whitelist) {
     std::ifstream t(whitelist);
     std::string str((std::istreambuf_iterator<char>(t)),
@@ -164,12 +172,10 @@ bool AFLCoverage::runOnModule(Module &M) {
 
   SmallVector<Instruction*, 1000> RemoveInst;
   for (auto &F : M) {
-    if (F.getName().startswith("llvm.") ||
-        (whitelist && (WhitelistSet.find(F.getName()) == WhitelistSet.end()))
-        ) {
-    //  || F.getSection() != ".fuzzables") {
+    if (whitelist && (WhitelistSet.find(F.getName()) == WhitelistSet.end())) {
       continue;
     }
+
     OKF("Instrumenting %s", F.getName().str().c_str());
 
     for (auto &BB : F) {
@@ -188,15 +194,13 @@ bool AFLCoverage::runOnModule(Module &M) {
             dyn_cast<InvokeInst>(&I)        ||
             dyn_cast<IndirectBrInst>(&I)    ||
             dyn_cast<UnreachableInst>(&I)   ||
-            dyn_cast<GetElementPtrInst>(&I) ||
             isa<PHINode>(&I)
             ){
           continue;
         }
 
-
-        Type *t = I.getType();
-        if (!(t->isIntegerTy() || t->isFloatingPointTy())) {
+        Type *IT = I.getType();
+        if (!(IT->isIntegerTy() || IT->isFloatingPointTy())) {
             continue;
         }
 
@@ -212,11 +216,15 @@ bool AFLCoverage::runOnModule(Module &M) {
         /* InstStatus is the status of the instruction, tells us if it
          * should be mutated or not */
 
+        PointerType *IPT = PointerType::getUnqual(I.getType());
+
         LoadInst *RandIdx = IRB.CreateLoad(GFZRandIdx);
         LoadInst *RandPtr = IRB.CreateLoad(GFZRandPtr);
         RandPtr->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
-        Value *RandPtrIdx =
-            IRB.CreateGEP(RandPtr, RandIdx);
+
+        Value *RandPtrCast = IRB.CreateZExtOrBitCast(RandPtr, IPT);
+
+        Value *RandPtrIdx = IRB.CreateGEP(RandPtrCast, RandIdx);
 
         /* access random pool */
 
@@ -233,8 +241,8 @@ bool AFLCoverage::runOnModule(Module &M) {
         LoadInst *InstStatus = IRB.CreateLoad(MapPtrIdx);
         LoadInst *RandVal = IRB.CreateLoad(RandPtrIdx);
         Value *FuzzVal = IRB.CreateZExt(
-                IRB.CreateAnd(InstStatus, RandVal),
-                I.getType());
+                IRB.CreateAnd(IRB.CreateSExt(InstStatus, IT), RandVal),
+                IT);
 
         Value *FuzzedVal = IRB.CreateXor(FuzzVal, NI);
 
