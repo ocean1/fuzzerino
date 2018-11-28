@@ -117,8 +117,15 @@ static void __afl_start_forkserver(void) {
      assume we're not running in forkserver mode and just execute program. */
 
   //if (write(FORKSRV_FD + 1, tmp, 4) != 4) return;
+
+  u8 *numiter = getenv("GFZ_NUM_ITER");
+  int maxi = (numiter == NULL) ? 500 : atoi(numiter);
   int i;
-  for (i=0; i < 420; i++) {
+  u8 *inststat = getenv("GFZ_STAT_VAL");
+  u8 insval = (inststat == NULL) ? 1 : atoi(inststat);
+
+  OKF("%s %u %s %u", numiter, maxi, inststat, insval);
+  for (i=0; i < maxi; i++) {
 
     // u32 was_killed;
     int status;
@@ -145,7 +152,7 @@ static void __afl_start_forkserver(void) {
 
       /* Once woken up, create a clone of our process. */
 
-      __gfz_map_area[i] = 0x01;
+      __gfz_map_area[i] = insval;
 
 
       sprintf(cmd, cmdfmt, i);
