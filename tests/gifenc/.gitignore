@@ -2,6 +2,7 @@ outputs/*
 *_trace.yaml
 *_gfz
 *_xray
+*.o
 
 # Created by https://www.gitignore.io/api/c
 # Edit at https://www.gitignore.io/?templates=c

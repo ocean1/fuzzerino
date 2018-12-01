@@ -15,7 +15,7 @@
 /* helper to write a little-endian 16-bit number portably */
 #define write_num(fd, n) write((fd), (uint8_t []) {(n) & 0xFF, (n) >> 8}, 2)
 
-uint8_t vga[0x30] = {
+static uint8_t vga[0x30] = {
     0x00, 0x00, 0x00,
     0xAA, 0x00, 0x00,
     0x00, 0xAA, 0x00,
@@ -40,7 +40,7 @@ struct Node {
 };
 typedef struct Node Node;
 
-Node *
+static Node *
 new_node(uint16_t key, int degree)
 {
     Node *node = calloc(1, sizeof(*node) + degree * sizeof(Node *));
@@ -49,7 +49,7 @@ new_node(uint16_t key, int degree)
     return node;
 }
 
-Node *
+static Node *
 new_trie(int degree, int *nkeys)
 {
     Node *root = new_node(0, degree);
@@ -60,7 +60,7 @@ new_trie(int degree, int *nkeys)
     return root;
 }
 
-void
+static void
 del_trie(Node *root, int degree)
 {
     if (!root)
@@ -70,7 +70,7 @@ del_trie(Node *root, int degree)
     free(root);
 }
 
-void put_loop(ge_GIF *gif, uint16_t loop);
+static void put_loop(ge_GIF *gif, uint16_t loop);
 
 ge_GIF *
 ge_new_gif(
@@ -127,7 +127,7 @@ no_gif:
     return NULL;
 }
 
-void
+static void
 put_loop(ge_GIF *gif, uint16_t loop)
 {
     write(gif->fd, (uint8_t []) {'!', 0xFF, 0x0B}, 3);
@@ -140,7 +140,7 @@ put_loop(ge_GIF *gif, uint16_t loop)
 /* Add packed key to buffer, updating offset and partial.
  *   gif->offset holds position to put next *bit*
  *   gif->partial holds bits to include in next byte */
-void
+static void
 put_key(ge_GIF *gif, uint16_t key, int key_size)
 {
     int byte_offset, bit_offset, bits_to_write;
@@ -161,7 +161,7 @@ put_key(ge_GIF *gif, uint16_t key, int key_size)
     gif->offset = (gif->offset + key_size) % (0xFF * 8);
 }
 
-void
+static void
 end_key(ge_GIF *gif)
 {
     int byte_offset;
@@ -174,7 +174,7 @@ end_key(ge_GIF *gif)
     gif->offset = gif->partial = 0;
 }
 
-void
+static void
 put_image(ge_GIF *gif, uint16_t w, uint16_t h, uint16_t x, uint16_t y)
 {
     int nkeys, key_size, i, j;
@@ -218,7 +218,7 @@ put_image(ge_GIF *gif, uint16_t w, uint16_t h, uint16_t x, uint16_t y)
     del_trie(root, degree);
 }
 
-int
+static int
 get_bbox(ge_GIF *gif, uint16_t *w, uint16_t *h, uint16_t *x, uint16_t *y)
 {
     int i, j, k;
@@ -246,7 +246,7 @@ get_bbox(ge_GIF *gif, uint16_t *w, uint16_t *h, uint16_t *x, uint16_t *y)
     }
 }
 
-void
+static void
 set_delay(ge_GIF *gif, uint16_t d)
 {
     write(gif->fd, (uint8_t []) {'!', 0xF9, 0x04, 0x04}, 4);

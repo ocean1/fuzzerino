@@ -4301,7 +4301,7 @@ mz_bool mz_zip_add_mem_to_archive_file_in_place(const char *pZip_filename, const
 
 mz_bool mz_zip_add_mem_to_archive_file_in_place_v2(const char *pZip_filename, const char *pArchive_name, const void *pBuf, size_t buf_size, const void *pComment, mz_uint16 comment_size, mz_uint level_and_flags, mz_zip_error *pErr)
 {
-    mz_bool status, created_new_archive = MZ_FALSE;
+    mz_bool status = MZ_TRUE, created_new_archive = MZ_FALSE;
     mz_zip_archive zip_archive;
     struct MZ_FILE_STAT_STRUCT file_stat;
     mz_zip_error actual_err = MZ_ZIP_NO_ERROR;
@@ -4309,20 +4309,6 @@ mz_bool mz_zip_add_mem_to_archive_file_in_place_v2(const char *pZip_filename, co
     mz_zip_zero_struct(&zip_archive);
     if ((int)level_and_flags < 0)
         level_and_flags = MZ_DEFAULT_LEVEL;
-
-    if ((!pZip_filename) || (!pArchive_name) || ((buf_size) && (!pBuf)) || ((comment_size) && (!pComment)) || ((level_and_flags & 0xF) > MZ_UBER_COMPRESSION))
-    {
-        if (pErr)
-            *pErr = MZ_ZIP_INVALID_PARAMETER;
-        return MZ_FALSE;
-    }
-
-    if (!mz_zip_writer_validate_archive_name(pArchive_name))
-    {
-        if (pErr)
-            *pErr = MZ_ZIP_INVALID_FILENAME;
-        return MZ_FALSE;
-    }
 
     /* Important: The regular non-64 bit version of stat() can fail here if the file is very large, which could cause the archive to be overwritten. */
     /* So be sure to compile with _LARGEFILE64_SOURCE 1 */
@@ -4333,7 +4319,6 @@ mz_bool mz_zip_add_mem_to_archive_file_in_place_v2(const char *pZip_filename, co
         {
             if (pErr)
                 *pErr = zip_archive.m_last_error;
-            return MZ_FALSE;
         }
 
         created_new_archive = MZ_TRUE;
@@ -4345,7 +4330,6 @@ mz_bool mz_zip_add_mem_to_archive_file_in_place_v2(const char *pZip_filename, co
         {
             if (pErr)
                 *pErr = zip_archive.m_last_error;
-            return MZ_FALSE;
         }
 
         if (!mz_zip_writer_init_from_reader_v2(&zip_archive, pZip_filename, level_and_flags))
@@ -4353,9 +4337,6 @@ mz_bool mz_zip_add_mem_to_archive_file_in_place_v2(const char *pZip_filename, co
             if (pErr)
                 *pErr = zip_archive.m_last_error;
 
-            mz_zip_reader_end_internal(&zip_archive, MZ_FALSE);
-
-            return MZ_FALSE;
         }
     }
 
@@ -4368,7 +4349,6 @@ mz_bool mz_zip_add_mem_to_archive_file_in_place_v2(const char *pZip_filename, co
         if (!actual_err)
             actual_err = zip_archive.m_last_error;
 
-        status = MZ_FALSE;
     }
 
     if (!mz_zip_writer_end_internal(&zip_archive, status))
@@ -4376,7 +4356,6 @@ mz_bool mz_zip_add_mem_to_archive_file_in_place_v2(const char *pZip_filename, co
         if (!actual_err)
             actual_err = zip_archive.m_last_error;
 
-        status = MZ_FALSE;
     }
 
     if ((!status) && (created_new_archive))

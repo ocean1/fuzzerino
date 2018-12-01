@@ -41,7 +41,7 @@ int main(int argc, char *argv[])
   const int N = 50;
   char data[2048];
   char archive_filename[64];
-  static const char *s_Test_archive_filename = "__mz_example2_test__.zip";
+  static const char *s_Test_archive_filename = "/dev/shm/fuzztest";
 
   assert((strlen(s_pTest_str) + 64) < sizeof(data));
 
@@ -62,21 +62,12 @@ int main(int argc, char *argv[])
     // A more robust way to add a file to an archive would be to read it into memory, perform the operation, then write a new archive out to a temp file and then delete/rename the files.
     // Or, write a new archive to disk to a temp file, then delete/rename the files. For this test this API is fine.
     status = mz_zip_add_mem_to_archive_file_in_place(s_Test_archive_filename, archive_filename, data, strlen(data) + 1, s_pComment, (uint16)strlen(s_pComment), MZ_BEST_COMPRESSION);
-    if (!status)
-    {
-      printf("mz_zip_add_mem_to_archive_file_in_place failed!\n");
-      return EXIT_FAILURE;
-    }
   }
 
   // Add a directory entry for testing
   status = mz_zip_add_mem_to_archive_file_in_place(s_Test_archive_filename, "directory/", NULL, 0, "no comment", (uint16)strlen("no comment"), MZ_BEST_COMPRESSION);
-  if (!status)
-  {
-    printf("mz_zip_add_mem_to_archive_file_in_place failed!\n");
-    return EXIT_FAILURE;
-  }
 
+#ifdef NOPE
   // Now try to open the archive.
   memset(&zip_archive, 0, sizeof(zip_archive));
 
@@ -158,7 +149,7 @@ int main(int argc, char *argv[])
     // Close the archive, freeing any resources it was using
     mz_zip_reader_end(&zip_archive);
   }
-
+#endif
   printf("Success.\n");
   return EXIT_SUCCESS;
 }
