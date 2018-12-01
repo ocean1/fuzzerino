@@ -206,10 +206,14 @@ bool AFLCoverage::runOnModule(Module &M) {
       continue;
     }
 
+    if (F.getName().startswith("llvm") || F.getName().startswith("__llvm"))
+        continue;
+
     OKF("Instrumenting %s", F.getName().str().c_str());
+    inst_func++;
 
     for (auto &BB : F) {
-        inst_func++;
+
 
       Instruction *NI = NULL;
 
@@ -219,22 +223,40 @@ bool AFLCoverage::runOnModule(Module &M) {
         if (NI != NULL && &I != NI)
             continue;
 
+        /* fuzz also all operands */
+
+        User::value_op_iterator OI, OE;
+
         /* heuristics to skip functions that might crash the target
          * too easily, will implement some better heuristics later :) */
 
-        if (dyn_cast<StoreInst>(&I)         ||
-            dyn_cast<CmpInst>(&I)           ||
+        if (
+            //dyn_cast<StoreInst>(&I)         ||
+            //dyn_cast<CmpInst>(&I)           ||
             dyn_cast<AllocaInst>(&I)        ||
             dyn_cast<BranchInst>(&I)        ||
             dyn_cast<SwitchInst>(&I)        ||
             dyn_cast<InvokeInst>(&I)        ||
             dyn_cast<IndirectBrInst>(&I)    ||
             dyn_cast<UnreachableInst>(&I)   ||
-            dyn_cast<GetElementPtrInst>(&I) ||
-            dyn_cast<ReturnInst>(&I)        ||
-            isa<PHINode>(&I)
+            //dyn_cast<GetElementPtrInst>(&I) ||
+            //dyn_cast<ReturnInst>(&I)        ||
+            isa<PHINode>(&I)  // PHY will need special handling
             ){
           continue;
+        }
+
+        for (OI = I.value_op_begin(), OE = I.value_op_end(); OI != OE; ++OI){
+            // for each op, if type is Int (will need to add also for floats, and other types....)
+            // take OI as Value, push fuzzed val, substitute it
+            //val = insertFuzzVal(I, OI);
+            //updateOp(OI, val);
+            //Value *inval = dyn_cast<Value*>(OI);
+            auto *OpI = dyn_cast<Instruction>(*OI);
+
+            if (!OpI)
+                continue;
+            OpI->getType();
         }
 
 
@@ -251,8 +273,7 @@ bool AFLCoverage::runOnModule(Module &M) {
 
         LoadInst *MapPtr = IRB.CreateLoad(GFZMapPtr);
         MapPtr->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
-        Value *MapPtrIdx =
-            IRB.CreateGEP(MapPtr, InstID);
+        Value *MapPtrIdx = IRB.CreateGEP(MapPtr, InstID);
 
         /* InstStatus is the status of the instruction, tells us if it
          * should be mutated or not */
@@ -264,7 +285,6 @@ bool AFLCoverage::runOnModule(Module &M) {
         RandPtr->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
 
         Value *RandPtrCast = IRB.CreateZExtOrBitCast(RandPtr, IPT);
-
         Value *RandPtrIdx = IRB.CreateGEP(RandPtrCast, RandIdx);
 
         /* access random pool */
@@ -275,18 +295,34 @@ bool AFLCoverage::runOnModule(Module &M) {
         IRB.CreateStore(Incr, GFZRandIdx)
             ->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
 
+        LoadInst *RandVal = IRB.CreateLoad(RandPtrIdx);
         //auto NI = (&I)->clone();
 
         //IRB.Insert(NI);
 
         LoadInst *InstStatus = IRB.CreateLoad(MapPtrIdx);
-        LoadInst *RandVal = IRB.CreateLoad(RandPtrIdx);
+        // for now we want to keep everything branchless, but I want a nice way
+        // to avoid having to branch and "disable" everytime fuzzing an inst
+        // abs(v) = (v + mask) ^ mask;
+        // it will re-enable this every 1 instruction that gets exc. for now
+        // a good enough approx...
+
+        Value *MShift = ConstantInt::get(Int32Ty, IT->getPrimitiveSizeInBits()*8-1);
+        Value *Mask = IRB.CreateLShr(InstStatus, MShift);
+        Value *SubStat = IRB.CreateAdd(InstStatus, Mask);
+        SubStat = IRB.CreateXor(InstStatus, Mask);
+
+        IRB.CreateStore(SubStat, MapPtrIdx)
+            ->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
+
         Value *FuzzVal;
 
         if ( IT->getPrimitiveSizeInBits() < InstStatus->getType()->getPrimitiveSizeInBits() ){
             FuzzVal = IRB.CreateAnd(IRB.CreateTrunc(InstStatus, IT), RandVal);
-        } else {
+        } else if ( IT->getPrimitiveSizeInBits() > InstStatus->getType()->getPrimitiveSizeInBits() ){
             FuzzVal = IRB.CreateAnd(IRB.CreateSExt(InstStatus, IT), RandVal);
+        } else {
+            FuzzVal = IRB.CreateAnd(IRB.CreateZExt(InstStatus, IT), RandVal);
         }
 
         Value *FuzzedVal = IRB.CreateAdd(FuzzVal, &I);
@@ -295,6 +331,8 @@ bool AFLCoverage::runOnModule(Module &M) {
 
         I.replaceAllUsesWith(FuzzedVal);
 
+        // replace back I as operand of fuzzedVal, got removed by
+        // replaceAllUses
         updateOperand(dyn_cast<Instruction>(FuzzedVal), 1, &I);
 
         //RemoveInst.push_back(&I);

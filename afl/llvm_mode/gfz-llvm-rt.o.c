@@ -109,7 +109,7 @@ static void __afl_start_forkserver(void) {
   static u8 tmp[4];
   s32 child_pid;
 
-  char *cmdfmt = "mv -f /dev/shm/fuzztest ./outputs/fuzztest_%lu";
+  char *cmdfmt = "mv -f /dev/shm/fuzztest ./outputs/%lu_fuzztest_%lu";
   char cmd[500];
   u8  child_stopped = 0;
 
@@ -129,6 +129,7 @@ static void __afl_start_forkserver(void) {
 
     // u32 was_killed;
     int status;
+	int a,b;
 
     /* Wait for parent by reading from the pipe. Abort if read fails. */
 
@@ -151,11 +152,14 @@ static void __afl_start_forkserver(void) {
     if (!child_stopped) {
 
       /* Once woken up, create a clone of our process. */
+      //a = (i+rand()) % maxi;
+      //b = (i+rand()) % maxi;
 
       __gfz_map_area[i] = insval;
 
+      //__gfz_map_area[a] = insval;
+      //__gfz_map_area[b] = insval;
 
-      sprintf(cmd, cmdfmt, i);
 
       child_pid = fork();
       if (child_pid < 0) _exit(1);
@@ -171,6 +175,8 @@ static void __afl_start_forkserver(void) {
       }
 
       __gfz_map_area[i] = 0;
+      //__gfz_map_area[a] = 0;
+      //__gfz_map_area[b] = 0;
 
     } else {
 
@@ -199,6 +205,7 @@ static void __afl_start_forkserver(void) {
 
     //if (write(FORKSRV_FD + 1, &status, 4) != 4) _exit(1);
 
+    sprintf(cmd, cmdfmt, (unsigned long)time(NULL), i);
     system(cmd);
   }
 
