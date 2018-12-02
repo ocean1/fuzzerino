@@ -298,6 +298,7 @@ bool AFLCoverage::runOnModule(Module &M) {
         // skip over inserted instructions
         if (NI != NULL && &I != NI)
           continue;
+        NI = NULL;
 
         /* fuzz also all operands */
 
@@ -319,7 +320,9 @@ bool AFLCoverage::runOnModule(Module &M) {
           continue;
         }
 
-        for (OI = I.value_op_begin(), OE = I.value_op_end(); OI != OE; ++OI) {
+        if( true || !(dyn_cast<LoadInst>(&I)) ){
+        int opidx;
+        for (opidx=0, OI = I.value_op_begin(), OE = I.value_op_end(); OI != OE; ++OI, ++opidx) {
           // for each op, if type is Int (will need to add also for floats, and
           // other types....) take OI as Value, push fuzzed val, substitute it
           // val = insertFuzzVal(I, OI);
@@ -330,8 +333,89 @@ bool AFLCoverage::runOnModule(Module &M) {
           if (!OpI)
             continue;
 
+          IRBuilder<> IRB(&I);
+          Type *OIT = OpI->getType();
+          Type *IT = I.getType();
+
+          if (!(OIT->isIntegerTy() /*|| OIT->isFloatingPointTy()*/) ||
+                OIT->isPointerTy()) {
+            continue;
+          }
+          // use an id to reference the fuzzable instruction in gfz map
+          ConstantInt *InstID = ConstantInt::get(Int32Ty, inst_id);
+
+          LoadInst *MapPtr = IRB.CreateLoad(GFZMapPtr);
+          MapPtr->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
+          Value *MapPtrIdx = IRB.CreateGEP(MapPtr, InstID);
+
+          /* InstStatus is the status of the instruction, tells us if it
+           * should be mutated or not */
+
+          PointerType *IPT = PointerType::getUnqual(OIT);
+
+          LoadInst *RandIdx = IRB.CreateLoad(GFZRandIdx);
+          LoadInst *RandPtr = IRB.CreateLoad(GFZRandPtr);
+          RandPtr->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
+
+          Value *RandPtrCast = IRB.CreateZExtOrBitCast(RandPtr, IPT);
+          Value *RandPtrIdx = IRB.CreateGEP(RandPtrCast, RandIdx);
+
+          /* access random pool */
+
+          /* inc idx to access rand pool */
+          Value *Incr = IRB.CreateAdd(RandIdx, ConstantInt::get(Int32Ty, 1));
+          Incr = IRB.CreateURem(Incr, ConstantInt::get(Int32Ty, 4096));
+          IRB.CreateStore(Incr, GFZRandIdx)
+              ->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
+
+          LoadInst *RandVal = IRB.CreateLoad(RandPtrIdx);
+
+          LoadInst *InstStatus = IRB.CreateLoad(MapPtrIdx);
+
+          // hopefully should be right, trick to clear negative numbers without
+          // mul once fuzzed val is off, it stays so
+          Value *SubInst =
+              IRB.CreateSub(InstStatus, ConstantInt::get(Int8Ty, -1));
+          Value *MShift = ConstantInt::get(Int8Ty, 7);
+          Value *Mask = IRB.CreateLShr(SubInst, MShift);
+          Value *Subs = IRB.CreateSub(Mask, ConstantInt::get(Int8Ty, -1));
+          Value *SubStat = IRB.CreateAnd(InstStatus, Subs);
+
+          IRB.CreateStore(SubStat, MapPtrIdx)
+              ->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
+
+          Value *FuzzVal;
+
+          if (OIT->isFloatingPointTy()) {
+            FuzzVal = IRB.CreateSIToFP(InstStatus, IT);
+            FuzzVal = IRB.CreateMul(FuzzVal, RandVal);
+          } else {
+            if (OIT->getPrimitiveSizeInBits() <
+                InstStatus->getType()->getPrimitiveSizeInBits()) {
+              FuzzVal = IRB.CreateAnd(IRB.CreateTrunc(InstStatus, OIT), RandVal);
+            } else {
+              FuzzVal =
+                  IRB.CreateAnd(IRB.CreateSExtOrBitCast(InstStatus, OIT), RandVal);
+            }
+          }
+
+          Value *FuzzedVal = IRB.CreateAdd(FuzzVal, OpI);
+
+          dyn_cast<Instruction>(FuzzedVal)->setMetadata(
+              M.getMDKindID("nosanitize"), MDNode::get(C, None));
+
+          // replace back I as operand of fuzzedVal, got removed by
+          // replaceAllUses
+          updateOperand(&I, opidx, dyn_cast<Instruction>(FuzzedVal));
+
+          // RemoveInst.push_back(&I);
+          nope++;
+
+          inst_id++;
+
           // Value* fuzzed = doFuzzVal(OpI, ...);
           // updateOperand(fuzzed, I, OI.num);
+        }
         }
 
         I.setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
@@ -391,7 +475,7 @@ bool AFLCoverage::runOnModule(Module &M) {
 
         if (IT->isFloatingPointTy()) {
           FuzzVal = IRB.CreateSIToFP(InstStatus, IT);
-          FuzzVal = IRB.CreateAnd(FuzzVal, RandVal);
+          FuzzVal = IRB.CreateMul(FuzzVal, RandVal);
         } else {
           if (IT->getPrimitiveSizeInBits() <
               InstStatus->getType()->getPrimitiveSizeInBits()) {
@@ -423,7 +507,7 @@ bool AFLCoverage::runOnModule(Module &M) {
     }
   }
 
-ciccio:
+//ciccio:
   while (!RemoveInst.empty()) {
     Instruction *RI = RemoveInst.pop_back_val();
     // TODO: find how to remove these... keeps on popping at random...
