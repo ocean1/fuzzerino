@@ -262,7 +262,7 @@ bool AFLCoverage::runOnModule(Module &M) {
 
         I.setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
         Type *IT = I.getType();
-        if (!(IT->isIntegerTy() ) || IT->isPointerTy() ) { //|| IT->isFloatingPointTy())) {
+        if (!(IT->isIntegerTy() || IT->isFloatingPointTy()) || IT->isPointerTy() ) {
             continue;
         }
 
@@ -307,10 +307,18 @@ bool AFLCoverage::runOnModule(Module &M) {
         // it will re-enable this every 1 instruction that gets exc. for now
         // a good enough approx...
 
-        Value *MShift = ConstantInt::get(Int32Ty, IT->getPrimitiveSizeInBits()*8-1);
+        /*Value *MShift = ConstantInt::get(Int32Ty, IT->getPrimitiveSizeInBits()*8-1);
         Value *Mask = IRB.CreateLShr(InstStatus, MShift);
         Value *SubStat = IRB.CreateAdd(InstStatus, Mask);
-        SubStat = IRB.CreateXor(InstStatus, Mask);
+        SubStat = IRB.CreateXor(InstStatus, Mask);*/
+
+        // hopefully should be right, trick to clear negative numbers without mul
+        // once fuzzed val is off, it stays so
+        Value *SubInst = IRB.CreateSub(InstStatus, ConstantInt::get(Int8Ty, -1));
+        Value *MShift = ConstantInt::get(Int8Ty, 7);
+        Value *Mask = IRB.CreateLShr(SubInst, MShift);
+        Value *Subs = IRB.CreateSub(Mask, ConstantInt::get(Int8Ty, -1));
+        Value *SubStat = IRB.CreateAnd(InstStatus, Subs);
 
         IRB.CreateStore(SubStat, MapPtrIdx)
             ->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
