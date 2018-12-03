@@ -4,22 +4,22 @@ SLEEP=$2
 
 #LPID=`pstree -s -p | grep $EXN | cut -d'(' -f 3 | cut -d')' -f1`
 
-P_PID=`pgrep $EXN | head -n1`
-CPID=`ps --ppid $P_PID | cut -d' ' -f1`
-echo $P_PID $CPID
+CPID=`ps h --ppid $EXN | cut -d' ' -f1`
+echo $CPID
 
 while :
 do
-    PID=${CPID}
 
+    PID=$CPID
     sleep ${SLEEP}
     #LPID=`pstree -s -p | grep $EXN | cut -d'(' -f 3 | cut -d')' -f1`
-    CPID=`ps --ppid $P_PID | cut -d' ' -f1`
+    CPID=`ps h --ppid $EXN | cut -d' ' -f1`
 
+    ps h --ppid $EXN
     if [ -z "$CPID" ]; then
-        echo "meh" > /dev/null;
+        echo "meh"
     elif [ "$PID" == "$CPID" ]; then
         echo "killing $PID";
-        kill $PID;
+        kill -9 $PID;
     fi
 done
