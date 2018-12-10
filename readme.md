@@ -28,7 +28,7 @@ libpng  [14549 39535 14549]
     + reuse allocated memory (structures, class instances...)
 + maybe avoid segfaults by allocating on purpose when crashing and restarting
 + handle Phi instructions
-+ explicitly skip the output of calls that return pointers (malloc)
++ explicitly skip the output of calls that return pointers (malloc) (?)
 + intra-function data-flow optimization: only instrument "leaf-nodes" (e.g. those that are not dominated, for example those that end up in a store, or are not referenced anymore...)
 + optimization: put a jump/call and skip over fuzzing, then nop it in child procs, phy instructions could help with allocation of registers in proper way, so we can nop instruction block, otherwise will have to do something better...D:
 + optimization: align RAND_POOL at RAND_POOL_SIZE, then increment ptr directly wrapping with % RAND_POOL_SIZE
