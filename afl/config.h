@@ -352,5 +352,7 @@
 // #define IGNORE_FINDS
 
 #define IDTMPFILE "/dev/shm/gfzidfile"
+#define MAX_FSIZE 50*1024*1024 // 50 MB of file are enough for now .. :)
+
 
 #endif /* ! _HAVE_CONFIG_H */
