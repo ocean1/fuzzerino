@@ -89,10 +89,13 @@ EXP_ST u8 *in_dir,                    /* Input directory with test cases  */
           *in_bitmap,                 /* Input bitmap                     */
           *doc_path,                  /* Path to documentation dir        */
           *target_path,               /* Path to target binary            */
-          *orig_cmdline;              /* Original command line            */
+          *orig_cmdline,              /* Original command line            */
+          *numiter;                   /* Number of iterations (gfuzz test)*/
 
 EXP_ST u32 exec_tmout = EXEC_TIMEOUT; /* Configurable exec timeout (ms)   */
 static u32 hang_tmout = EXEC_TIMEOUT; /* Timeout used for hang det (ms)   */
+
+static u32 maxi = 2000;               /* max # of iterations (gfz test)   */
 
 EXP_ST u64 mem_limit  = MEM_LIMIT;    /* Memory cap for child (MB)        */
 
@@ -118,6 +121,7 @@ EXP_ST u8  skip_deterministic,        /* Skip deterministic stages?       */
            shuffle_queue,             /* Shuffle input queue?             */
            bitmap_changed = 1,        /* Time to update bitmap?           */
            qemu_mode,                 /* Running in QEMU mode?            */
+           gfuzz_mode,                  /* Running in gfuzz mode?           */
            skip_requested,            /* Skip request, via SIGUSR1        */
            run_over10m,               /* Run time over 10 minutes?        */
            persistent_mode,           /* Running in persistent mode?      */
@@ -2020,6 +2024,10 @@ EXP_ST void init_forkserver(char** argv) {
 
 #endif /* ^RLIMIT_AS */
 
+      /* limit output file(s) size */
+      if (gfuzz_mode){
+          setrlimit(RLIMIT_FSIZE, &r);
+      }
 
     }
 
@@ -7716,7 +7724,7 @@ int main(int argc, char** argv) {
   struct timeval tv;
   struct timezone tz;
 
-  SAYF(cCYA "afl-fuzz " cBRI VERSION cRST " by <lcamtuf@google.com>\n");
+  SAYF(cCYA "gfz-fuzz " cBRI VERSION cRST " by <lcamtuf@google.com>, _ocean\n");
 
   doc_path = access(DOC_PATH, F_OK) ? "docs" : DOC_PATH;
 
@@ -7891,6 +7899,15 @@ int main(int argc, char** argv) {
 
         break;
 
+      case 'G': /* gFuzz mode */
+
+        if (gfuzz_mode) FATAL("Multiple -G options not supported");
+        gfuzz_mode = 1;
+
+        if (!mem_limit_given) mem_limit = MEM_LIMIT;
+
+        break;
+
       default:
 
         usage(argv[0]);
@@ -7978,9 +7995,9 @@ int main(int argc, char** argv) {
   else
     use_argv = argv + optind;
 
-  perform_dry_run(use_argv);
+  //perform_dry_run(use_argv);
 
-  cull_queue();
+  //cull_queue();
 
   show_init_stats();
 
@@ -7997,6 +8014,10 @@ int main(int argc, char** argv) {
     sleep(4);
     start_time += 4000;
     if (stop_soon) goto stop_fuzzing;
+  }
+
+  if (gfuzz_mode) {
+    goto gfuzz;
   }
 
   while (1) {
@@ -8091,6 +8112,28 @@ stop_fuzzing:
   OKF("We're done here. Have a nice day!\n");
 
   exit(0);
+
+gfuzz:
+
+  numiter = getenv("GFZ_NUM_ITER");
+  maxi = (numiter == NULL) ? 500 : atoi(numiter);
+  u32 i = 0;
+
+  while (i < maxi) {
+      u32 timeout = 50;
+      run_target(use_argv, timeout);
+
+      ++i;
+  }
+
+  show_stats();
+
+  write_bitmap();
+  write_stats_file(0, 0, 0);
+  save_auto();
+
+  goto stop_fuzzing;
+
 
 }
 

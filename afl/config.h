@@ -49,7 +49,7 @@
 
 /* Default memory limit for child process (MB): */
 
-#ifndef __x86_64__ 
+#ifndef __x86_64__
 #  define MEM_LIMIT         25
 #else
 #  define MEM_LIMIT         50

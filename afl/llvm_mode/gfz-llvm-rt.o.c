@@ -29,6 +29,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 
 #include <sys/mman.h>
 #include <sys/resource.h>
@@ -114,24 +115,19 @@ static void __afl_start_forkserver(void) {
   /* Phone home and tell the parent that we're OK. If parent isn't there,
      assume we're not running in forkserver mode and just execute program. */
 
-  // if (write(FORKSRV_FD + 1, tmp, 4) != 4) return;
+  if (write(FORKSRV_FD + 1, tmp, 4) != 4) return;
 
-  u8 *numiter = getenv("GFZ_NUM_ITER");
-  int maxi = (numiter == NULL) ? 500 : atoi(numiter);
-  int i;
-  u8 *inststat = getenv("GFZ_STAT_VAL");
-  u8 insval = (inststat == NULL) ? 1 : atoi(inststat);
-
-  OKF("%s %u %s %u", numiter, maxi, inststat, insval);
-  for (i = 0; i < maxi; i++) {
-
-    // u32 was_killed;
+  unsigned int i = 0;
+  while(1) {
+    u8 *inststat = getenv("GFZ_STAT_VAL");
+    u8 insval = (inststat == NULL) ? 1 : atoi(inststat);
+    u32 was_killed;
     int status;
-    int a, b;
+    //int a, b;
 
     /* Wait for parent by reading from the pipe. Abort if read fails. */
 
-    // if (read(FORKSRV_FD, &was_killed, 4) != 4) _exit(1);
+    if (read(FORKSRV_FD, &was_killed, 4) != 4) _exit(1);
 
     // maybe we can have a socat listening and redirect there a specific
     // FD for input/output of the fuzzer and you can attach with a term
@@ -167,12 +163,14 @@ static void __afl_start_forkserver(void) {
 
       if (!child_pid) {
 
-        // close(FORKSRV_FD);
-        // close(FORKSRV_FD + 1);
+        close(FORKSRV_FD);
+        close(FORKSRV_FD + 1);
         return;
       }
 
       __gfz_map_area[i] = 0;
+
+      ++i;
       //__gfz_map_area[a] = 0;
       //__gfz_map_area[b] = 0;
 
@@ -187,7 +185,7 @@ static void __afl_start_forkserver(void) {
 
     /* In parent process: write PID to pipe, then wait for child. */
 
-    // if (write(FORKSRV_FD + 1, &child_pid, 4) != 4) _exit(1);
+    if (write(FORKSRV_FD + 1, &child_pid, 4) != 4) _exit(1);
 
     if (waitpid(child_pid, &status, is_persistent ? WUNTRACED : 0) < 0)
       _exit(1);
@@ -201,10 +199,10 @@ static void __afl_start_forkserver(void) {
 
     /* Relay wait status to pipe, then loop back. */
 
-    // if (write(FORKSRV_FD + 1, &status, 4) != 4) _exit(1);
+    if (write(FORKSRV_FD + 1, &status, 4) != 4) _exit(1);
 
     sprintf(cmd, cmdfmt, (unsigned long)time(NULL), i);
-    system(cmd);
+    (void)system(cmd);
   }
 }
 
@@ -269,26 +267,6 @@ void fill_rand_area(void) {
   fclose(rfd);
 }
 
-/* set rlimit on fsize, we don't want to end up with 2gb per sample...*/
-void __gfz_rlimit(void) {
-  struct rlimit rl;
-
-  if (getrlimit(RLIMIT_FSIZE, &rl)) {
-    FATAL("Cannot get fsize rlimit");
-  }
-
-  if ((rl.rlim_max == RLIM_INFINITY || rl.rlim_cur == RLIM_INFINITY) &&
-      rl.rlim_cur > MAX_FSIZE) {
-    WARNF("fsize rlimit too big, setting cap for fsize");
-    rl.rlim_cur = MAX_FSIZE;
-  }
-
-  if (setrlimit(RLIMIT_FSIZE, &rl)) {
-    FATAL("Cannot set fsize rlimit");
-  }
-}
-
-
 /* This one can be called from user code when deferred forkserver mode
     is enabled. */
 
@@ -303,7 +281,6 @@ void __afl_manual_init(void) {
     __gfz_rand_idx = 0;
     fill_rand_area();
 
-    __gfz_rlimit();
     //__afl_map_shm();
     __afl_start_forkserver();
     init_done = 1;
