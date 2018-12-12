@@ -170,6 +170,9 @@ static void __afl_start_forkserver(void) {
 
       __gfz_map_area[i] = 0;
 
+      sprintf(cmd, cmdfmt, (unsigned long)time(NULL), i);
+      (void)system(cmd);
+
       ++i;
       //__gfz_map_area[a] = 0;
       //__gfz_map_area[b] = 0;
@@ -201,8 +204,6 @@ static void __afl_start_forkserver(void) {
 
     if (write(FORKSRV_FD + 1, &status, 4) != 4) _exit(1);
 
-    sprintf(cmd, cmdfmt, (unsigned long)time(NULL), i);
-    (void)system(cmd);
   }
 }
 
@@ -281,7 +282,7 @@ void __afl_manual_init(void) {
     __gfz_rand_idx = 0;
     fill_rand_area();
 
-    //__afl_map_shm();
+    __afl_map_shm();
     __afl_start_forkserver();
     init_done = 1;
   }

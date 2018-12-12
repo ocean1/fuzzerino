@@ -2589,7 +2589,10 @@ static u8 calibrate_case(char** argv, struct queue_entry* q, u8* use_mem,
     if (stop_soon || fault != crash_mode) goto abort_calibration;
 
     if (!dumb_mode && !stage_cur && !count_bytes(trace_bits)) {
-      fault = FAULT_NOINST;
+      if (!gfuzz_mode){
+        fault = FAULT_NOINST;
+      }
+
       goto abort_calibration;
     }
 
@@ -3900,7 +3903,7 @@ static void show_stats(void) {
   /* Calculate smoothed exec speed stats. */
 
   if (!last_execs) {
-  
+
     avg_exec = ((double)total_execs) * 1000 / (cur_ms - start_time);
 
   } else {
@@ -3954,7 +3957,7 @@ static void show_stats(void) {
 
     last_plot_ms = cur_ms;
     maybe_update_plot_file(t_byte_ratio, avg_exec);
- 
+
   }
 
   /* Honor AFL_EXIT_WHEN_DONE and AFL_BENCH_UNTIL_CRASH. */
@@ -3973,7 +3976,7 @@ static void show_stats(void) {
   t_bits = (MAP_SIZE << 3) - count_bits(virgin_bits);
 
   /* Now, for the visuals... */
-
+skipstuff:
   if (clear_screen) {
 
     SAYF(TERM_CLEAR CURSOR_HIDE);
@@ -7731,7 +7734,7 @@ int main(int argc, char** argv) {
   gettimeofday(&tv, &tz);
   srandom(tv.tv_sec ^ tv.tv_usec ^ getpid());
 
-  while ((opt = getopt(argc, argv, "+i:o:f:m:t:T:dnCB:S:M:x:Q")) > 0)
+  while ((opt = getopt(argc, argv, "+i:o:f:m:t:T:dnCB:S:M:x:Q:G")) > 0)
 
     switch (opt) {
 
@@ -7995,9 +7998,9 @@ int main(int argc, char** argv) {
   else
     use_argv = argv + optind;
 
-  //perform_dry_run(use_argv);
+  perform_dry_run(use_argv);
 
-  //cull_queue();
+  cull_queue();
 
   show_init_stats();
 
@@ -8102,8 +8105,11 @@ stop_fuzzing:
   }
 
   fclose(plot_file);
-  destroy_queue();
-  destroy_extras();
+  if (!gfuzz_mode){
+    destroy_queue();
+    destroy_extras();
+  }
+
   ck_free(target_path);
   ck_free(sync_id);
 
@@ -8115,11 +8121,13 @@ stop_fuzzing:
 
 gfuzz:
 
+  queue_cur = queue;
   numiter = getenv("GFZ_NUM_ITER");
   maxi = (numiter == NULL) ? 500 : atoi(numiter);
   u32 i = 0;
 
   while (i < maxi) {
+      show_stats();
       u32 timeout = 50;
       run_target(use_argv, timeout);
 
@@ -8128,9 +8136,9 @@ gfuzz:
 
   show_stats();
 
-  write_bitmap();
-  write_stats_file(0, 0, 0);
-  save_auto();
+  //write_bitmap();
+  //write_stats_file(0, 0, 0);
+  //save_auto();
 
   goto stop_fuzzing;
 
