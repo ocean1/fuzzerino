@@ -38,6 +38,8 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
+#include <malloc.h>
+
 /* This is a somewhat ugly hack for the experimental 'trace-pc-guard' mode.
    Basically, we need to make sure that the forkserver is initialized after
    the LLVM-generated runtime initialization pass, not before. */
@@ -74,6 +76,13 @@ const ssize_t __gfz_map_size = 4 * 1024 * 1024;
 static u8 is_persistent;
 
 /* SHM setup. */
+
+// override free, generators are short lived programs (http://www.drdobbs.com/cpp/increasing-compiler-speed-by-over-75/240158941)
+// https://twitter.com/johnregehr/status/1073801738707070977
+// we could also override malloc to provide a little bit more space to reduce SEGFAULTs
+void free(void *ptr)
+{
+}
 
 static void __afl_map_shm(void) {
 

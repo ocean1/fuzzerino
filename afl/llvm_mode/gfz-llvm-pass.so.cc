@@ -227,7 +227,7 @@ bool AFLCoverage::runOnModule(Module &M) {
 
         /* fuzz also all operands */
 
-        User::value_op_iterator OI, OE;
+        User::op_iterator OI, OE;
 
         /* heuristics to skip functions that might crash the target
          * too easily, will implement some better heuristics later :) */
@@ -235,9 +235,12 @@ bool AFLCoverage::runOnModule(Module &M) {
         if (
             // dyn_cast<StoreInst>(&I)         ||
             // dyn_cast<CmpInst>(&I)           ||
-            dyn_cast<AllocaInst>(&I) || dyn_cast<BranchInst>(&I) ||
-            dyn_cast<SwitchInst>(&I) || dyn_cast<InvokeInst>(&I) ||
-            dyn_cast<IndirectBrInst>(&I) || dyn_cast<UnreachableInst>(&I) ||
+            //dyn_cast<AllocaInst>(&I)
+            dyn_cast<BranchInst>(&I) ||
+            //dyn_cast<SwitchInst>(&I) ||
+            dyn_cast<InvokeInst>(&I) ||
+            dyn_cast<IndirectBrInst>(&I) ||
+            dyn_cast<UnreachableInst>(&I) ||
             // dyn_cast<GetElementPtrInst>(&I) ||
             // dyn_cast<ReturnInst>(&I)        ||
             isa<PHINode>(&I) // PHY will need special handling
@@ -246,8 +249,13 @@ bool AFLCoverage::runOnModule(Module &M) {
         }
 
         if( true || !(dyn_cast<LoadInst>(&I)) ){
+        auto *DI = dyn_cast<CallInst>(&I);
         int opidx;
-        for (opidx=0, OI = I.value_op_begin(), OE = I.value_op_end(); OI != OE; ++OI, ++opidx) {
+        for (opidx=0, OI = DI ? DI->arg_begin() : I.op_begin(),
+            OE = DI ? DI->arg_end() : I.op_end();
+            OI != OE; ++OI, ++opidx) {
+
+          if (OI == OE) break;
           // for each op, if type is Int (will need to add also for floats, and
           // other types....) take OI as Value, push fuzzed val, substitute it
           // val = insertFuzzVal(I, OI);
