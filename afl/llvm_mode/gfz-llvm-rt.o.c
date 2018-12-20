@@ -126,7 +126,7 @@ static void __afl_start_forkserver(void) {
 
   if (write(FORKSRV_FD + 1, tmp, 4) != 4) return;
 
-  unsigned int i = 0;
+  int i = -1; // make a clean dry run with one sample
   while(1) {
     u8 *inststat = getenv("GFZ_STAT_VAL");
     u8 insval = (inststat == NULL) ? 1 : atoi(inststat);
@@ -159,6 +159,7 @@ static void __afl_start_forkserver(void) {
       // a = (i+rand()) % maxi;
       // b = (i+rand()) % maxi;
 
+	if (i > 0)
       __gfz_map_area[i] = insval;
 
       //__gfz_map_area[a] = insval;
@@ -187,7 +188,6 @@ static void __afl_start_forkserver(void) {
       //__gfz_map_area[b] = 0;
 
     } else {
-
       /* Special handling for persistent mode: if the child is alive but
          currently stopped, simply restart it with SIGCONT. */
 

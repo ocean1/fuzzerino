@@ -46,6 +46,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/XRay/YAMLXRayRecord.h"
+#include "llvm/IR/IntrinsicInst.h"
 #include <fstream>
 #include <streambuf>
 #include <string>
@@ -238,7 +239,6 @@ bool AFLCoverage::runOnModule(Module &M) {
             //dyn_cast<AllocaInst>(&I)
             dyn_cast<BranchInst>(&I) ||
             //dyn_cast<SwitchInst>(&I) ||
-            dyn_cast<InvokeInst>(&I) ||
             dyn_cast<IndirectBrInst>(&I) ||
             dyn_cast<UnreachableInst>(&I) ||
             // dyn_cast<GetElementPtrInst>(&I) ||
@@ -248,7 +248,8 @@ bool AFLCoverage::runOnModule(Module &M) {
           continue;
         }
 
-        if( true || !(dyn_cast<LoadInst>(&I)) ){
+        if( !(dyn_cast<GetElementPtrInst>(&I) || dyn_cast<SwitchInst>(&I) ||
+              dyn_cast<IntrinsicInst>(&I))){
         auto *DI = dyn_cast<CallInst>(&I);
         int opidx;
         for (opidx=0, OI = DI ? DI->arg_begin() : I.op_begin(),
@@ -261,8 +262,9 @@ bool AFLCoverage::runOnModule(Module &M) {
           // val = insertFuzzVal(I, OI);
           // updateOp(OI, val);
           // Value *inval = dyn_cast<Value*>(OI);
-          auto *OpI = dyn_cast<Instruction>(*OI);
-
+          auto *OpI = dyn_cast<Value>(*OI);
+          auto *OpII = dyn_cast<Instruction>(*OI);
+          OpI = OpI ? OpI : OpII;
           if (!OpI)
             continue;
 
@@ -270,7 +272,7 @@ bool AFLCoverage::runOnModule(Module &M) {
           Type *OIT = OpI->getType();
           Type *IT = I.getType();
 
-          if (!(OIT->isIntegerTy() /*|| OIT->isFloatingPointTy()*/) ||
+          if (  !(OIT->isIntegerTy() /*|| OIT->isFloatingPointTy()*/) ||
                 OIT->isPointerTy()) {
             continue;
           }
