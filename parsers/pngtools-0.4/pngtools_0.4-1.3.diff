@@ -1,0 +1,538 @@
+--- pngtools-0.4.orig/Makefile.in
++++ pngtools-0.4/Makefile.in
+@@ -67,7 +67,7 @@
+ COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
+ 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
+ CCLD = $(CC)
+-LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
++LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@ -lpng
+ SOURCES = $(pngchunkdesc_SOURCES) $(pngchunks_SOURCES) \
+ 	$(pngcp_SOURCES) $(pnginfo_SOURCES)
+ DIST_SOURCES = $(pngchunkdesc_SOURCES) $(pngchunks_SOURCES) \
+--- pngtools-0.4.orig/configure.in
++++ pngtools-0.4/configure.in
+@@ -19,7 +19,7 @@
+ AC_CHECK_LIB(m, atan)
+ 
+ dnl -lpng:
+-AC_CHECK_LIB(png, png_libpng_ver)
++AC_CHECK_LIB(png, png_get_libpng_ver)
+ 
+ dnl STDC checks for stdlib.h stdarg.h string.h and float.h
+ AC_HEADER_STDC
+--- pngtools-0.4.orig/debian/changelog
++++ pngtools-0.4/debian/changelog
+@@ -0,0 +1,50 @@
++pngtools (0.4-1.3) unstable; urgency=medium
++
++  * Non-maintainer upload.
++  * Switch to autoreconf (Closes: #822547)
++  * Bump compat level to 9
++  * Drop cdbs
++  * Refactor rules file, fixing a build failure
++    with as-needed flags.
++  * Patch configure.in following png rename of
++    api.
++
++ -- Gianfranco Costamagna <locutusofborg@debian.org>  Sun, 24 Apr 2016 22:47:36 +0200
++
++pngtools (0.4-1.2) unstable; urgency=medium
++
++  * Non-maintainer upload.
++  * Fix previous upload for libpng12 by conditional compiling (Closes: #811001)
++
++ -- Tobias Frost <tobi@debian.org>  Thu, 14 Jan 2016 20:40:19 +0100
++
++pngtools (0.4-1.1) unstable; urgency=medium
++
++  * Non-maintainer upload.
++  * Fix "FTBFS with libpng 1.5", taking patch from Nobuhiro (Closes: #641892)
++  * Change B-D to libpng-dev from libpng12-dev (Closes: #662476)
++
++ -- Tobias Frost <tobi@debian.org>  Thu, 07 Jan 2016 01:05:36 +0100
++
++pngtools (0.4-1) unstable; urgency=low
++
++  * New upstream release;
++  * Update compat level to 7;
++  * Update Standards-Version to 3.8.3:
++    - Using new Homepage field in debian/control.
++  * Remove patches/pngchunks.diff (applied upstream);
++  * Fix minus sign in manpages.
++
++ -- Nelson A. de Oliveira <naoliv@debian.org>  Tue, 18 Aug 2009 17:04:10 -0300
++
++pngtools (0.3-2) unstable; urgency=low
++
++  * Fix pngchunks on 64 bits platforms (Closes: #503820).
++
++ -- Nelson A. de Oliveira <naoliv@debian.org>  Wed, 10 Dec 2008 08:06:18 -0200
++
++pngtools (0.3-1) unstable; urgency=low
++
++  * Initial release (Closes: #405139).
++
++ -- Nelson A. de Oliveira <naoliv@debian.org>  Tue, 31 Jul 2007 17:45:22 -0300
+--- pngtools-0.4.orig/debian/compat
++++ pngtools-0.4/debian/compat
+@@ -0,0 +1 @@
++9
+--- pngtools-0.4.orig/debian/control
++++ pngtools-0.4/debian/control
+@@ -0,0 +1,17 @@
++Source: pngtools
++Section: graphics
++Priority: optional
++Maintainer: Nelson A. de Oliveira <naoliv@debian.org>
++Build-Depends: debhelper (>= 9), dh-autoreconf, libpng-dev
++Standards-Version: 3.9.8
++Homepage: http://www.stillhq.com/pngtools/
++
++Package: pngtools
++Architecture: any
++Depends: ${shlibs:Depends}, ${misc:Depends}
++Suggests: optipng | pngcrush
++Description: series of tools for PNG (Portable Network Graphics) images
++ pngtools is a suite of utilities to work with PNG (Portable Network
++ Graphics) files, equivalents to libtiff's tiffinfo, and tiffcp commands.
++ These commands are called pnginfo, pngcp. tiffdump is replaced by pngchunks
++ and pngchunkdesc as well.
+--- pngtools-0.4.orig/debian/copyright
++++ pngtools-0.4/debian/copyright
+@@ -0,0 +1,29 @@
++This package was debianized by Nelson A. de Oliveira <naoliv@debian.org> on
++Tue, 31 Jul 2007 17:45:22 -0300.
++
++It was downloaded from http://www.stillhq.com/pngtools/
++
++Upstream Author: Michael Still <mikal@stillhq.com>
++
++Copyright: 2001-2005 Michael Still
++
++License:
++
++   This package is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License as published by
++   the Free Software Foundation, under version 2 of the License.
++
++   This package is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this package; if not, write to the Free Software
++   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
++
++On Debian systems, the complete text of the GNU General
++Public License can be found in `/usr/share/common-licenses/GPL-2'.
++
++The Debian packaging is © 2007, Nelson A. de Oliveira <naoliv@debian.org> and
++is licensed under the GPL, see above.
+--- pngtools-0.4.orig/debian/docs
++++ pngtools-0.4/debian/docs
+@@ -0,0 +1 @@
++chunks.txt
+--- pngtools-0.4.orig/debian/manpages
++++ pngtools-0.4/debian/manpages
+@@ -0,0 +1 @@
++debian/*.1
+--- pngtools-0.4.orig/debian/pngchunkdesc.1
++++ pngtools-0.4/debian/pngchunkdesc.1
+@@ -0,0 +1,18 @@
++.TH PNGCHUNKDESC 1 "Tue, 31 Jul 2007 17:55:51 \-0300"
++.SH NAME
++pngchunkdesc \- decode information embedded into a PNG chunk name
++.SH SYNOPSIS
++.B pngchunkdesc
++.SH DESCRIPTION
++PNG files are based around a series of chunks, which embody the information stored in the image file. These chunks have four character ASCII names, where the case of each letter stores additional information.
++.PP
++This program decodes the case information in the chunk names, and displays it. The program reads chunk names from stdin, and write chunk descriptions to stdout.
++.SH SEE ALSO
++.BR pngchunks (1),
++.BR pngcp (1),
++.BR pnginfo (1).
++.SH AUTHOR
++pngchunkdesc was written by Michael Still <mikal@stillhq.com>.
++.PP
++This manual page was written by Nelson A. de Oliveira <naoliv@debian.org>,
++for the Debian project (but may be used by others).
+--- pngtools-0.4.orig/debian/pngchunks.1
++++ pngtools-0.4/debian/pngchunks.1
+@@ -0,0 +1,52 @@
++.TH PNGCHUNKS 1 "Tue, 31 Jul 2007 17:55:51 \-0300"
++.SH NAME
++pngchunks \- print information embedded into a PNG file
++.SH SYNOPSIS
++.B pngchunks
++file
++.SH DESCRIPTION
++\fBpngchunks\fP is a program that displays informations from files created according to the Portable Network Graphics file format.
++.SH EXAMPLE
++pngchunks input.png
++Chunk: Data Length 13 (max 2147483647), Type 1380206665 [IHDR]
++  Critical, public, PNG 1.2 compliant, unsafe to copy
++  IHDR Width: 256
++  IHDR Height: 256
++  IHDR Bitdepth: 8
++  IHDR Colortype: 2
++  IHDR Compression: 0
++  IHDR Filter: 0
++  IHDR Interlace: 0
++  IHDR Compression algorithm is Deflate
++  IHDR Filter method is type zero (None, Sub, Up, Average, Paeth)
++  IHDR Interlacing is disabled
++  Chunk CRC: \-753909967
++Chunk: Data Length 6 (max 2147483647), Type 1145523042 [bKGD]
++  Ancillary, public, PNG 1.2 compliant, unsafe to copy
++  ... Unknown chunk type
++  Chunk CRC: 554438993
++Chunk: Data Length 9 (max 2147483647), Type 1935231088 [pHYs]
++  Ancillary, public, PNG 1.2 compliant, safe to copy
++  ... Unknown chunk type
++  Chunk CRC: \-757235972
++Chunk: Data Length 7 (max 2147483647), Type 1162692980 [tIME]
++  Ancillary, public, PNG 1.2 compliant, unsafe to copy
++  ... Unknown chunk type
++  Chunk CRC: 429243611
++Chunk: Data Length 831 (max 2147483647), Type 1413563465 [IDAT]
++  Critical, public, PNG 1.2 compliant, unsafe to copy
++  IDAT contains image data
++  Chunk CRC: 1406256926
++Chunk: Data Length 0 (max 2147483647), Type 1145980233 [IEND]
++  Critical, public, PNG 1.2 compliant, unsafe to copy
++  IEND contains no data
++  Chunk CRC: \-1371381630
++.SH SEE ALSO
++.BR pngchunkdesc (1),
++.BR pngcp (1),
++.BR pnginfo (1).
++.SH AUTHOR
++pngchunks was written by Michael Still <mikal@stillhq.com>.
++.PP
++This manual page was written by Nelson A. de Oliveira <naoliv@debian.org>,
++for the Debian project (but may be used by others).
+--- pngtools-0.4.orig/debian/pngcp.1
++++ pngtools-0.4/debian/pngcp.1
+@@ -0,0 +1,23 @@
++.TH PNGCP 1 "Tue, 31 Jul 2007 17:55:51 \-0300"
++.SH NAME
++pngcp \- create a new PNG file, having changed some attributes
++.SH SYNOPSIS
++.B pngcp
++[\-d <depth>] [\-s <samples per pixel>] <input filename> <output filename>
++.SH DESCRIPTION
++The \fBpngcp\fP create a new PNG file using the image data from the input file. The output file will have the bitdepth and number of samples per pixel as specified on the command line. There are limits on what is a valid combination imposed by the PNG specification \-\- \fBpngcp\fP will inform you of invalid combinations.
++.PP
++Samples with more than eight bits are not correctly handled at the moment.
++.SH RETURNS
++Nothing.
++.SH EXAMPLE
++pngcp toucan.png new.png
++.SH SEE ALSO
++.BR pngchunkdesc (1),
++.BR pngchunks (1),
++.BR pnginfo (1).
++.SH AUTHOR
++pngcp was written by Michael Still <mikal@stillhq.com>.
++.PP
++This manual page was written by Nelson A. de Oliveira <naoliv@debian.org>,
++for the Debian project (but may be used by others).
+--- pngtools-0.4.orig/debian/pnginfo.1
++++ pngtools-0.4/debian/pnginfo.1
+@@ -0,0 +1,66 @@
++.TH PNGINFO 1 "Tue, 31 Jul 2007 17:55:51 \-0300"
++.SH NAME
++pnginfo \- display information on the PNG files named
++.SH SYNOPSIS
++.B pnginfo
++[\-t] [\-d] [\-D] <filenames>
++.SH DESCRIPTION
++This command dumps information about the PNG files named on the command line. This command's output is based on the output of the \fBtiffinfo\fP command, which is part of the \fBlibtiff\fP distribution. Each line output by the command represents a value that has been set within the PNG file.
++.PP
++The \fB-t\fP command line option forces pnginfo to use \fIlibtiff\fP \fBtiffinfo\fP style lables, instead of the more relevant png names. The \fB-d\fP command line option dumps the bitmap contained by the image to standard out, whilst the \fB-D\fP command merely checks that the image bitmap could be extracted from the file. If nothing is reported by \fB-D\fP, then there was no error.
++.PP
++The format for the output bitmaps is hexadecimal, with each pixel presented as a triple \-\- for instance [red green blue]. This means that paletted images et cetera will have their bitmaps expanded before display.
++.SH RETURNS
++Nothing.
++.SH EXAMPLE
++pnginfo \-t toucan.png basn3p02.png basn6a16.png
++toucan.png...
++  Image Width: 162 Image Length: 150
++  Bits/Sample: 8
++  Samples/Pixel: 1
++  Pixel Depth: 8
++  Colour Type (Photometric Interpretation): PALETTED COLOUR with alpha (256 colours, 256 transparent) 
++  Image filter: Single row per byte filter 
++  Interlacing: Adam7 interlacing 
++  Compression Scheme: Deflate method 8, 32k window
++  Resolution: 0, 0 (unit unknown)
++  FillOrder: msb-to-lsb
++  Byte Order: Network (Big Endian)
++  Number of text strings: 0 of 0
++
++basn3p02.png...
++  Image Width: 32 Image Length: 32
++  Bits/Sample: 2
++  Samples/Pixel: 1
++  Pixel Depth: 2
++  Colour Type (Photometric Interpretation): PALETTED COLOUR (4 colours, 0 transparent) 
++  Image filter: Single row per byte filter 
++  Interlacing: No interlacing 
++  Compression Scheme: Deflate method 8, 32k window
++  Resolution: 0, 0 (unit unknown)
++  FillOrder: msb-to-lsb
++  Byte Order: Network (Big Endian)
++  Number of text strings: 0 of 0
++
++basn6a16.png...
++  Image Width: 32 Image Length: 32
++  Bits/Sample: 16
++  Samples/Pixel: 4
++  Pixel Depth: 64
++  Colour Type (Photometric Interpretation): RGB with alpha channel 
++  Image filter: Single row per byte filter 
++  Interlacing: No interlacing
++  Compression Scheme: Deflate method 8, 32k window
++  Resolution: 0, 0 (unit unknown)
++  FillOrder: msb-to-lsb
++  Byte Order: Network (Big Endian)
++  Number of text strings: 0 of 0
++.SH SEE ALSO
++.BR pngchunkdesc (1),
++.BR pngchunks (1),
++.BR pngcp (1),
++.SH AUTHOR
++pnginfo was written by Michael Still <mikal@stillhq.com>.
++.PP
++This manual page was written by Nelson A. de Oliveira <naoliv@debian.org>,
++for the Debian project (but may be used by others).
+--- pngtools-0.4.orig/debian/rules
++++ pngtools-0.4/debian/rules
+@@ -0,0 +1,6 @@
++#!/usr/bin/make -f
++
++export DEB_BUILD_MAINT_OPTIONS = hardening=+all
++
++%:
++	dh $@ --with autoreconf
+--- pngtools-0.4.orig/debian/watch
++++ pngtools-0.4/debian/watch
+@@ -0,0 +1,2 @@
++version=3
++http://www.stillhq.com/pngtools/source/pngtools_(\d+)_(\d+)\.tgz
+--- pngtools-0.4.orig/pnginfo.c
++++ pngtools-0.4/pnginfo.c
+@@ -136,6 +136,10 @@
+   unsigned long imageBufSize, width, height, runlen;
+   unsigned char signature;
+   int bitdepth, colourtype;
++  png_byte channels;
++  int interlace_type, compression_type, filter_type;
++  png_uint_32 res_x, res_y;
++  int unit_type;
+   png_uint_32 i, j, rowbytes;
+   png_structp png;
+   png_infop info;
+@@ -177,8 +181,8 @@
+   png_init_io (png, image);
+   png_set_sig_bytes (png, 8);
+   png_read_info (png, info);
+-  png_get_IHDR (png, info, &width, &height, &bitdepth, &colourtype, NULL,
+-		NULL, NULL);
++  png_get_IHDR (png, info, &width, &height, &bitdepth, &colourtype, &interlace_type, &compression_type, &filter_type);
++  channels = png_get_channels(png, info);
+ 
+   ///////////////////////////////////////////////////////////////////////////
+   // Start displaying information
+@@ -187,15 +191,31 @@
+   printf ("  Image Width: %d Image Length: %d\n", width, height);
+   if(tiffnames == pnginfo_true){
+     printf ("  Bits/Sample: %d\n", bitdepth);
+-    printf ("  Samples/Pixel: %d\n", info->channels);
+-    printf ("  Pixel Depth: %d\n", info->pixel_depth);	// Does this add value?
++    printf ("  Samples/Pixel: %d\n", channels);
++    printf ("  Pixel Depth: %d\n",channels * bitdepth);	// Does this add value?
+   }
+   else{
+     printf ("  Bitdepth (Bits/Sample): %d\n", bitdepth);
+-    printf ("  Channels (Samples/Pixel): %d\n", info->channels);
+-    printf ("  Pixel depth (Pixel Depth): %d\n", info->pixel_depth);	// Does this add value?
++    printf ("  Channels (Samples/Pixel): %d\n", channels);
++    printf ("  Pixel depth (Pixel Depth): %d\n",  channels * bitdepth);	// Does this add value?
+   }
+ 
++  png_bytep trans_alpha;
++  int num_trans;
++  png_color_16p trans_color;
++  png_colorp palette;
++  int num_palette;
++
++  png_get_tRNS(png, info, &trans_alpha, &num_trans, &trans_color);
++  png_get_PLTE(png, info, &palette, &num_palette);
++
++#if PNG_LIBPNG_VER_MAJOR >= 1 && PNG_LIBPNG_VER_MINOR >= 4
++ png_get_pHYs_dpi(png, info, &res_x, &res_y, &unit_type);
++#else
++ res_x = info->x_pixels_per_unit;
++ res_y = info->y_pixels_per_unit;
++#endif
++
+   // Photometric interp packs a lot of information
+   printf ("  Colour Type (Photometric Interpretation): ");
+ 
+@@ -207,10 +227,10 @@
+ 
+     case PNG_COLOR_TYPE_PALETTE:
+       printf ("PALETTED COLOUR ");
+-      if (info->num_trans > 0)
++      if (num_trans > 0)
+ 	printf ("with alpha ");
+       printf ("(%d colours, %d transparent) ",
+-	      info->num_palette, info->num_trans);
++	      num_palette, num_trans);
+       break;
+ 
+     case PNG_COLOR_TYPE_RGB:
+@@ -232,7 +252,7 @@
+   printf ("\n");
+ 
+   printf ("  Image filter: ");
+-  switch (info->filter_type)
++  switch (filter_type)
+     {
+     case PNG_FILTER_TYPE_BASE:
+       printf ("Single row per byte filter ");
+@@ -249,7 +269,7 @@
+   printf ("\n");
+ 
+   printf ("  Interlacing: ");
+-  switch (info->interlace_type)
++  switch (interlace_type)
+     {
+     case PNG_INTERLACE_NONE:
+       printf ("No interlacing ");
+@@ -266,7 +286,7 @@
+   printf ("\n");
+ 
+   printf ("  Compression Scheme: ");
+-  switch (info->compression_type)
++  switch (compression_type)
+     {
+     case PNG_COMPRESSION_TYPE_BASE:
+       printf ("Deflate method 8, 32k window");
+@@ -278,9 +298,8 @@
+     }
+   printf ("\n");
+ 
+-  printf ("  Resolution: %d, %d ",
+-	  info->x_pixels_per_unit, info->y_pixels_per_unit);
+-  switch (info->phys_unit_type)
++  printf ("  Resolution: %d, %d ",res_x, res_y);
++  switch (unit_type)
+     {
+     case PNG_RESOLUTION_UNKNOWN:
+       printf ("(unit unknown)");
+@@ -299,15 +318,19 @@
+   // FillOrder is always msb-to-lsb, big endian
+   printf ("  FillOrder: msb-to-lsb\n  Byte Order: Network (Big Endian)\n");
+ 
++  png_textp text_ptr;
++  int num_text;
++  png_get_text(png, info, &text_ptr, &num_text);
++
+   // Text comments
+-  printf ("  Number of text strings: %d of %d\n",
+-	  info->num_text, info->max_text);
++  printf ("  Number of text strings: %d\n",
++	  num_text);
+ 
+-  for (i = 0; i < info->num_text; i++)
++  for (i = 0; i < num_text; i++)
+     {
+-      printf ("    %s ", info->text[i].key);
++      printf ("    %s ", text_ptr[i].key);
+ 
+-      switch (info->text[1].compression)
++      switch (text_ptr[1].compression)
+ 	{
+ 	case -1:
+ 	  printf ("(tEXt uncompressed)");
+@@ -332,12 +355,12 @@
+ 
+       printf (": ");
+       j = 0;
+-      while (info->text[i].text[j] != '\0')
++      while (text_ptr[i].text[j] != '\0')
+ 	{
+-	  if (info->text[i].text[j] == '\n')
++	  if (text_ptr[i].text[j] == '\n')
+ 	    printf ("\\n");
+ 	  else
+-	    fputc (info->text[i].text[j], stdout);
++	    fputc (text_ptr[i].text[j], stdout);
+ 
+ 	  j++;
+ 	}
+@@ -385,14 +408,14 @@
+ 
+ 	  printf ("Dumping the bitmap for this image:\n");
+ 	  printf ("(Expanded samples result in %d bytes per pixel, %d channels with %d bytes per channel)\n\n", 
+-		  info->channels * bytespersample, info->channels, bytespersample);
++		  channels * bytespersample, channels, bytespersample);
+ 
+ 	  // runlen is used to stop us displaying repeated byte patterns over and over --
+ 	  // I display them once, and then tell you how many times it occured in the file.
+ 	  // This currently only applies to runs on zeros -- I should one day add an
+ 	  // option to extend this to runs of other values as well
+ 	  runlen = 0;
+-	  for (i = 0; i < rowbytes * height / info->channels; i += info->channels * bytespersample)
++	  for (i = 0; i < rowbytes * height / channels; i += channels * bytespersample)
+ 	    {
+ 	      int scount, bcount, pixel;
+ 
+@@ -408,16 +431,16 @@
+ 
+ 	      // Determine if this is a pixel whose entire value is zero
+ 	      pixel = 0;
+-	      for(scount = 0; scount < info->channels; scount++)
++	      for(scount = 0; scount < channels; scount++)
+ 		for(bcount = 0; bcount < bytespersample; bcount++)
+ 		  pixel += bitmap[i + scount * bytespersample + bcount];
+ 
+ 	      if ((runlen == 0) && !pixel)
+ 		{
+ 		  printf ("[");
+-		  for(scount = 0; scount < info->channels; scount++){
++		  for(scount = 0; scount < channels; scount++){
+ 		    for(bcount = 0; bcount < bytespersample; bcount++) printf("00");
+-		    if(scount != info->channels - 1) printf(" ");
++		    if(scount != channels - 1) printf(" ");
+ 		  }
+ 		  printf ("] ");
+ 		  runlen++;
+@@ -425,10 +448,10 @@
+ 
+ 	      if (runlen == 0){
+ 		printf ("[");
+-		for(scount = 0; scount < info->channels; scount++){
++		for(scount = 0; scount < channels; scount++){
+ 		  for(bcount = 0; bcount < bytespersample; bcount++)
+ 		    printf("%02x", (unsigned char) bitmap[i + scount * bytespersample + bcount]);
+-		  if(scount != info->channels - 1) printf(" ");
++		  if(scount != channels - 1) printf(" ");
+ 		}
+ 		printf("] ");
+ 	      }
+--- pngtools-0.4.orig/pngread.c
++++ pngtools-0.4/pngread.c
+@@ -68,7 +68,7 @@
+   // palette is correctly reported...
+   //png_set_strip_alpha (png);
+   png_read_update_info (png, info);
+-  *channels = info->channels;
++  *channels = png_get_channels(png, info);
+   
+   rowbytes = png_get_rowbytes (png, info);
+   if((row_pointers = malloc (*height * sizeof (png_bytep))) == NULL){

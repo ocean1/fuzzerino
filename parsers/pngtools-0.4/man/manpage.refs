@@ -1,0 +1,7 @@
+{
+  '' => '',
+  'refentry:PNGCP' => 'pngcp(3)',
+  'refentry:PNGINFO' => 'pnginfo(3)',
+  'refentry:PNGCHUNKDESC' => 'pngchunkdesc(3)',
+  '' => ''
+}

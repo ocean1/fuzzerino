@@ -1,0 +1,23 @@
+.TH PNGCP 1 "Tue, 31 Jul 2007 17:55:51 \-0300"
+.SH NAME
+pngcp \- create a new PNG file, having changed some attributes
+.SH SYNOPSIS
+.B pngcp
+[\-d <depth>] [\-s <samples per pixel>] <input filename> <output filename>
+.SH DESCRIPTION
+The \fBpngcp\fP create a new PNG file using the image data from the input file. The output file will have the bitdepth and number of samples per pixel as specified on the command line. There are limits on what is a valid combination imposed by the PNG specification \-\- \fBpngcp\fP will inform you of invalid combinations.
+.PP
+Samples with more than eight bits are not correctly handled at the moment.
+.SH RETURNS
+Nothing.
+.SH EXAMPLE
+pngcp toucan.png new.png
+.SH SEE ALSO
+.BR pngchunkdesc (1),
+.BR pngchunks (1),
+.BR pnginfo (1).
+.SH AUTHOR
+pngcp was written by Michael Still <mikal@stillhq.com>.
+.PP
+This manual page was written by Nelson A. de Oliveira <naoliv@debian.org>,
+for the Debian project (but may be used by others).

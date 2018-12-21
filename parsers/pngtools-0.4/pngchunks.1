@@ -1,0 +1,52 @@
+.TH PNGCHUNKS 1 "Tue, 31 Jul 2007 17:55:51 \-0300"
+.SH NAME
+pngchunks \- print information embedded into a PNG file
+.SH SYNOPSIS
+.B pngchunks
+file
+.SH DESCRIPTION
+\fBpngchunks\fP is a program that displays informations from files created according to the Portable Network Graphics file format.
+.SH EXAMPLE
+pngchunks input.png
+Chunk: Data Length 13 (max 2147483647), Type 1380206665 [IHDR]
+  Critical, public, PNG 1.2 compliant, unsafe to copy
+  IHDR Width: 256
+  IHDR Height: 256
+  IHDR Bitdepth: 8
+  IHDR Colortype: 2
+  IHDR Compression: 0
+  IHDR Filter: 0
+  IHDR Interlace: 0
+  IHDR Compression algorithm is Deflate
+  IHDR Filter method is type zero (None, Sub, Up, Average, Paeth)
+  IHDR Interlacing is disabled
+  Chunk CRC: \-753909967
+Chunk: Data Length 6 (max 2147483647), Type 1145523042 [bKGD]
+  Ancillary, public, PNG 1.2 compliant, unsafe to copy
+  ... Unknown chunk type
+  Chunk CRC: 554438993
+Chunk: Data Length 9 (max 2147483647), Type 1935231088 [pHYs]
+  Ancillary, public, PNG 1.2 compliant, safe to copy
+  ... Unknown chunk type
+  Chunk CRC: \-757235972
+Chunk: Data Length 7 (max 2147483647), Type 1162692980 [tIME]
+  Ancillary, public, PNG 1.2 compliant, unsafe to copy
+  ... Unknown chunk type
+  Chunk CRC: 429243611
+Chunk: Data Length 831 (max 2147483647), Type 1413563465 [IDAT]
+  Critical, public, PNG 1.2 compliant, unsafe to copy
+  IDAT contains image data
+  Chunk CRC: 1406256926
+Chunk: Data Length 0 (max 2147483647), Type 1145980233 [IEND]
+  Critical, public, PNG 1.2 compliant, unsafe to copy
+  IEND contains no data
+  Chunk CRC: \-1371381630
+.SH SEE ALSO
+.BR pngchunkdesc (1),
+.BR pngcp (1),
+.BR pnginfo (1).
+.SH AUTHOR
+pngchunks was written by Michael Still <mikal@stillhq.com>.
+.PP
+This manual page was written by Nelson A. de Oliveira <naoliv@debian.org>,
+for the Debian project (but may be used by others).

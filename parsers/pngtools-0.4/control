@@ -1,0 +1,17 @@
+Source: pngtools
+Section: graphics
+Priority: optional
+Maintainer: Nelson A. de Oliveira <naoliv@debian.org>
+Build-Depends: debhelper (>= 9), dh-autoreconf, libpng-dev
+Standards-Version: 3.9.8
+Homepage: http://www.stillhq.com/pngtools/
+
+Package: pngtools
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Suggests: optipng | pngcrush
+Description: series of tools for PNG (Portable Network Graphics) images
+ pngtools is a suite of utilities to work with PNG (Portable Network
+ Graphics) files, equivalents to libtiff's tiffinfo, and tiffcp commands.
+ These commands are called pnginfo, pngcp. tiffdump is replaced by pngchunks
+ and pngchunkdesc as well.
