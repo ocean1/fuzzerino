@@ -116,7 +116,7 @@ bool AFLCoverage::runOnModule(Module &M) {
   IntegerType *Int8Ty = IntegerType::getInt8Ty(C);
   IntegerType *Int32Ty = IntegerType::getInt32Ty(C);
   GlobalVariable *GFZMapPtr =
-      new GlobalVariable(M, PointerType::get(Int8Ty, 0), false,
+      new GlobalVariable(M, PointerType::get(Int32Ty, 0), false,
                          GlobalValue::ExternalLinkage, 0, "__gfz_map_area");
 
   GlobalVariable *GFZRandPtr =
@@ -134,7 +134,7 @@ bool AFLCoverage::runOnModule(Module &M) {
   if (isatty(2) && !getenv("AFL_QUIET")) {
 
     SAYF(cCYA "gfz-llvm-pass " cBRI VERSION cRST
-              " by <lszekeres@google.com>, <ocean>\n");
+              " by <lszekeres@google.com>, <_ocean>\n");
 
   } else
     be_quiet = 1;
@@ -209,8 +209,8 @@ bool AFLCoverage::runOnModule(Module &M) {
       continue;
     }
 
-    if (F.getName().startswith("llvm") || F.getName().startswith("__llvm"))
-      continue;
+    if ( F.isIntrinsic() ) continue; // skip intrinsic func
+        //F.getName().startswith("llvm") || F.getName().startswith("__llvm") )
 
     OKF("Instrumenting %s", F.getName().str().c_str());
     inst_func++;
@@ -243,7 +243,7 @@ bool AFLCoverage::runOnModule(Module &M) {
             dyn_cast<UnreachableInst>(&I) ||
             // dyn_cast<GetElementPtrInst>(&I) ||
             // dyn_cast<ReturnInst>(&I)        ||
-            isa<PHINode>(&I) // PHY will need special handling
+            isa<PHINode>(&I) // PHI will need special handling, they need to be grouped at the basic block level, so if we really want to change them we need to split blocks and take care of them being at the beginning of it
         ) {
           continue;
         }
@@ -310,10 +310,10 @@ bool AFLCoverage::runOnModule(Module &M) {
           // hopefully should be right, trick to clear negative numbers without
           // mul once fuzzed val is off, it stays so
           Value *SubInst =
-              IRB.CreateSub(InstStatus, ConstantInt::get(Int8Ty, -1));
-          Value *MShift = ConstantInt::get(Int8Ty, 7);
+              IRB.CreateSub(InstStatus, ConstantInt::get(Int32Ty, -1));
+          Value *MShift = ConstantInt::get(Int32Ty, 7);
           Value *Mask = IRB.CreateLShr(SubInst, MShift);
-          Value *Subs = IRB.CreateSub(Mask, ConstantInt::get(Int8Ty, -1));
+          Value *Subs = IRB.CreateSub(Mask, ConstantInt::get(Int32Ty, -1));
           Value *SubStat = IRB.CreateAnd(InstStatus, Subs);
 
           IRB.CreateStore(SubStat, MapPtrIdx)
@@ -397,10 +397,10 @@ bool AFLCoverage::runOnModule(Module &M) {
         // hopefully should be right, trick to clear negative numbers without
         // mul once fuzzed val is off, it stays so
         Value *SubInst =
-            IRB.CreateSub(InstStatus, ConstantInt::get(Int8Ty, -1));
-        Value *MShift = ConstantInt::get(Int8Ty, 7);
+            IRB.CreateSub(InstStatus, ConstantInt::get(Int32Ty, -1));
+        Value *MShift = ConstantInt::get(Int32Ty, 7);
         Value *Mask = IRB.CreateLShr(SubInst, MShift);
-        Value *Subs = IRB.CreateSub(Mask, ConstantInt::get(Int8Ty, -1));
+        Value *Subs = IRB.CreateSub(Mask, ConstantInt::get(Int32Ty, -1));
         Value *SubStat = IRB.CreateAnd(InstStatus, Subs);
 
         IRB.CreateStore(SubStat, MapPtrIdx)

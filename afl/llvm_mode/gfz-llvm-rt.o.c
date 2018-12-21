@@ -62,7 +62,7 @@ __thread u32 __afl_prev_loc;
 /* "Rand" area gets filled by the thread itself every time we change fuzz
  * strategy or when all values have been used, for example filled with low/high
  * values, or random values */
-u8 *__gfz_map_area = NULL;
+u32 *__gfz_map_area = NULL;
 u8 *__gfz_rand_area = NULL;
 u32 __gfz_rand_idx;
 
@@ -117,7 +117,8 @@ static void __afl_start_forkserver(void) {
   static u8 tmp[4];
   s32 child_pid;
 
-  char *cmdfmt = "mv -f /dev/shm/fuzztest ./outputs/%lu_fuzztest_%lu";
+  char *cmdfmt = "./outputs/%lu_fuzztest_%lu";
+	char *oldp = "/dev/shm/fuzztest";
   char cmd[500];
   u8 child_stopped = 0;
 
@@ -181,7 +182,8 @@ static void __afl_start_forkserver(void) {
       __gfz_map_area[i] = 0;
 
       sprintf(cmd, cmdfmt, (unsigned long)time(NULL), i);
-      (void)system(cmd);
+      //(void)system(cmd);
+			rename(oldp, cmd);
 
       ++i;
       //__gfz_map_area[a] = 0;
