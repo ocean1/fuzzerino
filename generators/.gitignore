@@ -1,5 +1,7 @@
 outputs/
-aflout
-empty
+cores/
+aflout/
+empty/
 *.o
 *.ll
+*.yaml
