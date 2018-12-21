@@ -1,6 +1,6 @@
-.PHONY: FORCE all clean tests
+.PHONY: FORCE all clean generators
 
-all: afl gfz dotests
+all: afl gfz dogen
 
 afl:
 	CC=clang-6.0 make -C afl
@@ -8,18 +8,18 @@ afl:
 gfz: afl
 	cd afl && ./mk.sh
 
-dotests:
-	cd tests && ./dotests.sh
+dogen:
+	cd generator && ./dotests.sh
 
-tests:
-	cd tests && ./compileall.sh
+generators:
+	cd generators && ./compileall.sh
 
 emit:
-	cd tests && ./emitall.sh
+	cd generators && ./emitall.sh
 
 clean:
 	make -C afl clean
-	make -C tests clean
+	make -C generators clean
 
 cleanall: clean
-	make -C tests cleanll
+	make -C generator cleanll

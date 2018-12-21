@@ -1,0 +1,5 @@
+outputs/
+aflout
+empty
+*.o
+*.ll

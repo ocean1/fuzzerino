@@ -12,7 +12,9 @@ const char* magic = "FFT"; // fast fuzzer test
 bool readstatic(FILE* fd, uint8_t *content, uint32_t *len){
 	void* buf = content;
 	
-	fread(buf, sizeof(uint32_t), 1, fd);
+	if(fread(buf, sizeof(uint32_t), 1, fd) < 1)
+		exit(1);
+
 	if (*(uint32_t*)buf != *(uint32_t*)magic) {
 		fprintf(stderr, "%x %x", *(uint32_t*)magic, *(uint32_t*)buf);
 		return false;
