@@ -183,7 +183,7 @@ static void __afl_start_forkserver(void) {
 
       sprintf(cmd, cmdfmt, (unsigned long)time(NULL), i);
       //(void)system(cmd);
-			rename(oldp, cmd);
+      rename(oldp, cmd);
 
       ++i;
       //__gfz_map_area[a] = 0;
