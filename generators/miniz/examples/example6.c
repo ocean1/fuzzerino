@@ -60,7 +60,7 @@ int main(int argc, char *argv[])
   const int iYmax = 4;
 
   // Output filename
-  static const char *pFilename = "/dev/shm/fuzztest";
+  char *pFilename = argv[1];
 
   int iX, iY;
   const double CxMin = -2.5;
