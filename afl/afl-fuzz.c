@@ -7121,6 +7121,12 @@ EXP_ST void setup_dirs_fds(void) {
 #endif /* !__sun */
 
   }
+  /* Make generated dir */
+  if (gfuzz_mode) {
+    tmp = alloc_printf("%s/generated", out_dir);
+    if (mkdir(tmp, 0700)) WARNF("Unable to create '%s'", tmp);
+    ck_free(tmp);
+  }
 
   /* Queue directory for any starting & discovered paths. */
 
@@ -7538,6 +7544,7 @@ EXP_ST void detect_file_args(char** argv) {
 
       if (!out_file)
         out_file = alloc_printf("%s/.cur_input", out_dir);
+
 
       /* Be sure that we're always using fully-qualified paths. */
 
@@ -8125,11 +8132,24 @@ gfuzz:
   numiter = getenv("GFZ_NUM_ITER");
   maxi = (numiter == NULL) ? 500 : atoi(numiter);
   u32 i = 0;
+  u8 fault;
 
   while (i < maxi) {
       show_stats();
       u32 timeout = 50;
-      run_target(use_argv, timeout);
+      fault = run_target(use_argv, timeout);
+
+      u8* fn = alloc_printf("%s/generated/%d", out_dir, i);
+      rename(out_file, fn);
+
+      switch (fault) {
+        case FAULT_TMOUT:
+          total_crashes++;
+          break;
+        case FAULT_CRASH:
+          total_tmouts++;
+          break;
+      }
 
       ++i;
   }
