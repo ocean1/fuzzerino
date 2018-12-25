@@ -117,9 +117,9 @@ static void __afl_start_forkserver(void) {
   static u8 tmp[4];
   s32 child_pid;
 
-  char *cmdfmt = "./outputs/%lu_fuzztest_%lu";
-	char *oldp = "/dev/shm/fuzztest";
-  char cmd[500];
+  //char *cmdfmt = "./outputs/%lu_fuzztest_%lu";
+	//char *oldp = "/dev/shm/fuzztest";
+  //char cmd[500];
   u8 child_stopped = 0;
 
   /* Phone home and tell the parent that we're OK. If parent isn't there,
@@ -181,9 +181,9 @@ static void __afl_start_forkserver(void) {
 
       __gfz_map_area[i] = 0;
 
-      sprintf(cmd, cmdfmt, (unsigned long)time(NULL), i);
+      //sprintf(cmd, cmdfmt, (unsigned long)time(NULL), i);
       //(void)system(cmd);
-			rename(oldp, cmd);
+      //rename(oldp, cmd);
 
       ++i;
       //__gfz_map_area[a] = 0;
