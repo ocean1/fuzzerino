@@ -76,3 +76,5 @@ ptest
 scratch
 
 xray-log.*
+
+*.o
