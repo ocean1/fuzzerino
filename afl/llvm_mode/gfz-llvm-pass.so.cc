@@ -40,13 +40,13 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/XRay/YAMLXRayRecord.h"
-#include "llvm/IR/IntrinsicInst.h"
 #include <fstream>
 #include <streambuf>
 #include <string>
@@ -71,8 +71,12 @@ public:
   // }
 
 private:
-  uint32_t inst_id = 0;
-  Value *fuzzInt(IRBuilder<> IRB, Instruction *I);
+  uint32_t inst_id = 0, inst_inst = 0;
+  void instrumentOperands(Instruction *I, GlobalVariable *GFZMapPtr,
+                     GlobalVariable *GFZRandPtr, GlobalVariable *GFZRandIdx);
+  Instruction *instrumentInstruction(Instruction *I, GlobalVariable *GFZMapPtr,
+                     GlobalVariable *GFZRandPtr, GlobalVariable *GFZRandIdx);
+  // Value *fuzzInt(IRBuilder<> IRB, Instruction *I);
 };
 
 } // namespace
@@ -108,6 +112,211 @@ static bool updateOperand(Instruction *Inst, unsigned Idx, Instruction *Mat) {
   return true;
 }
 
+void AFLCoverage::instrumentOperands(Instruction *I, GlobalVariable *GFZMapPtr,
+                                GlobalVariable *GFZRandPtr,
+                                GlobalVariable *GFZRandIdx) {
+
+  User::op_iterator OI, OE;
+  Function *F = I->getFunction();
+  Module *M = F->getParent();
+  LLVMContext &C = M->getContext();
+
+  IntegerType *Int8Ty = IntegerType::getInt8Ty(C);
+  IntegerType *Int32Ty = IntegerType::getInt32Ty(C);
+
+  auto *DI = dyn_cast<CallInst>(I);
+  int opidx;
+  for (opidx = 0, OI = DI ? DI->arg_begin() : I->op_begin(),
+      OE = DI ? DI->arg_end() : I->op_end();
+       OI != OE; ++OI, ++opidx) {
+
+    if (OI == OE)
+      break;
+    // for each op, if type is Int (will need to add also for floats, and
+    // other types....) take OI as Value, push fuzzed val, substitute it
+    // val = insertFuzzVal(I, OI);
+    // updateOp(OI, val);
+    // Value *inval = dyn_cast<Value*>(OI);
+
+    auto *OpI = dyn_cast<Value>(*OI);
+    auto *OpII = dyn_cast<Instruction>(*OI);
+    OpI = OpI ? OpI : OpII;
+    if (!OpI)
+      continue;
+
+    IRBuilder<> IRB(I);
+    Type *OIT = OpI->getType();
+    Type *IT = I->getType();
+
+    if (!(OIT->isIntegerTy() /*|| OIT->isFloatingPointTy()*/) ||
+        OIT->isPointerTy()) {
+      continue;
+    }
+    // use an id to reference the fuzzable instruction in gfz map
+    ConstantInt *InstID = ConstantInt::get(Int32Ty, inst_id);
+
+    LoadInst *MapPtr = IRB.CreateLoad(GFZMapPtr);
+    MapPtr->setMetadata(M->getMDKindID("nosanitize"), MDNode::get(C, None));
+    Value *MapPtrIdx = IRB.CreateGEP(MapPtr, InstID);
+
+    /* InstStatus is the status of the instruction, tells us if it
+     * should be mutated or not */
+
+    PointerType *IPT = PointerType::getUnqual(OIT);
+
+    LoadInst *RandIdx = IRB.CreateLoad(GFZRandIdx);
+    LoadInst *RandPtr = IRB.CreateLoad(GFZRandPtr);
+    RandPtr->setMetadata(M->getMDKindID("nosanitize"), MDNode::get(C, None));
+
+    Value *RandPtrCast = IRB.CreateZExtOrBitCast(RandPtr, IPT);
+    Value *RandPtrIdx = IRB.CreateGEP(RandPtrCast, RandIdx);
+
+    /* access random pool */
+
+    /* inc idx to access rand pool */
+    Value *Incr = IRB.CreateAdd(RandIdx, ConstantInt::get(Int32Ty, 1));
+    Incr = IRB.CreateURem(Incr, ConstantInt::get(Int32Ty, 4096));
+    IRB.CreateStore(Incr, GFZRandIdx)
+        ->setMetadata(M->getMDKindID("nosanitize"), MDNode::get(C, None));
+
+    LoadInst *RandVal = IRB.CreateLoad(RandPtrIdx);
+
+    LoadInst *InstStatus = IRB.CreateLoad(MapPtrIdx);
+
+    // hopefully should be right, trick to clear negative numbers without
+    // mul once fuzzed val is off, it stays so
+    Value *SubInst = IRB.CreateSub(InstStatus, ConstantInt::get(Int32Ty, -1));
+    Value *MShift = ConstantInt::get(Int32Ty, 7);
+    Value *Mask = IRB.CreateLShr(SubInst, MShift);
+    Value *Subs = IRB.CreateSub(Mask, ConstantInt::get(Int32Ty, -1));
+    Value *SubStat = IRB.CreateAnd(InstStatus, Subs);
+
+    IRB.CreateStore(SubStat, MapPtrIdx)
+        ->setMetadata(M->getMDKindID("nosanitize"), MDNode::get(C, None));
+
+    Value *FuzzVal;
+
+    if (OIT->isFloatingPointTy()) {
+      FuzzVal = IRB.CreateSIToFP(InstStatus, IT);
+      FuzzVal = IRB.CreateMul(FuzzVal, RandVal);
+    } else {
+      if (OIT->getPrimitiveSizeInBits() <
+          InstStatus->getType()->getPrimitiveSizeInBits()) {
+        FuzzVal = IRB.CreateAnd(IRB.CreateTrunc(InstStatus, OIT), RandVal);
+      } else {
+        FuzzVal =
+            IRB.CreateAnd(IRB.CreateSExtOrBitCast(InstStatus, OIT), RandVal);
+      }
+    }
+
+    Value *FuzzedVal = IRB.CreateAdd(FuzzVal, OpI);
+
+    dyn_cast<Instruction>(FuzzedVal)->setMetadata(M->getMDKindID("nosanitize"),
+                                                  MDNode::get(C, None));
+
+    // replace back I as operand of fuzzedVal, got removed by
+    updateOperand(I, opidx, dyn_cast<Instruction>(FuzzedVal));
+
+    inst_id++;
+    inst_inst++;
+  }
+}
+
+Instruction* AFLCoverage::instrumentInstruction(Instruction *I, GlobalVariable *GFZMapPtr,
+                                GlobalVariable *GFZRandPtr,
+                                GlobalVariable *GFZRandIdx) {
+
+  Function *F = I->getFunction();
+  Module *M = F->getParent();
+  LLVMContext &C = M->getContext();
+
+  //IntegerType *Int8Ty = IntegerType::getInt8Ty(C);
+  IntegerType *Int32Ty = IntegerType::getInt32Ty(C);
+
+  Instruction *NI = NULL;
+
+  Type *IT = I->getType();
+
+        if (!(IT->isIntegerTy() /*|| IT->isFloatingPointTy()*/) ||
+            IT->isPointerTy()) {
+          return NULL;
+        }
+
+        NI = I->getNextNode();
+        IRBuilder<> IRB(NI);
+        // use an id to reference the fuzzable instruction in gfz map
+        ConstantInt *InstID = ConstantInt::get(Int32Ty, inst_id);
+
+        LoadInst *MapPtr = IRB.CreateLoad(GFZMapPtr);
+        MapPtr->setMetadata(M->getMDKindID("nosanitize"), MDNode::get(C, None));
+        Value *MapPtrIdx = IRB.CreateGEP(MapPtr, InstID);
+
+        /* InstStatus is the status of the instruction, tells us if it
+         * should be mutated or not */
+
+        PointerType *IPT = PointerType::getUnqual(I->getType());
+
+        LoadInst *RandIdx = IRB.CreateLoad(GFZRandIdx);
+        LoadInst *RandPtr = IRB.CreateLoad(GFZRandPtr);
+        RandPtr->setMetadata(M->getMDKindID("nosanitize"), MDNode::get(C, None));
+
+        Value *RandPtrCast = IRB.CreateZExtOrBitCast(RandPtr, IPT);
+        Value *RandPtrIdx = IRB.CreateGEP(RandPtrCast, RandIdx);
+
+        /* access random pool */
+
+        /* inc idx to access rand pool */
+        Value *Incr = IRB.CreateAdd(RandIdx, ConstantInt::get(Int32Ty, 1));
+        Incr = IRB.CreateURem(Incr, ConstantInt::get(Int32Ty, 4096));
+        IRB.CreateStore(Incr, GFZRandIdx)
+            ->setMetadata(M->getMDKindID("nosanitize"), MDNode::get(C, None));
+
+        LoadInst *RandVal = IRB.CreateLoad(RandPtrIdx);
+
+        LoadInst *InstStatus = IRB.CreateLoad(MapPtrIdx);
+
+        // hopefully should be right, trick to clear negative numbers without
+        // mul once fuzzed val is off, it stays so
+        Value *SubInst =
+            IRB.CreateSub(InstStatus, ConstantInt::get(Int32Ty, -1));
+        Value *MShift = ConstantInt::get(Int32Ty, 7);
+        Value *Mask = IRB.CreateLShr(SubInst, MShift);
+        Value *Subs = IRB.CreateSub(Mask, ConstantInt::get(Int32Ty, -1));
+        Value *SubStat = IRB.CreateAnd(InstStatus, Subs);
+
+        IRB.CreateStore(SubStat, MapPtrIdx)
+            ->setMetadata(M->getMDKindID("nosanitize"), MDNode::get(C, None));
+
+        Value *FuzzVal;
+
+        if (IT->isFloatingPointTy()) {
+          FuzzVal = IRB.CreateSIToFP(InstStatus, IT);
+          FuzzVal = IRB.CreateMul(FuzzVal, RandVal);
+        } else {
+          if (IT->getPrimitiveSizeInBits() <
+              InstStatus->getType()->getPrimitiveSizeInBits()) {
+            FuzzVal = IRB.CreateAnd(IRB.CreateTrunc(InstStatus, IT), RandVal);
+          } else {
+            FuzzVal =
+                IRB.CreateAnd(IRB.CreateSExtOrBitCast(InstStatus, IT), RandVal);
+          }
+        }
+
+        Value *FuzzedVal = IRB.CreateAdd(FuzzVal, I);
+
+        dyn_cast<Instruction>(FuzzedVal)->setMetadata(
+            M->getMDKindID("nosanitize"), MDNode::get(C, None));
+
+        I->replaceAllUsesWith(FuzzedVal);
+
+        // replace back I as operand of fuzzedVal, got removed by
+        // replaceAllUses
+        updateOperand(dyn_cast<Instruction>(FuzzedVal), 1, I);
+
+        inst_id++;
+        inst_inst++;
+        return NI;
+}
 
 bool AFLCoverage::runOnModule(Module &M) {
 
@@ -184,36 +393,30 @@ bool AFLCoverage::runOnModule(Module &M) {
     }
   }
 
-  /* global variables for GFZ */
-  // 0, GlobalVariable::GeneralDynamicTLSModel, 0, false);
-
   /* Instrument all the things! */
 
   int inst_blocks = 0, inst_func = 0;
-  unsigned int nope = 0;
 
   // TODO: implement skipping of functions and modules by implementing
   // a #pragma nofuzz and __attribute(nofuzz)
 
-  // ugly hack, don't want to implement an LTO pass, keep track of current ID in
-  // a locked file
+  // ugly hack, don't want to implement an LTO pass,
+  // keep track of current ID in a locked file
   lock.l_type = F_WRLCK;
   fcntl(idfd, F_SETLKW, &lock);
   lseek(idfd, 0, SEEK_SET);
   if (read(idfd, &inst_id, sizeof(inst_id)) != sizeof(inst_id))
     inst_id = 0;
 
-  SmallVector<Instruction *, 1000> RemoveInst;
   for (auto &F : M) {
+    inst_inst = inst_blocks = 0;
+
     if (whitelist && (WhitelistSet.find(F.getName()) == WhitelistSet.end())) {
       continue;
     }
 
-    if ( F.isIntrinsic() ) continue; // skip intrinsic func
-        //F.getName().startswith("llvm") || F.getName().startswith("__llvm") )
-
-    OKF("Instrumenting %s", F.getName().str().c_str());
-    inst_func++;
+    if (F.isIntrinsic())
+      continue; // skip intrinsic funcs
 
     for (auto &BB : F) {
 
@@ -226,232 +429,35 @@ bool AFLCoverage::runOnModule(Module &M) {
           continue;
         NI = NULL;
 
-        /* fuzz also all operands */
-
-        User::op_iterator OI, OE;
-
-        /* heuristics to skip functions that might crash the target
-         * too easily, will implement some better heuristics later :) */
-
-        if (
-            // dyn_cast<StoreInst>(&I)         ||
-            // dyn_cast<CmpInst>(&I)           ||
-            //dyn_cast<AllocaInst>(&I)
-            dyn_cast<BranchInst>(&I) ||
-            //dyn_cast<SwitchInst>(&I) ||
-            dyn_cast<IndirectBrInst>(&I) ||
-            dyn_cast<UnreachableInst>(&I) ||
+        if (dyn_cast<BranchInst>(&I) || dyn_cast<IndirectBrInst>(&I) ||
+            dyn_cast<UnreachableInst>(&I) || isa<PHINode>(&I)
+            // dyn_cast<SwitchInst>(&I) ||
             // dyn_cast<GetElementPtrInst>(&I) ||
             // dyn_cast<ReturnInst>(&I)        ||
-            isa<PHINode>(&I) // PHI will need special handling, they need to be grouped at the basic block level, so if we really want to change them we need to split blocks and take care of them being at the beginning of it
+            // dyn_cast<StoreInst>(&I)         ||
+            // dyn_cast<CmpInst>(&I)           ||
+            // dyn_cast<AllocaInst>(&I)
         ) {
           continue;
         }
 
-        if( !(dyn_cast<GetElementPtrInst>(&I) || dyn_cast<SwitchInst>(&I) ||
-              dyn_cast<IntrinsicInst>(&I))){
-        auto *DI = dyn_cast<CallInst>(&I);
-        int opidx;
-        for (opidx=0, OI = DI ? DI->arg_begin() : I.op_begin(),
-            OE = DI ? DI->arg_end() : I.op_end();
-            OI != OE; ++OI, ++opidx) {
-
-          if (OI == OE) break;
-          // for each op, if type is Int (will need to add also for floats, and
-          // other types....) take OI as Value, push fuzzed val, substitute it
-          // val = insertFuzzVal(I, OI);
-          // updateOp(OI, val);
-          // Value *inval = dyn_cast<Value*>(OI);
-          auto *OpI = dyn_cast<Value>(*OI);
-          auto *OpII = dyn_cast<Instruction>(*OI);
-          OpI = OpI ? OpI : OpII;
-          if (!OpI)
-            continue;
-
-          IRBuilder<> IRB(&I);
-          Type *OIT = OpI->getType();
-          Type *IT = I.getType();
-
-          if (  !(OIT->isIntegerTy() /*|| OIT->isFloatingPointTy()*/) ||
-                OIT->isPointerTy()) {
-            continue;
-          }
-          // use an id to reference the fuzzable instruction in gfz map
-          ConstantInt *InstID = ConstantInt::get(Int32Ty, inst_id);
-
-          LoadInst *MapPtr = IRB.CreateLoad(GFZMapPtr);
-          MapPtr->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
-          Value *MapPtrIdx = IRB.CreateGEP(MapPtr, InstID);
-
-          /* InstStatus is the status of the instruction, tells us if it
-           * should be mutated or not */
-
-          PointerType *IPT = PointerType::getUnqual(OIT);
-
-          LoadInst *RandIdx = IRB.CreateLoad(GFZRandIdx);
-          LoadInst *RandPtr = IRB.CreateLoad(GFZRandPtr);
-          RandPtr->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
-
-          Value *RandPtrCast = IRB.CreateZExtOrBitCast(RandPtr, IPT);
-          Value *RandPtrIdx = IRB.CreateGEP(RandPtrCast, RandIdx);
-
-          /* access random pool */
-
-          /* inc idx to access rand pool */
-          Value *Incr = IRB.CreateAdd(RandIdx, ConstantInt::get(Int32Ty, 1));
-          Incr = IRB.CreateURem(Incr, ConstantInt::get(Int32Ty, 4096));
-          IRB.CreateStore(Incr, GFZRandIdx)
-              ->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
-
-          LoadInst *RandVal = IRB.CreateLoad(RandPtrIdx);
-
-          LoadInst *InstStatus = IRB.CreateLoad(MapPtrIdx);
-
-          // hopefully should be right, trick to clear negative numbers without
-          // mul once fuzzed val is off, it stays so
-          Value *SubInst =
-              IRB.CreateSub(InstStatus, ConstantInt::get(Int32Ty, -1));
-          Value *MShift = ConstantInt::get(Int32Ty, 7);
-          Value *Mask = IRB.CreateLShr(SubInst, MShift);
-          Value *Subs = IRB.CreateSub(Mask, ConstantInt::get(Int32Ty, -1));
-          Value *SubStat = IRB.CreateAnd(InstStatus, Subs);
-
-          IRB.CreateStore(SubStat, MapPtrIdx)
-              ->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
-
-          Value *FuzzVal;
-
-          if (OIT->isFloatingPointTy()) {
-            FuzzVal = IRB.CreateSIToFP(InstStatus, IT);
-            FuzzVal = IRB.CreateMul(FuzzVal, RandVal);
-          } else {
-            if (OIT->getPrimitiveSizeInBits() <
-                InstStatus->getType()->getPrimitiveSizeInBits()) {
-              FuzzVal = IRB.CreateAnd(IRB.CreateTrunc(InstStatus, OIT), RandVal);
-            } else {
-              FuzzVal =
-                  IRB.CreateAnd(IRB.CreateSExtOrBitCast(InstStatus, OIT), RandVal);
-            }
-          }
-
-          Value *FuzzedVal = IRB.CreateAdd(FuzzVal, OpI);
-
-          dyn_cast<Instruction>(FuzzedVal)->setMetadata(
-              M.getMDKindID("nosanitize"), MDNode::get(C, None));
-
-          // replace back I as operand of fuzzedVal, got removed by
-          // replaceAllUses
-          updateOperand(&I, opidx, dyn_cast<Instruction>(FuzzedVal));
-
-          // RemoveInst.push_back(&I);
-          nope++;
-
-          inst_id++;
-
-          // Value* fuzzed = doFuzzVal(OpI, ...);
-          // updateOperand(fuzzed, I, OI.num);
-        }
+        if (!(dyn_cast<GetElementPtrInst>(&I) || dyn_cast<SwitchInst>(&I) ||
+              dyn_cast<IntrinsicInst>(&I))) {
+          instrumentOperands(&I, GFZMapPtr, GFZRandPtr, GFZRandIdx);
         }
 
-        I.setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
+        NI = instrumentInstruction(&I, GFZMapPtr, GFZRandPtr, GFZRandIdx);
 
-        Type *IT = I.getType();
-        if (!(IT->isIntegerTy() /*|| IT->isFloatingPointTy()*/) ||
-            IT->isPointerTy()) {
-          continue;
-        }
-
-        NI = (&I)->getNextNode();
-        IRBuilder<> IRB(NI);
-        // use an id to reference the fuzzable instruction in gfz map
-        ConstantInt *InstID = ConstantInt::get(Int32Ty, inst_id);
-
-        LoadInst *MapPtr = IRB.CreateLoad(GFZMapPtr);
-        MapPtr->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
-        Value *MapPtrIdx = IRB.CreateGEP(MapPtr, InstID);
-
-        /* InstStatus is the status of the instruction, tells us if it
-         * should be mutated or not */
-
-        PointerType *IPT = PointerType::getUnqual(I.getType());
-
-        LoadInst *RandIdx = IRB.CreateLoad(GFZRandIdx);
-        LoadInst *RandPtr = IRB.CreateLoad(GFZRandPtr);
-        RandPtr->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
-
-        Value *RandPtrCast = IRB.CreateZExtOrBitCast(RandPtr, IPT);
-        Value *RandPtrIdx = IRB.CreateGEP(RandPtrCast, RandIdx);
-
-        /* access random pool */
-
-        /* inc idx to access rand pool */
-        Value *Incr = IRB.CreateAdd(RandIdx, ConstantInt::get(Int32Ty, 1));
-        Incr = IRB.CreateURem(Incr, ConstantInt::get(Int32Ty, 4096));
-        IRB.CreateStore(Incr, GFZRandIdx)
-            ->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
-
-        LoadInst *RandVal = IRB.CreateLoad(RandPtrIdx);
-
-        LoadInst *InstStatus = IRB.CreateLoad(MapPtrIdx);
-
-        // hopefully should be right, trick to clear negative numbers without
-        // mul once fuzzed val is off, it stays so
-        Value *SubInst =
-            IRB.CreateSub(InstStatus, ConstantInt::get(Int32Ty, -1));
-        Value *MShift = ConstantInt::get(Int32Ty, 7);
-        Value *Mask = IRB.CreateLShr(SubInst, MShift);
-        Value *Subs = IRB.CreateSub(Mask, ConstantInt::get(Int32Ty, -1));
-        Value *SubStat = IRB.CreateAnd(InstStatus, Subs);
-
-        IRB.CreateStore(SubStat, MapPtrIdx)
-            ->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
-
-        Value *FuzzVal;
-
-        if (IT->isFloatingPointTy()) {
-          FuzzVal = IRB.CreateSIToFP(InstStatus, IT);
-          FuzzVal = IRB.CreateMul(FuzzVal, RandVal);
-        } else {
-          if (IT->getPrimitiveSizeInBits() <
-              InstStatus->getType()->getPrimitiveSizeInBits()) {
-            FuzzVal = IRB.CreateAnd(IRB.CreateTrunc(InstStatus, IT), RandVal);
-          } else {
-            FuzzVal =
-                IRB.CreateAnd(IRB.CreateSExtOrBitCast(InstStatus, IT), RandVal);
-          }
-        }
-
-        Value *FuzzedVal = IRB.CreateAdd(FuzzVal, &I);
-
-        dyn_cast<Instruction>(FuzzedVal)->setMetadata(
-            M.getMDKindID("nosanitize"), MDNode::get(C, None));
-
-        I.replaceAllUsesWith(FuzzedVal);
-
-        // replace back I as operand of fuzzedVal, got removed by
-        // replaceAllUses
-        updateOperand(dyn_cast<Instruction>(FuzzedVal), 1, &I);
-
-        // RemoveInst.push_back(&I);
-        nope++;
-
-        inst_id++;
       }
 
       inst_blocks++;
     }
-  }
 
-//ciccio:
-  while (!RemoveInst.empty()) {
-    Instruction *RI = RemoveInst.pop_back_val();
-    // TODO: find how to remove these... keeps on popping at random...
-    RI->removeFromParent();
-    if (nope == 0)
-      nope = 50;
+    if (!be_quiet && inst_inst != 0)
+      OKF("Instrumented %s [%u I, %u BB].", F.getName().str().c_str(),
+          inst_inst, inst_blocks);
+    inst_func++;
   }
-
-  OKF("Removing stuff %u", nope);
 
   lseek(idfd, 0, SEEK_SET);
   if (write(idfd, &inst_id, sizeof(inst_id)) != sizeof(inst_id)) {
@@ -465,17 +471,20 @@ bool AFLCoverage::runOnModule(Module &M) {
 
   if (!be_quiet) {
 
-    if (!inst_blocks)
+    if (!inst_func)
       WARNF("No instrumentation targets found.");
     else
-      OKF("Instrumented %u BB, %u I, %u F (%s mode, ratio %u%%).", inst_blocks,
-          inst_id, inst_func,
-          getenv("AFL_HARDEN")
-              ? "hardened"
-              : ((getenv("AFL_USE_ASAN") || getenv("AFL_USE_MSAN"))
-                     ? "ASAN/MSAN"
-                     : "non-hardened"),
-          inst_ratio);
+      OKF("Instrumented %u F, %u I (%u total).", //(%s mode, ratio %u%%)."
+          inst_func, inst_inst, inst_id);
+    // there's functions with 0 I/ 0 BB (external references?) check them out....
+    /*inst_blocks,
+    inst_id, inst_func,
+    getenv("AFL_HARDEN")
+        ? "hardened"
+        : ((getenv("AFL_USE_ASAN") || getenv("AFL_USE_MSAN"))
+               ? "ASAN/MSAN"
+               : "non-hardened"),
+    inst_ratio);*/
   }
 
   return true;
