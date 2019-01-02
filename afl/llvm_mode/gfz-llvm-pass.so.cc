@@ -241,6 +241,9 @@ Instruction* AFLCoverage::instrumentInstruction(Instruction *I, GlobalVariable *
         }
 
         NI = I->getNextNode();
+
+        if (!NI)
+            return NULL;
         //NI->print(errs());
         //errs() << "\n";
 
@@ -422,10 +425,16 @@ bool AFLCoverage::runOnModule(Module &M) {
       continue; // skip intrinsic funcs
 
     for (auto &BB : F) {
+
+      if (BB.getFirstInsertionPt() == BB.end())
+          continue;
+
       for (auto &I : BB) {
 
         if ((isa<BranchInst>(&I) || isa<IndirectBrInst>(&I) ||
-            isa<UnreachableInst>(&I) || isa<PHINode>(&I))) {
+            isa<UnreachableInst>(&I) || isa<PHINode>(&I) ||
+            isa<CatchSwitchInst>(&I) || isa<ResumeInst>(&I) ||
+            isa<LandingPadInst>(&I) )) {
             continue;
         }
 
