@@ -22,25 +22,24 @@ UPX     [19437 42291 19437]
 libpng  [14549 39535 14549]
 
 #TODOs
++ use "coverage", we need a inststatus telling us when a given instruction is disabled from fuzzing, when we want to measure if we got new paths explored, and the fuzzing "strategy", this way we can measure for a given input/run how many times a given instruction is executed, we can skip all the others (and measure those that haven't been hit yet by a dry run), and then choose a fuzzing strategy for the others (e.g. wait for iteration X and then mutate, or always mutate, or change the way we mutate it ADD/XOR/NULL the value etc...) this will solve a bunch of problems
++ we can use CAS (content addressable storage) to move the outputs without generating a shitton of outputs by using a fast hash like xxhash, and storing the sample only when needed to avoid fduping over
++ build custom generator respecting useful properties for a nice format (PNG/GIF/PE?...), perhaps instead work on a small client to fuzz some nice network protocol, that's were it may shine (even timing based stuff shouldn't change much, possibly we just want to avoid mutations that cause a disconnect, explore a bit the state of a variable, and decide if you just avoid fuzzing it at all at a given time) fuzz fucking filezilla (like build an ftp server and client!), or putty... `https://juliareda.eu/2018/12/eu-fossa-bug-bounties/`
++ handle Phi instructions: those need to be grouped, at the start of a basic block
++ data analysis (optimization) remove instructions that do not change the flow of data output (sinks are writes or calls/invoke)
++ data analysis: implement fuzzing for pointers, just change randomly stuff in pointed structure, try to infer length of struct perhaps by instrumenting mallocs and taint tracking objects? (maybe a custom allocator might help -- especially when stuff gets allocated precisely for each object) -- let's try maybe fuzzing MQTT? :PPPP better also apache or something
+
 + implement smart heuristics
     + smart handling of pointers
     + bogus structures
     + reuse allocated memory (structures, class instances...)
 + maybe avoid segfaults by allocating on purpose when crashing and restarting
-+ handle Phi instructions
 + explicitly skip the output of calls that return pointers (malloc) (?)
 + intra-function data-flow optimization: only instrument "leaf-nodes" (e.g. those that are not dominated, for example those that end up in a store, or are not referenced anymore...)
-+ optimization: put a jump/call and skip over fuzzing, then nop it in child procs, phy instructions could help with allocation of registers in proper way, so we can nop instruction block, otherwise will have to do something better...D:
 + optimization: align RAND_POOL at RAND_POOL_SIZE, then increment ptr directly wrapping with % RAND_POOL_SIZE
 + rand pool must be per thread (meh... not much of it used), or need atomic instructions to update
 + add floats to tests
-+ fix rand value, is just 8 bits, instead read a I.getType by casting
-+ keep track of coverage in one file per each module under analysis (no locks needed :)) then in makefile just update the last part (or in clang overlay, if linking --can be understood? then we collect the info for each module, and patch the output file with lief or equivalent -- or close to a signature/in a known string/signature -- not a big overhead, should happen only once when executing the father process )
-+ integrate with afl fuzz
-+ add called functions to function set and store in xray yaml (if they were not found at runtime)
-+ self-disable of status bit? (can I reenable it always?) -- need to add another "field" which is the "probability" changing it? from very low to very high (can we avoid using mul/div/rem is compiler smart to do it for us?)
-+ implement branching setup of instructions, should get a small hit considering that most times branch predictor should say nay (maybe we can even hint it?)
-+ https://pdfs.semanticscholar.org/bfca/81c7fbc6b2c32430dc756b936a6b0c2d0585.pdf use tyche-i to generate pseudorand numbers :D
++ https://pdfs.semanticscholar.org/bfca/81c7fbc6b2c32430dc756b936a6b0c2d0585.pdf use tyche-i to generate pseudorand numbers
 
         /*
         * if (CallInst *Call = dyn_cast<CallInst>(&I)) {

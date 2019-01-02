@@ -42,11 +42,14 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/XRay/YAMLXRayRecord.h"
+#include <iostream>
 #include <fstream>
 #include <streambuf>
 #include <string>
@@ -156,7 +159,6 @@ void AFLCoverage::instrumentOperands(Instruction *I, GlobalVariable *GFZMapPtr,
     ConstantInt *InstID = ConstantInt::get(Int32Ty, inst_id);
 
     LoadInst *MapPtr = IRB.CreateLoad(GFZMapPtr);
-    MapPtr->setMetadata(M->getMDKindID("nosanitize"), MDNode::get(C, None));
     Value *MapPtrIdx = IRB.CreateGEP(MapPtr, InstID);
 
     /* InstStatus is the status of the instruction, tells us if it
@@ -166,7 +168,6 @@ void AFLCoverage::instrumentOperands(Instruction *I, GlobalVariable *GFZMapPtr,
 
     LoadInst *RandIdx = IRB.CreateLoad(GFZRandIdx);
     LoadInst *RandPtr = IRB.CreateLoad(GFZRandPtr);
-    RandPtr->setMetadata(M->getMDKindID("nosanitize"), MDNode::get(C, None));
 
     Value *RandPtrCast = IRB.CreateZExtOrBitCast(RandPtr, IPT);
     Value *RandPtrIdx = IRB.CreateGEP(RandPtrCast, RandIdx);
@@ -176,8 +177,7 @@ void AFLCoverage::instrumentOperands(Instruction *I, GlobalVariable *GFZMapPtr,
     /* inc idx to access rand pool */
     Value *Incr = IRB.CreateAdd(RandIdx, ConstantInt::get(Int32Ty, 1));
     Incr = IRB.CreateURem(Incr, ConstantInt::get(Int32Ty, 4096));
-    IRB.CreateStore(Incr, GFZRandIdx)
-        ->setMetadata(M->getMDKindID("nosanitize"), MDNode::get(C, None));
+    IRB.CreateStore(Incr, GFZRandIdx);
 
     LoadInst *RandVal = IRB.CreateLoad(RandPtrIdx);
 
@@ -191,8 +191,7 @@ void AFLCoverage::instrumentOperands(Instruction *I, GlobalVariable *GFZMapPtr,
     Value *Subs = IRB.CreateSub(Mask, ConstantInt::get(Int32Ty, -1));
     Value *SubStat = IRB.CreateAnd(InstStatus, Subs);
 
-    IRB.CreateStore(SubStat, MapPtrIdx)
-        ->setMetadata(M->getMDKindID("nosanitize"), MDNode::get(C, None));
+    IRB.CreateStore(SubStat, MapPtrIdx);
 
     Value *FuzzVal;
 
@@ -211,8 +210,7 @@ void AFLCoverage::instrumentOperands(Instruction *I, GlobalVariable *GFZMapPtr,
 
     Value *FuzzedVal = IRB.CreateAdd(FuzzVal, OpI);
 
-    dyn_cast<Instruction>(FuzzedVal)->setMetadata(M->getMDKindID("nosanitize"),
-                                                  MDNode::get(C, None));
+    dyn_cast<Instruction>(FuzzedVal);
 
     // replace back I as operand of fuzzedVal, got removed by
     updateOperand(I, opidx, dyn_cast<Instruction>(FuzzedVal));
@@ -243,13 +241,34 @@ Instruction* AFLCoverage::instrumentInstruction(Instruction *I, GlobalVariable *
         }
 
         NI = I->getNextNode();
+        //NI->print(errs());
+        //errs() << "\n";
+
+        /* if (*instStatus == 0 ){
+         *  incrementMap(); // keep a map telling us #times we went over an inst.
+         *  this way we can keep track of: new instructions (maybe at BB level?)
+         *  and # times we went over it
+         *  Ival = I;
+         * } else {
+         *   Ival = fuzzVal(I);
+         * } */
+
         IRBuilder<> IRB(NI);
         // use an id to reference the fuzzable instruction in gfz map
         ConstantInt *InstID = ConstantInt::get(Int32Ty, inst_id);
+        UnreachableInst *FakeVal = IRB.CreateUnreachable();
+        I->replaceAllUsesWith(FakeVal);
 
         LoadInst *MapPtr = IRB.CreateLoad(GFZMapPtr);
-        MapPtr->setMetadata(M->getMDKindID("nosanitize"), MDNode::get(C, None));
         Value *MapPtrIdx = IRB.CreateGEP(MapPtr, InstID);
+        LoadInst *InstStatus = IRB.CreateLoad(MapPtrIdx);
+
+        Value *InstEnabled = IRB.CreateICmpEQ(InstStatus, ConstantInt::get(Int32Ty, 0));
+
+        TerminatorInst *CheckStatus = SplitBlockAndInsertIfThen(InstEnabled, NI, false,
+                MDBuilder(C).createBranchWeights(1, 100000));
+
+        IRB.SetInsertPoint(CheckStatus);
 
         /* InstStatus is the status of the instruction, tells us if it
          * should be mutated or not */
@@ -258,7 +277,6 @@ Instruction* AFLCoverage::instrumentInstruction(Instruction *I, GlobalVariable *
 
         LoadInst *RandIdx = IRB.CreateLoad(GFZRandIdx);
         LoadInst *RandPtr = IRB.CreateLoad(GFZRandPtr);
-        RandPtr->setMetadata(M->getMDKindID("nosanitize"), MDNode::get(C, None));
 
         Value *RandPtrCast = IRB.CreateZExtOrBitCast(RandPtr, IPT);
         Value *RandPtrIdx = IRB.CreateGEP(RandPtrCast, RandIdx);
@@ -268,12 +286,10 @@ Instruction* AFLCoverage::instrumentInstruction(Instruction *I, GlobalVariable *
         /* inc idx to access rand pool */
         Value *Incr = IRB.CreateAdd(RandIdx, ConstantInt::get(Int32Ty, 1));
         Incr = IRB.CreateURem(Incr, ConstantInt::get(Int32Ty, 4096));
-        IRB.CreateStore(Incr, GFZRandIdx)
-            ->setMetadata(M->getMDKindID("nosanitize"), MDNode::get(C, None));
+        IRB.CreateStore(Incr, GFZRandIdx);
 
         LoadInst *RandVal = IRB.CreateLoad(RandPtrIdx);
 
-        LoadInst *InstStatus = IRB.CreateLoad(MapPtrIdx);
 
         // hopefully should be right, trick to clear negative numbers without
         // mul once fuzzed val is off, it stays so
@@ -284,8 +300,7 @@ Instruction* AFLCoverage::instrumentInstruction(Instruction *I, GlobalVariable *
         Value *Subs = IRB.CreateSub(Mask, ConstantInt::get(Int32Ty, -1));
         Value *SubStat = IRB.CreateAnd(InstStatus, Subs);
 
-        IRB.CreateStore(SubStat, MapPtrIdx)
-            ->setMetadata(M->getMDKindID("nosanitize"), MDNode::get(C, None));
+        IRB.CreateStore(SubStat, MapPtrIdx);
 
         Value *FuzzVal;
 
@@ -304,14 +319,18 @@ Instruction* AFLCoverage::instrumentInstruction(Instruction *I, GlobalVariable *
 
         Value *FuzzedVal = IRB.CreateAdd(FuzzVal, I);
 
-        dyn_cast<Instruction>(FuzzedVal)->setMetadata(
-            M->getMDKindID("nosanitize"), MDNode::get(C, None));
+        //dyn_cast<Instruction>(FuzzedVal);
 
-        I->replaceAllUsesWith(FuzzedVal);
+        IRB.SetInsertPoint(NI);
 
-        // replace back I as operand of fuzzedVal, got removed by
-        // replaceAllUses
-        updateOperand(dyn_cast<Instruction>(FuzzedVal), 1, I);
+        PHINode *PHI = IRB.CreatePHI(IT, 2);
+        BasicBlock *CondBlock = I->getParent();
+        PHI->addIncoming(I, CondBlock);
+        BasicBlock *ThenBlock = cast<Instruction>(FuzzedVal)->getParent();
+        PHI->addIncoming(FuzzedVal, ThenBlock);
+
+        FakeVal->replaceAllUsesWith(PHI);
+        FakeVal->eraseFromParent();
 
         inst_id++;
         inst_inst++;
@@ -336,20 +355,19 @@ bool AFLCoverage::runOnModule(Module &M) {
       M, Int32Ty, false, GlobalValue::ExternalLinkage, 0, "__gfz_rand_idx");
 
   StringSet<> WhitelistSet;
+  SmallVector<Instruction*, 64> ToInstrument, ToInstrumentOps;
+
   /* Show a banner */
 
   char be_quiet = 0;
 
   if (isatty(2) && !getenv("AFL_QUIET")) {
-
     SAYF(cCYA "gfz-llvm-pass " cBRI VERSION cRST
               " by <lszekeres@google.com>, <_ocean>\n");
-
   } else
     be_quiet = 1;
 
-  /* get temporary file to keep ID of fuzzed register to be used as gfz_map idx
-   */
+  /* get temporary file to keep ID of fuzzed register to be used as gfz_map idx */
   struct flock lock;
   int idfd;
 
@@ -357,35 +375,20 @@ bool AFLCoverage::runOnModule(Module &M) {
               S_IRUSR | S_IWUSR | S_IRGRP);
   memset(&lock, 0, sizeof(lock));
 
-  /* Decide instrumentation ratio */
-
-  char *inst_ratio_str = getenv("AFL_INST_RATIO");
-  unsigned int inst_ratio = 100;
-
-  if (inst_ratio_str) {
-
-    if (sscanf(inst_ratio_str, "%u", &inst_ratio) != 1 || !inst_ratio ||
-        inst_ratio > 100)
-      FATAL("Bad value of AFL_INST_RATIO (must be between 1 and 100)");
-  }
-
   /* white list functions */
   char *whitelist = getenv("GFZ_WHITE_LIST");
 
   /* scan for functions explicitly marked as fuzzable */
-  for (auto &F : M) {
-    if (F.getSection() == ".fuzzables") {
+  for (auto &F : M) if (F.getSection() == ".fuzzables")
       WhitelistSet.insert(F.getName());
-    }
-  }
 
+  /* read executed functions from llvm xray yaml*/
   if (whitelist) {
     std::ifstream t(whitelist);
     std::string str((std::istreambuf_iterator<char>(t)),
                     std::istreambuf_iterator<char>());
     Input y(str);
     YAMLXRayTrace Wlt;
-
     y >> Wlt;
 
     for (auto const &rec : Wlt.Records) {
@@ -419,34 +422,18 @@ bool AFLCoverage::runOnModule(Module &M) {
       continue; // skip intrinsic funcs
 
     for (auto &BB : F) {
-
-      Instruction *NI = NULL;
-
       for (auto &I : BB) {
 
-        // skip over inserted instructions
-        if (NI != NULL && &I != NI)
-          continue;
-        NI = NULL;
-
-        if (dyn_cast<BranchInst>(&I) || dyn_cast<IndirectBrInst>(&I) ||
-            dyn_cast<UnreachableInst>(&I) || isa<PHINode>(&I)
-            // dyn_cast<SwitchInst>(&I) ||
-            // dyn_cast<GetElementPtrInst>(&I) ||
-            // dyn_cast<ReturnInst>(&I)        ||
-            // dyn_cast<StoreInst>(&I)         ||
-            // dyn_cast<CmpInst>(&I)           ||
-            // dyn_cast<AllocaInst>(&I)
-        ) {
-          continue;
+        if ((isa<BranchInst>(&I) || isa<IndirectBrInst>(&I) ||
+            isa<UnreachableInst>(&I) || isa<PHINode>(&I))) {
+            continue;
         }
 
-        if (!(dyn_cast<GetElementPtrInst>(&I) || dyn_cast<SwitchInst>(&I) ||
-              dyn_cast<IntrinsicInst>(&I))) {
-          instrumentOperands(&I, GFZMapPtr, GFZRandPtr, GFZRandIdx);
-        }
+        if (!(isa<GetElementPtrInst>(&I) || isa<SwitchInst>(&I) ||
+              isa<IntrinsicInst>(&I)))
+            ToInstrumentOps.push_back(&I);
 
-        NI = instrumentInstruction(&I, GFZMapPtr, GFZRandPtr, GFZRandIdx);
+        ToInstrument.push_back(&I);
 
       }
 
@@ -458,6 +445,12 @@ bool AFLCoverage::runOnModule(Module &M) {
           inst_inst, inst_blocks);
     inst_func++;
   }
+
+  for (auto I: ToInstrument)
+    (void)instrumentInstruction(I, GFZMapPtr, GFZRandPtr, GFZRandIdx);
+
+  for (auto I: ToInstrumentOps)
+          instrumentOperands(I, GFZMapPtr, GFZRandPtr, GFZRandIdx);
 
   lseek(idfd, 0, SEEK_SET);
   if (write(idfd, &inst_id, sizeof(inst_id)) != sizeof(inst_id)) {
