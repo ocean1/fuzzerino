@@ -1,0 +1,33 @@
+identify-im6.q16: unable to open image `examples/aflout/generated/*': No such file or directory @ error/blob.c/OpenBlob/2701.
+identify-im6.q16: no decode delegate for this image format `' @ error/constitute.c/ReadImage/504.
+identify-im6.q16: negative or zero image size `aflout/generated/1236' @ error/gif.c/ReadGIFImage/1289.
+identify-im6.q16: corrupt image `aflout/generated/1237' @ error/gif.c/PingGIFImage/942.
+identify-im6.q16: corrupt image `aflout/generated/1238' @ error/gif.c/PingGIFImage/942.
+identify-im6.q16: insufficient image data in file `aflout/generated/1246' @ error/gif.c/ReadGIFImage/1044.
+identify-im6.q16: no decode delegate for this image format `' @ error/constitute.c/ReadImage/504.
+identify-im6.q16: no decode delegate for this image format `' @ error/constitute.c/ReadImage/504.
+identify-im6.q16: negative or zero image size `aflout/generated/1251' @ error/gif.c/ReadGIFImage/1289.
+identify-im6.q16: insufficient image data in file `aflout/generated/1277' @ error/gif.c/ReadGIFImage/1044.
+identify-im6.q16: insufficient image data in file `aflout/generated/1282' @ error/gif.c/ReadGIFImage/1044.
+identify-im6.q16: insufficient image data in file `aflout/generated/1284' @ error/gif.c/ReadGIFImage/1044.
+identify-im6.q16: width or height exceeds limit `aflout/generated/1297' @ error/cache.c/OpenPixelCache/3839.
+identify-im6.q16: negative or zero image size `aflout/generated/1393' @ error/gif.c/ReadGIFImage/1404.
+identify-im6.q16: negative or zero image size `aflout/generated/1395' @ error/gif.c/ReadGIFImage/1404.
+identify-im6.q16: negative or zero image size `aflout/generated/1399' @ error/gif.c/ReadGIFImage/1289.
+identify-im6.q16: negative or zero image size `aflout/generated/1402' @ error/gif.c/ReadGIFImage/1404.
+identify-im6.q16: negative or zero image size `aflout/generated/1417' @ error/gif.c/ReadGIFImage/1404.
+identify-im6.q16: negative or zero image size `aflout/generated/1421' @ error/gif.c/ReadGIFImage/1404.
+identify-im6.q16: negative or zero image size `aflout/generated/1422' @ error/gif.c/ReadGIFImage/1404.
+identify-im6.q16: width or height exceeds limit `aflout/generated/1671' @ error/cache.c/OpenPixelCache/3839.
+identify-im6.q16: width or height exceeds limit `aflout/generated/1673' @ error/cache.c/OpenPixelCache/3839.
+identify-im6.q16: width or height exceeds limit `aflout/generated/1674' @ error/cache.c/OpenPixelCache/3839.
+identify-im6.q16: width or height exceeds limit `aflout/generated/1686' @ error/cache.c/OpenPixelCache/3839.
+identify-im6.q16: width or height exceeds limit `aflout/generated/1689' @ error/cache.c/OpenPixelCache/3839.
+identify-im6.q16: corrupt image `aflout/generated/1694' @ error/gif.c/PingGIFImage/942.
+identify-im6.q16: corrupt image `aflout/generated/1697' @ error/gif.c/PingGIFImage/942.
+identify-im6.q16: corrupt image `aflout/generated/1698' @ error/gif.c/PingGIFImage/942.
+identify-im6.q16: corrupt image `aflout/generated/1835' @ error/gif.c/PingGIFImage/944.
+identify-im6.q16: corrupt image `aflout/generated/2155' @ error/gif.c/PingGIFImage/948.
+identify-im6.q16: negative or zero image size `aflout/generated/2371' @ error/gif.c/ReadGIFImage/1404.
+identify-im6.q16: width or height exceeds limit `aflout/generated/2591' @ error/cache.c/OpenPixelCache/3839.
+identify-im6.q16: negative or zero image size `aflout/generated/2618' @ error/gif.c/ReadGIFImage/1404.

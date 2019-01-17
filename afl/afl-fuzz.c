@@ -8136,7 +8136,7 @@ gfuzz:
 
   while (i < maxi) {
       show_stats();
-      u32 timeout = 50;
+      u32 timeout = exec_tmout;
       fault = run_target(use_argv, timeout);
 
       u8* fn = alloc_printf("%s/generated/%d", out_dir, i);
@@ -8144,10 +8144,10 @@ gfuzz:
 
       switch (fault) {
         case FAULT_TMOUT:
-          total_crashes++;
+          ++total_tmouts;
           break;
         case FAULT_CRASH:
-          total_tmouts++;
+          ++total_crashes;
           break;
       }
 

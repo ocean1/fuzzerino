@@ -54,6 +54,8 @@
 #include <streambuf>
 #include <string>
 
+//#define branching_en
+
 using llvm::xray::YAMLXRayTrace;
 using llvm::yaml::Input;
 
@@ -231,113 +233,106 @@ Instruction* AFLCoverage::instrumentInstruction(Instruction *I, GlobalVariable *
   //IntegerType *Int8Ty = IntegerType::getInt8Ty(C);
   IntegerType *Int32Ty = IntegerType::getInt32Ty(C);
 
-  Instruction *NI = NULL;
-
   Type *IT = I->getType();
+  Instruction *NI = I->getNextNode();
 
-        if (!(IT->isIntegerTy() /*|| IT->isFloatingPointTy()*/) ||
-            IT->isPointerTy()) {
-          return NULL;
-        }
+  // PHI must be grouped at the beginning of the basic block
+  while (NI && isa<PHINode>(I))
+      NI = NI->getNextNode();
 
-        NI = I->getNextNode();
+  if (!NI)
+      return NULL;
 
-        if (!NI)
-            return NULL;
-        //NI->print(errs());
-        //errs() << "\n";
+  // use an id to reference the fuzzable instruction in gfz map
+  ConstantInt *InstID = ConstantInt::get(Int32Ty, inst_id);
 
-        /* if (*instStatus == 0 ){
-         *  incrementMap(); // keep a map telling us #times we went over an inst.
-         *  this way we can keep track of: new instructions (maybe at BB level?)
-         *  and # times we went over it
-         *  Ival = I;
-         * } else {
-         *   Ival = fuzzVal(I);
-         * } */
+  IRBuilder<> IRB(NI);
+  UnreachableInst *FakeVal = IRB.CreateUnreachable();
+  I->replaceAllUsesWith(FakeVal);
 
-        IRBuilder<> IRB(NI);
-        // use an id to reference the fuzzable instruction in gfz map
-        ConstantInt *InstID = ConstantInt::get(Int32Ty, inst_id);
-        UnreachableInst *FakeVal = IRB.CreateUnreachable();
-        I->replaceAllUsesWith(FakeVal);
+  LoadInst *MapPtr = IRB.CreateLoad(GFZMapPtr);
+  Value *MapPtrIdx = IRB.CreateGEP(MapPtr, InstID);
+  LoadInst *InstStatus = IRB.CreateLoad(MapPtrIdx);
 
-        LoadInst *MapPtr = IRB.CreateLoad(GFZMapPtr);
-        Value *MapPtrIdx = IRB.CreateGEP(MapPtr, InstID);
-        LoadInst *InstStatus = IRB.CreateLoad(MapPtrIdx);
+#ifdef branching_en
+  Value *InstEnabled = IRB.CreateICmpEQ(InstStatus, ConstantInt::get(Int32Ty, 0));
 
-        Value *InstEnabled = IRB.CreateICmpEQ(InstStatus, ConstantInt::get(Int32Ty, 0));
+  TerminatorInst *CheckStatus = SplitBlockAndInsertIfThen(InstEnabled, NI, false,
+          MDBuilder(C).createBranchWeights((1<<20)-1, 1));
 
-        TerminatorInst *CheckStatus = SplitBlockAndInsertIfThen(InstEnabled, NI, false,
-                MDBuilder(C).createBranchWeights(1, 100000));
+  IRB.SetInsertPoint(CheckStatus);
+#endif
 
-        IRB.SetInsertPoint(CheckStatus);
+  /* InstStatus is the status of the instruction, tells us if it
+   * should be mutated or not */
 
-        /* InstStatus is the status of the instruction, tells us if it
-         * should be mutated or not */
+  PointerType *IPT = PointerType::getUnqual(I->getType());
 
-        PointerType *IPT = PointerType::getUnqual(I->getType());
+  LoadInst *RandIdx = IRB.CreateLoad(GFZRandIdx);
+  LoadInst *RandPtr = IRB.CreateLoad(GFZRandPtr);
 
-        LoadInst *RandIdx = IRB.CreateLoad(GFZRandIdx);
-        LoadInst *RandPtr = IRB.CreateLoad(GFZRandPtr);
+  Value *RandPtrCast = IRB.CreateZExtOrBitCast(RandPtr, IPT);
+  Value *RandPtrIdx = IRB.CreateGEP(RandPtrCast, RandIdx);
 
-        Value *RandPtrCast = IRB.CreateZExtOrBitCast(RandPtr, IPT);
-        Value *RandPtrIdx = IRB.CreateGEP(RandPtrCast, RandIdx);
+  /* access random pool */
 
-        /* access random pool */
+  /* inc idx to access rand pool */
+  Value *Incr = IRB.CreateAdd(RandIdx, ConstantInt::get(Int32Ty, 1));
+  Incr = IRB.CreateURem(Incr, ConstantInt::get(Int32Ty, 4096));
+  IRB.CreateStore(Incr, GFZRandIdx);
 
-        /* inc idx to access rand pool */
-        Value *Incr = IRB.CreateAdd(RandIdx, ConstantInt::get(Int32Ty, 1));
-        Incr = IRB.CreateURem(Incr, ConstantInt::get(Int32Ty, 4096));
-        IRB.CreateStore(Incr, GFZRandIdx);
-
-        LoadInst *RandVal = IRB.CreateLoad(RandPtrIdx);
+  LoadInst *RandVal = IRB.CreateLoad(RandPtrIdx);
 
 
-        // hopefully should be right, trick to clear negative numbers without
-        // mul once fuzzed val is off, it stays so
-        Value *SubInst =
-            IRB.CreateSub(InstStatus, ConstantInt::get(Int32Ty, -1));
-        Value *MShift = ConstantInt::get(Int32Ty, 7);
-        Value *Mask = IRB.CreateLShr(SubInst, MShift);
-        Value *Subs = IRB.CreateSub(Mask, ConstantInt::get(Int32Ty, -1));
-        Value *SubStat = IRB.CreateAnd(InstStatus, Subs);
+  // hopefully should be right, trick to clear negative numbers without
+  // mul once fuzzed val is off, it stays so
+  Value *SubInst =
+      IRB.CreateSub(InstStatus, ConstantInt::get(Int32Ty, -1));
+  Value *MShift = ConstantInt::get(Int32Ty, 7);
+  Value *Mask = IRB.CreateLShr(SubInst, MShift);
+  Value *Subs = IRB.CreateSub(Mask, ConstantInt::get(Int32Ty, -1));
+  Value *SubStat = IRB.CreateAnd(InstStatus, Subs);
 
-        IRB.CreateStore(SubStat, MapPtrIdx);
+  IRB.CreateStore(SubStat, MapPtrIdx);
 
-        Value *FuzzVal;
+  Value *FuzzVal;
 
-        if (IT->isFloatingPointTy()) {
-          FuzzVal = IRB.CreateSIToFP(InstStatus, IT);
-          FuzzVal = IRB.CreateMul(FuzzVal, RandVal);
-        } else {
-          if (IT->getPrimitiveSizeInBits() <
-              InstStatus->getType()->getPrimitiveSizeInBits()) {
-            FuzzVal = IRB.CreateAnd(IRB.CreateTrunc(InstStatus, IT), RandVal);
-          } else {
-            FuzzVal =
-                IRB.CreateAnd(IRB.CreateSExtOrBitCast(InstStatus, IT), RandVal);
-          }
-        }
+  if (IT->isFloatingPointTy()) {
+    FuzzVal = IRB.CreateSIToFP(InstStatus, IT);
+    FuzzVal = IRB.CreateMul(FuzzVal, RandVal);
+  } else {
+    if (IT->getPrimitiveSizeInBits() <
+        InstStatus->getType()->getPrimitiveSizeInBits()) {
+      FuzzVal = IRB.CreateAnd(IRB.CreateTrunc(InstStatus, IT), RandVal);
+    } else {
+      FuzzVal =
+          IRB.CreateAnd(IRB.CreateSExtOrBitCast(InstStatus, IT), RandVal);
+    }
+  }
 
-        Value *FuzzedVal = IRB.CreateAdd(FuzzVal, I);
+  Value *FuzzedVal = IRB.CreateAdd(FuzzVal, I);
 
-        //dyn_cast<Instruction>(FuzzedVal);
+  //dyn_cast<Instruction>(FuzzedVal);
 
-        IRB.SetInsertPoint(NI);
+#ifdef branching_en
+  IRB.SetInsertPoint(NI);
 
-        PHINode *PHI = IRB.CreatePHI(IT, 2);
-        BasicBlock *CondBlock = I->getParent();
-        PHI->addIncoming(I, CondBlock);
-        BasicBlock *ThenBlock = cast<Instruction>(FuzzedVal)->getParent();
-        PHI->addIncoming(FuzzedVal, ThenBlock);
+  PHINode *PHI = IRB.CreatePHI(IT, 2);
+  BasicBlock *CondBlock = I->getParent();
+  PHI->addIncoming(I, CondBlock);
+  BasicBlock *ThenBlock = cast<Instruction>(FuzzedVal)->getParent();
+  PHI->addIncoming(FuzzedVal, ThenBlock);
 
-        FakeVal->replaceAllUsesWith(PHI);
-        FakeVal->eraseFromParent();
+  FakeVal->replaceAllUsesWith(PHI);
+#else
+  FakeVal->replaceAllUsesWith(FuzzedVal);
+#endif
+  FakeVal->eraseFromParent();
 
-        inst_id++;
-        inst_inst++;
-        return NI;
+  inst_id++;
+  inst_inst++;
+
+  return NI;
 }
 
 bool AFLCoverage::runOnModule(Module &M) {
@@ -432,15 +427,20 @@ bool AFLCoverage::runOnModule(Module &M) {
       for (auto &I : BB) {
 
         if ((isa<BranchInst>(&I) || isa<IndirectBrInst>(&I) ||
-            isa<UnreachableInst>(&I) || isa<PHINode>(&I) ||
+            isa<UnreachableInst>(&I) ||
             isa<CatchSwitchInst>(&I) || isa<ResumeInst>(&I) ||
             isa<LandingPadInst>(&I) )) {
             continue;
         }
 
         if (!(isa<GetElementPtrInst>(&I) || isa<SwitchInst>(&I) ||
-              isa<IntrinsicInst>(&I)))
+              isa<IntrinsicInst>(&I) || isa<PHINode>(&I) ))
             ToInstrumentOps.push_back(&I);
+
+        Type *IT = I.getType();
+
+        if (!(IT->isIntegerTy() /*|| IT->isFloatingPointTy()*/) ||
+            IT->isPointerTy()) continue;
 
         ToInstrument.push_back(&I);
 

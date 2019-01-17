@@ -127,7 +127,7 @@ static void __afl_start_forkserver(void) {
 
   if (write(FORKSRV_FD + 1, tmp, 4) != 4) return;
 
-  int i = -1; // make a clean dry run with one sample
+  int i = 0; // make a clean dry run with one sample
   while(1) {
     u8 *inststat = getenv("GFZ_STAT_VAL");
     u8 insval = (inststat == NULL) ? 1 : atoi(inststat);
@@ -138,11 +138,6 @@ static void __afl_start_forkserver(void) {
     /* Wait for parent by reading from the pipe. Abort if read fails. */
 
     if (read(FORKSRV_FD, &was_killed, 4) != 4) _exit(1);
-
-    // maybe we can have a socat listening and redirect there a specific
-    // FD for input/output of the fuzzer and you can attach with a term
-    // can this be done without breaking term? like redirect immediately
-    // stdio, but using a select on it to wait for input? (asynchronous)
 
     /* If we stopped the child in persistent mode, but there was a race
        condition and afl-fuzz already issued SIGKILL, write off the old
@@ -160,7 +155,7 @@ static void __afl_start_forkserver(void) {
       // a = (i+rand()) % maxi;
       // b = (i+rand()) % maxi;
 
-	if (i > 0)
+    if (i > 0)
       __gfz_map_area[i] = insval;
 
       //__gfz_map_area[a] = insval;

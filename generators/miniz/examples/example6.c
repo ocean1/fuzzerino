@@ -56,11 +56,11 @@ int main(int argc, char *argv[])
   (void)argc, (void)argv;
 
   // Image resolution
-  const int iXmax = 3;
-  const int iYmax = 4;
+  const int iXmax = atoi(argv[1]);
+  const int iYmax = atoi(argv[2]);
 
   // Output filename
-  char *pFilename = argv[1];
+  char *pFilename = argv[3];
 
   int iX, iY;
   const double CxMin = -2.5;

@@ -1,3 +1,4 @@
+.deps
 outputs/*
 *_trace.yaml
 *_gfz

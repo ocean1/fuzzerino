@@ -1,7 +1,7 @@
 #include "gifenc.h"
 
 int
-main()
+main(int argc, char *argv[])
 {
     int i, j;
     int w = 12, h = 9;
@@ -10,7 +10,7 @@ main()
 
     /* create a GIF */
     ge_GIF *gif = ge_new_gif(
-        "/dev/shm/fuzztest",  /* file name */
+        argv[1],  /* file name */
         w, h,           /* canvas size */
         (uint8_t []) {  /* palette */
             0x00, 0x00, 0x00, /* 0 -> black */

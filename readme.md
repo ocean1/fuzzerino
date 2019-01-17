@@ -1,6 +1,18 @@
 g-fuzz
 -----------
 
+Kang inverse fuzzing (10.000 execs - 5 secs) then switches to normal fuzzer, with fuzzerino we can cover more space:
+  - we apply coverage also to the generator since we might be exploring a new path (not present in Kang)
+  - we propose it's better to simply run the generator for a certain amount of time (like 2 hours?) and explore as many paths in the generator, and the output "quality" is measured by means of: fuzz values that do NOT crash the program, that generate a unique seed, and that increase the coverage of G. We argue that the generated outputs while not excerting new states in a given program, might do so in others, and once you run the "inverse" fuzzer, better keep them stored and resuse it across several programs (e.g. run them directly and use t-min on them, to select those before running afl and mutating them :))
+  - kang thesis does not show the difference in path exploration between a pure inverse and direct fuzzing approach
+  - we don't keep track of file sizes as kang do but enforce a hard limit for filesize via ulimits, the generator won't be able to write files bigger than a given limit (e.g., empirically we can set to 10k, mostly we will be generating extremely smaller files instead... :)
+  - it's also weird how they limit the operations and fuzzing "strategies", moreover not going "deep" by considering limit values
+  - the approach might be very useful to test network protocols - those that need to keep a state in particular, when we want to discover bugs depending on the state (and embedded systems in general).
+  - they make no consideration on memory allocation related crashes (e.g., we already disable all malloc checks and plan to let the allocator get some more memory to reduce the chance of crashes by overwriting a close object - also we can switch to some fast malloc implementation like 9cc they even remove frees, for short lived processes it's a great strategy "exit()" garbage collector :P
+- https://repository.upenn.edu/cgi/viewcontent.cgi?article=1553&context=cis_papers crazy stuff about program inversion to test different TIFF readers, might do the same experiment to find different behavior in client (e.g., libmagick, PIL, libpng all handle a bit differently png bombs, we find that some images aren't parsed correctly and are cause of bugs in different programs (e.g. eog, feh, out-of-memory in chrome against firefox which runs -- I'd love trying to reproduce this again, and then understand the real cause of crash -- new version of chrome happily runs for now)
+- miss comparison with https://pdfs.semanticscholar.org/8c8d/8fd604404df3518f40ba95f3085196e9b929.pdf
+- https://ieeexplore.ieee.org/abstract/document/5984105
+
 g-fuzzer is a novel fuzzer focusing on exploiting the semantic of a binary format generator
 to generate batch of samples to be used for directly fuzzing a target, or that can be employed
 as further seeds for afl-fuzz.
