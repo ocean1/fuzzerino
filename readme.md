@@ -74,3 +74,10 @@ libpng  [14549 39535 14549]
             // some value depending on RAND_POOL and GFZ_MAP
             // GFZ_MAP will tell if mutation is active (set by fuzzer)
         //}
+
+
+Trophies:
++ https://github.com/OpenPrinting/cups-filters/issues/82
++ https://github.com/OpenPrinting/cups-filters/issues/81
++ https://github.com/glennrp/libpng/issues/265
++ https://gitlab.gnome.org/GNOME/eog/issues/33 (private bug, cannot be seen)
