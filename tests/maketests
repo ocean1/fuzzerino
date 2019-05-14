@@ -1,8 +1,8 @@
 # Makefile
 .PHONY: FORCE all clean emitllvm
+AFL_DONT_OPTIMIZE?=true
 
 DEBUG ?= 0
-EMIT_LLVM ?= 0
 
 CC ?= gfz-clang-fast
 
@@ -43,4 +43,4 @@ clean:
 	rm -f *.o
 
 verify:
-	opt -verify g.ll
+	opt-6.0 -verify g.ll

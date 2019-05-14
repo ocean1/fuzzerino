@@ -1,13 +1,20 @@
 .PHONY: FORCE all clean
 
+LLVM_CONFIG=llvm-config-6.0
+CC=clang-6.0
+AFL_DONT_OPTIMIZE?=true
 DEBUG ?= 0
 
+export CC
+export LLVM_CONFIG
+export AFL_DONT_OPTIMIZE
 export DEBUG
+
 
 test%: t% FORCE
 	make -C $<
 
-all: test1 test2
+all: test1 test2 emit_all all_verify
 
 clean%: t%
 	make -C $< clean
@@ -33,6 +40,6 @@ emit%: t%
 emit_all: emit1 emit2
 
 verif%:
-	make -C $< verify
+	make -C t$* verify
 
-verify: verif1 verif2
+all_verify: verif1 verif2
