@@ -1,21 +1,19 @@
-.PHONY: FORCE all clean generators
+.PHONY: FORCE all clean tests afl fuzzerino dogen generators emit
 
-all: afl gfz dogen
+all: afl dogen
+
+#fuzzerino: afl
+#	cd afl && ./mk.sh
 
 afl:
-	CC=clang-6.0 make -C afl
-
-gfz: afl
-	cd afl && ./mk.sh
-
-dogen:
-	cd generator && ./dotests.sh
-
-generators:
-	cd generators && ./compileall.sh
+	LLVM_CONFIG=llvm-config-6.0 CC=clang-6.0 make -C afl
 
 emit:
-	cd generators && ./emitall.sh
+	cd tests && ./emitall.sh
+
+tests: emit
+	make -C tests
+#	cd tests && ./compileall.sh
 
 clean:
 	make -C afl clean

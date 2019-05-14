@@ -31,3 +31,8 @@ emit%: t%
 	make -C $< emitllvm
 
 emit_all: emit1 emit2
+
+verif%:
+	make -C $< verify
+
+verify: verif1 verif2

@@ -1,4 +1,4 @@
-g-fuzz
+fuzzerino
 -----------
 
 Kang inverse fuzzing (10.000 execs - 5 secs) then switches to normal fuzzer, with fuzzerino we can cover more space:

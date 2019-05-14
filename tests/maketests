@@ -41,3 +41,6 @@ cleanll:
 clean:
 	rm -f gtest ptest
 	rm -f *.o
+
+verify:
+	opt -verify g.ll
