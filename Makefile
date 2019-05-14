@@ -9,17 +9,17 @@ gfz: afl
 	cd afl && ./mk.sh
 
 dogen:
-	cd generator && ./dotests.sh
+	cd tests && ./dotests.sh
 
 generators:
-	cd generators && ./compileall.sh
+	cd tests && ./compileall.sh
 
 emit:
-	cd generators && ./emitall.sh
+	cd tests && ./emitall.sh
 
 clean:
 	make -C afl clean
-	make -C generators clean
+	make -C tests clean
 
-cleanall: clean
-	make -C generator cleanll
+cleanll: clean
+	make -C tests cleanll
