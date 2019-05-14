@@ -2,22 +2,18 @@
 
 all: afl dogen
 
-#fuzzerino: afl
-#	cd afl && ./mk.sh
+tests: emit
+	make -C tests
 
 afl:
 	LLVM_CONFIG=llvm-config-6.0 CC=clang-6.0 make -C afl
 
-emit:
-	cd tests && ./emitall.sh
-
-tests: emit
-	make -C tests
-#	cd tests && ./compileall.sh
+gfz: afl
+	cd afl && ./mk.sh
 
 clean:
 	make -C afl clean
-	make -C generators clean
+	make -C tests clean
 
-cleanall: clean
-	make -C generator cleanll
+cleanll: clean
+	make -C tests cleanll
