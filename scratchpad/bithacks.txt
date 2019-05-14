@@ -1,0 +1,56 @@
+        // for now we want to keep everything branchless, but I want a nice way
+        // to avoid having to branch and "disable" everytime fuzzing an inst
+        // abs(v) = (v + mask) ^ mask;
+        // it will re-enable this every 1 instruction that gets exc. for now
+        // a good enough approx...
+
+        /*Value *MShift = ConstantInt::get(Int32Ty, IT->getPrimitiveSizeInBits()*8-1);
+        Value *Mask = IRB.CreateLShr(InstStatus, MShift);
+        Value *SubStat = IRB.CreateAdd(InstStatus, Mask);
+        SubStat = IRB.CreateXor(InstStatus, Mask);*/
+
+=========================================
+
+def k(x): return ((((MutableInt8(x)&0x80))>>7)+1)
+k gives us 0 if number negative, 1 for positive,
+if we mul k*(instatus-1) we have solved our problem of having to "clean up"
+but at the cost of a mul
+
+can we avoid by xoring?
+
+and with 0x7f? and then we have -1 == 127...
+
+and 0x80 then rol(1) give us 0/1 = -/+ then can multiply to keep over 0
+
+avoid the mul?
+
+#absolute number:
+def mask(x): return ((((MutableInt8(x)>>(32*8-1))))
+def a(x): return (x+mask(x))^mask(x)
+
+
+don't really know what was going on before
+
+===================================
+
+def k(a): c_int8(((a>>255)^255)&0xff).value // this one gives the sign (with the xor with get the opposite in terms of representation -1 = pos 1 = neg)
+
+a*k(1) = opposite
+
+so abs(k(a)*a) ??? don't know what this is
+
+
+// this gives us the high bit (sign)
+def hb(x): MutableUInt8(x)&MutableUInt8(0x80)
+hb(x)^0x80 // gives us 0 for neg and -1
+
+(((hb(2)^0xff)>>6)-1)>>1
+
+gives 1 for + num. and 0 for - numbers lol but a bit of ops 
+
+
+
+
+
+
+

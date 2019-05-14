@@ -1,5 +1,6 @@
 .deps
 outputs/*
+aflout/*
 *_trace.yaml
 *_gfz
 *_xray
