@@ -125,7 +125,18 @@ static void __afl_start_forkserver(void) {
   /* Phone home and tell the parent that we're OK. If parent isn't there,
      assume we're not running in forkserver mode and just execute program. */
 
-  if (write(FORKSRV_FD + 1, tmp, 4) != 4) return;
+  if (write(FORKSRV_FD + 1, tmp, 4) != 4) {
+    int i = 0;
+
+    printf("\n[+] First 50 elements of map area:\n[");
+
+    for (i = 0; i < 50; ++i) {
+        printf("%d, ", __gfz_map_area[i]);
+    }
+
+    printf("]");
+    return;
+  }
 
   int i = 0; // make a clean dry run with one sample
   while(1) {
@@ -283,7 +294,29 @@ void __afl_manual_init(void) {
 
   if (!init_done) {
 
+    // __gfz_map_area = calloc(__gfz_map_size, 1);
+
+    // BEGIN TEMP
     __gfz_map_area = calloc(__gfz_map_size, 1);
+
+    FILE *map_file;
+
+    if (!(map_file = fopen("./gfz.map", "rb")))
+    {
+        printf("Error! Could not open file\n");
+        exit(-1);
+    }
+    
+    ssize_t n_bytes = fread(__gfz_map_area, __gfz_map_size, 1, map_file);
+    
+    if (n_bytes <= 0) {
+        printf("ko (%ld)\n", n_bytes);
+        exit(-1);
+    }
+    else
+        printf("[+] Map read.");
+    // END TEMP
+
     __gfz_rand_area = malloc(RAND_POOL_SIZE);
     __gfz_rand_idx = 0;
     fill_rand_area();

@@ -1,0 +1,1 @@
+GFZ_NUM_ITER=10000 AFL_SKIP_CPUFREQ=1 afl/bin/afl-fuzz -i irons/in -o irons/out -m10000 -t5000 -G tests/t1/gtest
