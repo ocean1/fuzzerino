@@ -1,4 +1,41 @@
 /*
+  Pointer instrumentation: work with Int64(s), just
+  ptrtoint the operand before performing math, and then
+  inttoptr it back at the end.
+
+  Downside of this: segfaults like no tomorrow.
+  Probably need to act on the pointed buffer.
+*/
+
+MutationFlags = IRB.CreateZExt(MutationFlags, IntegerType::getInt64Ty(C));
+
+// Op * (MutationFlags & 00000001)
+Value *KeepOriginal = IRB.CreateMul(
+  IRB.CreatePtrToInt(Op, IntegerType::getInt64Ty(C)),
+  IRB.CreateAnd(MutationFlags,
+                ConstantInt::get(IntegerType::getInt64Ty(C), 1)));
+
+// 1 * ((MutationFlags & 00000010) >> 1)
+Value *PlusOne = IRB.CreateMul(
+  ConstantInt::get(IntegerType::getInt64Ty(C), 1),
+  IRB.CreateLShr(IRB.CreateAnd(MutationFlags,
+                               ConstantInt::get(IntegerType::getInt64Ty(C), 2)),
+                 ConstantInt::get(IntegerType::getInt64Ty(C), 1)));
+
+// -1 * ((MutationFlags & 00000100) >> 2)
+Value *MinusOne = IRB.CreateMul(
+  ConstantInt::get(IntegerType::getInt64Ty(C), -1),
+  IRB.CreateLShr(IRB.CreateAnd(MutationFlags,
+                               ConstantInt::get(IntegerType::getInt64Ty(C), 4)),
+                 ConstantInt::get(IntegerType::getInt64Ty(C), 2)));
+
+// Add mutations together to obtain the new operand
+FuzzedVal = IRB.CreateAdd(KeepOriginal,
+              IRB.CreateAdd(PlusOne, MinusOne));
+
+FuzzedVal = IRB.CreateIntToPtr(FuzzedVal, OT);
+
+/*
   Increase idx to access random pool
   
 */

@@ -56,22 +56,56 @@ fp:      coming soon
 
 --- integer
 
-0000 0001: KEEP_ORIGINAL
-0000 0010: PLUS_ONE
-0000 0100: MINUS_ONE
-0000 1000: PLUS_MAX
-0001 0000: PLUS_RAND
+0000 0000 0000 0001: KEEP_ORIGINAL
+
+0000 0000 0000 0010: PLUS_ONE
+0000 0000 0000 0100: MINUS_ONE
+
+0000 0000 0000 1000: INTERESTING_1 (16, -129, -32769)
+0000 0000 0001 0000: INTERESTING_2 (32, 128, 32768)
+0000 0000 0010 0000: INTERESTING_3 (64, 255, 65535)
+0000 0000 0100 0000: INTERESTING_4 (100, 256, 65536)
+0000 0000 1000 0000: INTERESTING_5 (n/a, 512, n/a)
+0000 0001 0000 0000: INTERESTING_6 (n/a, 1000, n/a)
+0000 0010 0000 0000: INTERESTING_7 (n/a, 1024, n/a)
+0000 0100 0000 0000: INTERESTING_8 (n/a, 4096, n/a)
+
+(if instruction is not a GEP:)
+
+0000 1000 0000 0000: PLUS_MAX
+0001 0000 0000 0000: PLUS_RAND
+
+0010 0000 0000 0000: RESERVED_1
+0100 0000 0000 0000: RESERVED_2
+1000 0000 0000 0000: RESERVED_3
 
 --- pointer
 
-0000 0001: PLUS_ONE
-0000 0010: MINUS_ONE
-0000 0100: PLUS_TWO
-0000 1000: MINUS_TWO
-0001 0000: PLUS_FOUR
-0010 0000: MINUS_FOUR
-0100 0000: PLUS_EIGHT
-1000 0000: MINUS_EIGHT
+0000 0000 0000 0001: KEEP_ORIGINAL
+0000 0000 0000 0010: PLUS_ONE
+0000 0000 0000 0100: MINUS_ONE
+0000 0000 0000 1000: PLUS_TWO
+0000 0000 0001 0000: MINUS_TWO
+0000 0000 0010 0000: PLUS_FOUR
+0000 0000 0100 0000: MINUS_FOUR
+0000 0000 1000 0000: PLUS_EIGHT
+0000 0001 0000 0000: MINUS_EIGHT
+
+--- TODO
+
+create simple whitelist-based heuristic for pointers
+
+argue that with integers we already cover most of the fuzzing
+by fuzzing GEP indices...
+
+otherwise there are just too many segfaults
+
+else we can write a smarter "queue" algorithm that is good at
+detecting when a certain location segfaults most of the time and then
+"turn it off", but it's not really nice
+
+OR: act on the pointed buffer, but then we would need to
+know at least its length - probably not possible in LLVM IR?
 
 --- fp
 

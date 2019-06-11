@@ -82,6 +82,7 @@ private:
   uint32_t inst_id = 0;
   uint32_t tot = 0;
   uint32_t sel = 0;
+  FILE *map_key_fd;
   void instrumentOperands(Instruction *I, GlobalVariable *GFZMapPtr,
                           GlobalVariable *GFZRandPtr, GlobalVariable *GFZRandIdx);
   Instruction* instrumentResult(Instruction *I, GlobalVariable *GFZMapPtr,
@@ -124,23 +125,6 @@ static bool updateOperand(Instruction *Inst, unsigned Idx, Instruction *Mat) {
   return true;
 }
 
-static IntegerType* getIntegerType(LLVMContext &C, unsigned bits) {
-  switch(bits) {
-    case 8:
-      return IntegerType::getInt8Ty(C);
-    case 16:
-      return IntegerType::getInt16Ty(C);
-    case 32:
-      return IntegerType::getInt32Ty(C);
-    case 64:
-      return IntegerType::getInt64Ty(C);
-    case 128:
-      return IntegerType::getInt128Ty(C);
-    default:
-      return IntegerType::getInt32Ty(C);
-  }
-}
-
 void AFLCoverage::instrumentOperands(Instruction *I, GlobalVariable *GFZMapPtr,
                                      GlobalVariable *GFZRandPtr,
                                      GlobalVariable *GFZRandIdx) {
@@ -154,12 +138,6 @@ void AFLCoverage::instrumentOperands(Instruction *I, GlobalVariable *GFZMapPtr,
   // val = insertFuzzVal(I, OI);
   // updateOp(OI, val);
   // Value *inval = dyn_cast<Value*>(OI);
-
-  // printf("\n    Instrumenting %s", I->getOpcodeName());
-
-  // if (isa<CallInst>(I)) {
-  //   printf("(%s)", dyn_cast<CallInst>(I)->getCalledFunction()->getName());
-  // }
 
   User::op_iterator OI, OE;
 
@@ -205,21 +183,21 @@ void AFLCoverage::instrumentOperands(Instruction *I, GlobalVariable *GFZMapPtr,
     //
     // Whenever we need an integer constant we call
     //
-    //     ConstantInt::get(getIntegerType(C, bits), value))
+    //     ConstantInt::get(IntegerType::getIntNTy(C, bits), value))
     //
-    // getIntegerType is just a quick function I wrote that
-    // yields the correct IntegerType: it's just a switch.
+    Value *FuzzedVal = NULL;
 
-    if (OT->isIntegerTy()) {
+    if ( OT->isIntegerTy() ) {
+
       unsigned bits = OT->getIntegerBitWidth();
 
-      // If the bits of the operand are not default, zext
-      // or bitcast the MutationFlags to match them.
-      if (bits != 32) {
-        MutationFlags = IRB.CreateZExtOrBitCast(MutationFlags,
-          getIntegerType(C, bits));
+      // If the bits of the operand are not default (16),
+      // zext or bitcast the MutationFlags to match them.
+      if (bits != 16) {
+        MutationFlags = IRB.CreateIntCast(MutationFlags,
+          IntegerType::getIntNTy(C, bits), false);
       }
-
+        
       // Remember to always get ConstantInt(s)
       // with the correct bit width!
 
@@ -227,39 +205,72 @@ void AFLCoverage::instrumentOperands(Instruction *I, GlobalVariable *GFZMapPtr,
       Value *KeepOriginal = IRB.CreateMul(
         Op,
         IRB.CreateAnd(MutationFlags,
-                      ConstantInt::get(getIntegerType(C, bits), 1)));
+                      ConstantInt::get(IntegerType::getIntNTy(C, bits), 1)));
       
       // 1 * ((MutationFlags & 00000010) >> 1)
       Value *PlusOne = IRB.CreateMul(
-        ConstantInt::get(getIntegerType(C, bits), 1),
+        ConstantInt::get(IntegerType::getIntNTy(C, bits), 1),
         IRB.CreateLShr(IRB.CreateAnd(MutationFlags,
-                                     ConstantInt::get(getIntegerType(C, bits), 2)),
-                       ConstantInt::get(getIntegerType(C, bits), 1)));
+                                     ConstantInt::get(IntegerType::getIntNTy(C, bits), 2)),
+                       ConstantInt::get(IntegerType::getIntNTy(C, bits), 1)));
 
       // -1 * ((MutationFlags & 00000100) >> 2)
       Value *MinusOne = IRB.CreateMul(
-        ConstantInt::get(getIntegerType(C, bits), -1),
+        ConstantInt::get(IntegerType::getIntNTy(C, bits), -1),
         IRB.CreateLShr(IRB.CreateAnd(MutationFlags,
-                                     ConstantInt::get(getIntegerType(C, bits), 4)),
-                       ConstantInt::get(getIntegerType(C, bits), 2)));
+                                     ConstantInt::get(IntegerType::getIntNTy(C, bits), 4)),
+                       ConstantInt::get(IntegerType::getIntNTy(C, bits), 2)));
       
       // Add mutations together to obtain the new operand
-      Value *FuzzedVal = IRB.CreateAdd(KeepOriginal,
-                           IRB.CreateAdd(PlusOne, MinusOne));
+      FuzzedVal = IRB.CreateAdd(KeepOriginal,
+                    IRB.CreateAdd(PlusOne, MinusOne));
+
+      // Interesting values based on bit width
+      std::vector<int> interesting;
+
+      if (bits == 8) {
+        int arr[] = { 4, 8, 16, 32, 64, 100, 128, 200};
+        interesting.insert(interesting.end(), arr, arr+(sizeof(arr)/sizeof(arr[0])));
+      } else if (bits == 16) {
+        int arr[] = { -129, 128, 256, 512, 1000, 1024, 2048, 4096 };
+        interesting.insert(interesting.end(), arr, arr+(sizeof(arr)/sizeof(arr[0])));
+      } else if (bits == 32) {
+        int arr[] = { -32769, 2048, 4096, 8192, 10000, 16384, 32768, 65536 };
+        interesting.insert(interesting.end(), arr, arr+(sizeof(arr)/sizeof(arr[0])));
+      }
+
+      unsigned flag = 8;
+      unsigned shift_pos = 3;
+
+      for ( int i : interesting ) {
+        FuzzedVal = IRB.CreateAdd(FuzzedVal,
+          IRB.CreateMul(
+            ConstantInt::get(IntegerType::getIntNTy(C, bits), i),
+            IRB.CreateLShr(IRB.CreateAnd(MutationFlags,
+                                         ConstantInt::get(IntegerType::getIntNTy(C, bits), flag)),
+                           ConstantInt::get(IntegerType::getIntNTy(C, bits), shift_pos))));
+
+        flag <<= 1;
+        shift_pos++;
+      }
+
+      // If the instruction is a GEP, _avoid_ adding
+      // max int value and random values.
 
       if ( !isa<GetElementPtrInst>(I) ) {
+        
         // Create arbitrary precision int with all ones
         // except for sign bit, which is cleared
         APInt max_int = APInt(bits, 0, false);
         max_int.setAllBits();
         max_int.clearSignBit();
 
-        // max * ((MutationFlags & 00001000) >> 3)
+        // max * ((MutationFlags & 0100 0000 0000) >> 3)
         Value *PlusMax = IRB.CreateMul(
           ConstantInt::get(C, max_int),
           IRB.CreateLShr(IRB.CreateAnd(MutationFlags,
-                                       ConstantInt::get(getIntegerType(C, bits), 8)),
-                         ConstantInt::get(getIntegerType(C, bits), 3)));
+                                       ConstantInt::get(IntegerType::getIntNTy(C, bits), 2048)),
+                         ConstantInt::get(IntegerType::getIntNTy(C, bits), 11)));
 
         // Access random pool
         // Index increase is *not* performed here because we want to
@@ -277,25 +288,47 @@ void AFLCoverage::instrumentOperands(Instruction *I, GlobalVariable *GFZMapPtr,
         Value *PlusRand = IRB.CreateMul(
           RandVal,
           IRB.CreateLShr(IRB.CreateAnd(MutationFlags,
-                                       ConstantInt::get(getIntegerType(C, bits), 16)),
-                         ConstantInt::get(getIntegerType(C, bits), 4)));
+                                       ConstantInt::get(IntegerType::getIntNTy(C, bits), 4096)),
+                         ConstantInt::get(IntegerType::getIntNTy(C, bits), 12)));
         
         // Add all these values together to obtain the new operand
         FuzzedVal = IRB.CreateAdd(FuzzedVal,
                       IRB.CreateAdd(PlusMax, PlusRand));
       }
-
-      // Update operand and increase the id of the
-      // instrumented location in the map
-      updateOperand(I, op_idx, dyn_cast<Instruction>(FuzzedVal));
-      inst_id++;
-
-    } else if (OT->isPointerTy()) {
-      // TODO
-    } else if (OT->isFloatingPointTy()) {
-      // TODO
-    }
     
+    } else if ( OT->isPointerTy() ) {
+
+      // TODO
+      //
+      // probably it only makes sense to act on the
+      // pointed buffer, but can I get info on it?
+    
+    } else if ( OT->isFloatingPointTy() ) {
+    
+      // TODO
+
+    }
+
+    // Debugging stuff    
+
+    fprintf(map_key_fd, "\n%d:\t%s", inst_id, I->getOpcodeName());
+
+    if ( isa<CallInst>(I) )
+      fprintf(map_key_fd, " (%s)", dyn_cast<CallInst>(I)->getCalledFunction()->getName());
+
+    fprintf(map_key_fd, ", operand %d", op_idx);
+
+    std::string str;
+    raw_string_ostream rso(str);
+    OT->print(rso);
+    fprintf(map_key_fd, ", type %s", rso.str().c_str());
+
+    // Update operand and increase the id of the
+    // instrumented location in the map
+    
+    updateOperand(I, op_idx, dyn_cast<Instruction>(FuzzedVal));
+    inst_id++;
+
     // TODO: Custom mutations for each type of instruction?
     if ( isa<ExtractElementInst>(I) ) {
       // 2nd operand only (integer, index)
@@ -316,44 +349,40 @@ void AFLCoverage::instrumentOperands(Instruction *I, GlobalVariable *GFZMapPtr,
   } // end op loop
 } // end instrumentOperands
 
-/*Instruction* AFLCoverage::instrumentResult(Instruction *I, GlobalVariable *GFZMapPtr,
-                                           GlobalVariable *GFZRandPtr,
-                                           GlobalVariable *GFZRandIdx) {
+/*Instruction* AFLCoverage::instrumentInstruction(Instruction *I, GlobalVariable *GFZMapPtr,
+                                GlobalVariable *GFZRandPtr,
+                                GlobalVariable *GFZRandIdx) {
 
   Function *F = I->getFunction();
   Module *M = F->getParent();
   LLVMContext &C = M->getContext();
 
-  IntegerType *getIntegerType(C, bits) = IntegerType::getgetIntegerTypeFromBitWidth(C, bits)(C);
+  //IntegerType *Int8Ty = IntegerType::getInt8Ty(C);
+  IntegerType *Int32Ty = IntegerType::getInt32Ty(C);
 
   Type *IT = I->getType();
   Instruction *NI = I->getNextNode();
 
-  // skip PHI instructions: they must be grouped at the beginning of the basic block
+  // PHI must be grouped at the beginning of the basic block
   while (NI && isa<PHINode>(I))
       NI = NI->getNextNode();
 
   if (!NI)
       return NULL;
 
-  // Use an id, which is hardcoded in the instrumentation,
-  // to reference the fuzzable instruction in gfz map
-  ConstantInt *InstID = ConstantInt::get(getIntegerType(C, bits), inst_id);
+  // use an id to reference the fuzzable instruction in gfz map
+  ConstantInt *InstID = ConstantInt::get(Int32Ty, inst_id);
 
-  // Create IRBuilder starting right after PHI instructions
   IRBuilder<> IRB(NI);
-
   UnreachableInst *FakeVal = IRB.CreateUnreachable();
   I->replaceAllUsesWith(FakeVal);
 
-  // InstStatus is the status of the instruction, tells us if it
-  // should be mutated or not
   LoadInst *MapPtr = IRB.CreateLoad(GFZMapPtr);
   Value *MapPtrIdx = IRB.CreateGEP(MapPtr, InstID);
   LoadInst *InstStatus = IRB.CreateLoad(MapPtrIdx);
 
 #ifdef branching_en
-  Value *InstEnabled = IRB.CreateICmpEQ(InstStatus, ConstantInt::get(getIntegerType(C, bits), 0));
+  Value *InstEnabled = IRB.CreateICmpEQ(InstStatus, ConstantInt::get(Int32Ty, 0));
 
   TerminatorInst *CheckStatus = SplitBlockAndInsertIfThen(InstEnabled, NI, false,
           MDBuilder(C).createBranchWeights((1<<20)-1, 1));
@@ -361,33 +390,34 @@ void AFLCoverage::instrumentOperands(Instruction *I, GlobalVariable *GFZMapPtr,
   IRB.SetInsertPoint(CheckStatus);
 #endif
 
-  // Access random pool getting random data of the same size
-  // as the instruction that we want to change
+  // InstStatus is the status of the instruction, tells us if it
+  // should be mutated or not
+
+  PointerType *IPT = PointerType::getUnqual(I->getType());
 
   LoadInst *RandIdx = IRB.CreateLoad(GFZRandIdx);
   LoadInst *RandPtr = IRB.CreateLoad(GFZRandPtr);
 
-  PointerType *IPT = PointerType::getUnqual(I->getType());
   Value *RandPtrCast = IRB.CreateZExtOrBitCast(RandPtr, IPT);
   Value *RandPtrIdx = IRB.CreateGEP(RandPtrCast, RandIdx);
 
-  // Increment RandIdx (can't we do it in the parent process?
-  // it should be a shared index)
-  Value *Incr = IRB.CreateAdd(RandIdx, ConstantInt::get(getIntegerType(C, bits), 1));
-  Incr = IRB.CreateURem(Incr, ConstantInt::get(getIntegerType(C, bits), 4096));
+  // access random pool
+
+  // inc idx to access rand pool
+  Value *Incr = IRB.CreateAdd(RandIdx, ConstantInt::get(Int32Ty, 1));
+  Incr = IRB.CreateURem(Incr, ConstantInt::get(Int32Ty, 4096));
   IRB.CreateStore(Incr, GFZRandIdx);
 
-  // Get the actual random value
   LoadInst *RandVal = IRB.CreateLoad(RandPtrIdx);
 
-  // Update gfz map area
+
   // hopefully should be right, trick to clear negative numbers without
   // mul once fuzzed val is off, it stays so
   Value *SubInst =
-      IRB.CreateSub(InstStatus, ConstantInt::get(getIntegerType(C, bits), -1));
-  Value *MShift = ConstantInt::get(getIntegerType(C, bits), 7);
+      IRB.CreateSub(InstStatus, ConstantInt::get(Int32Ty, -1));
+  Value *MShift = ConstantInt::get(Int32Ty, 7);
   Value *Mask = IRB.CreateLShr(SubInst, MShift);
-  Value *Subs = IRB.CreateSub(Mask, ConstantInt::get(getIntegerType(C, bits), -1));
+  Value *Subs = IRB.CreateSub(Mask, ConstantInt::get(Int32Ty, -1));
   Value *SubStat = IRB.CreateAnd(InstStatus, Subs);
 
   IRB.CreateStore(SubStat, MapPtrIdx);
@@ -427,19 +457,24 @@ void AFLCoverage::instrumentOperands(Instruction *I, GlobalVariable *GFZMapPtr,
   FakeVal->eraseFromParent();
 
   inst_id++;
+  inst_inst++;
 
   return NI;
 }*/
 
 bool AFLCoverage::runOnModule(Module &M) {
 
+  // File used for debugging  
+  map_key_fd = fopen("./map_key.txt", "a");
+
   LLVMContext &C = M.getContext();
 
   IntegerType *Int8Ty = IntegerType::getInt8Ty(C);
+  IntegerType *Int16Ty = IntegerType::getInt16Ty(C);
   IntegerType *Int32Ty = IntegerType::getInt32Ty(C);
   
   GlobalVariable *GFZMapPtr =
-      new GlobalVariable(M, PointerType::get(Int32Ty, 0), false,
+      new GlobalVariable(M, PointerType::get(Int16Ty, 0), false,
                          GlobalValue::ExternalLinkage, 0, "__gfz_map_area");
 
   GlobalVariable *GFZRandPtr =
@@ -648,6 +683,8 @@ bool AFLCoverage::runOnModule(Module &M) {
     WARNF("No instrumentation targets found.");
     // there's functions with 0 I/ 0 BB (external references?) check them out....
   }
+
+  fclose(map_key_fd);
 
   return true;
 

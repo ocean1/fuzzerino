@@ -62,7 +62,7 @@ __thread u32 __afl_prev_loc;
 /* "Rand" area gets filled by the thread itself every time we change fuzz
  * strategy or when all values have been used, for example filled with low/high
  * values, or random values */
-u32 *__gfz_map_area = NULL;
+u16 *__gfz_map_area = NULL;
 u8 *__gfz_rand_area = NULL;
 u32 __gfz_rand_idx;
 
@@ -125,18 +125,7 @@ static void __afl_start_forkserver(void) {
   /* Phone home and tell the parent that we're OK. If parent isn't there,
      assume we're not running in forkserver mode and just execute program. */
 
-  if (write(FORKSRV_FD + 1, tmp, 4) != 4) {
-    int i = 0;
-
-    printf("\n[+] First 50 elements of map area:\n[");
-
-    for (i = 0; i < 50; ++i) {
-        printf("%d, ", __gfz_map_area[i]);
-    }
-
-    printf("]");
-    return;
-  }
+  if (write(FORKSRV_FD + 1, tmp, 4) != 4) return;
 
   int i = 0; // make a clean dry run with one sample
   while(1) {
