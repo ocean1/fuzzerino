@@ -114,10 +114,10 @@ Value *FuzzedVal = IRB.CreateAdd(FuzzVal, OpI);
 
 // hopefully should be right, trick to clear negative numbers without
 // mul once fuzzed val is off, it stays so
-Value *SubInst = IRB.CreateSub(InstStatus, ConstantInt::get(Int32Ty, -1));
+Value *SubInst = IRB.CreateSub(MutationFlags, ConstantInt::get(Int32Ty, -1));
 Value *MShift = ConstantInt::get(Int32Ty, 7);
 Value *Mask = IRB.CreateLShr(SubInst, MShift);
 Value *Subs = IRB.CreateSub(Mask, ConstantInt::get(Int32Ty, -1));
-Value *SubStat = IRB.CreateAnd(InstStatus, Subs);
+Value *SubStat = IRB.CreateAnd(MutationFlags, Subs);
 
 IRB.CreateStore(SubStat, MapPtrIdx);
