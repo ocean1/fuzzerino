@@ -79,9 +79,11 @@
 /* Lots of globals, but mostly for the status UI and other things where it
    really makes no sense to haul them around as function parameters. */
 
+FILE *log_file;
 
 EXP_ST u8 *in_dir,                    /* Input directory with test cases  */
           *out_file,                  /* File to fuzz, if any             */
+          *gen_file,                  /* Generated file (gFuzz mode)      */
           *out_dir,                   /* Working & output directory       */
           *sync_dir,                  /* Synchronization directory        */
           *sync_id,                   /* Fuzzer ID                        */
@@ -121,7 +123,7 @@ EXP_ST u8  skip_deterministic,        /* Skip deterministic stages?       */
            shuffle_queue,             /* Shuffle input queue?             */
            bitmap_changed = 1,        /* Time to update bitmap?           */
            qemu_mode,                 /* Running in QEMU mode?            */
-           gfuzz_mode,                  /* Running in gfuzz mode?           */
+           gfuzz_mode,                /* Running in gfuzz mode?           */
            skip_requested,            /* Skip request, via SIGUSR1        */
            run_over10m,               /* Run time over 10 minutes?        */
            persistent_mode,           /* Running in persistent mode?      */
@@ -2447,7 +2449,8 @@ static u8 run_target(char** argv, u32 timeout) {
 
     kill_signal = WTERMSIG(status);
 
-    if (child_timed_out && kill_signal == SIGKILL) return FAULT_TMOUT;
+    if (child_timed_out && kill_signal == SIGKILL)
+      return FAULT_TMOUT;
 
     return FAULT_CRASH;
 
@@ -3976,7 +3979,6 @@ static void show_stats(void) {
   t_bits = (MAP_SIZE << 3) - count_bits(virgin_bits);
 
   /* Now, for the visuals... */
-skipstuff:
   if (clear_screen) {
 
     SAYF(TERM_CLEAR CURSOR_HIDE);
@@ -7299,7 +7301,6 @@ static void check_crash_handling(void) {
 
 }
 
-
 /* Check CPU governor. */
 
 static void check_cpu_governor(void) {
@@ -7738,10 +7739,12 @@ int main(int argc, char** argv) {
 
   doc_path = access(DOC_PATH, F_OK) ? "docs" : DOC_PATH;
 
+  log_file = fopen("./afl-fuzz.log", "a");
+
   gettimeofday(&tv, &tz);
   srandom(tv.tv_sec ^ tv.tv_usec ^ getpid());
 
-  while ((opt = getopt(argc, argv, "+i:o:f:m:t:T:dnCB:S:M:x:Q:G")) > 0)
+  while ((opt = getopt(argc, argv, "+i:o:f:m:t:T:dnCB:S:M:x:Q:Gg:")) > 0)
 
     switch (opt) {
 
@@ -7916,6 +7919,12 @@ int main(int argc, char** argv) {
 
         if (!mem_limit_given) mem_limit = MEM_LIMIT;
 
+        break;
+
+      case 'g': /* generated file (gFuzz mode) */
+
+        if (gen_file) FATAL("Multiple -g options not supported");
+        gen_file = optarg;
         break;
 
       default:
@@ -8137,10 +8146,13 @@ gfuzz:
   while (i < maxi) {
       show_stats();
       u32 timeout = exec_tmout;
+      
       fault = run_target(use_argv, timeout);
-
-      u8* fn = alloc_printf("%s/generated/%d", out_dir, i);
-      rename(out_file, fn);
+      
+      if (gen_file) {
+        u8* fn = alloc_printf("%s/generated/%d", out_dir, i);
+        rename(gen_file, fn);
+      }
 
       switch (fault) {
         case FAULT_TMOUT:
@@ -8161,7 +8173,6 @@ gfuzz:
   //save_auto();
 
   goto stop_fuzzing;
-
 
 }
 

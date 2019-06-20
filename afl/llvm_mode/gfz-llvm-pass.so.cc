@@ -89,7 +89,7 @@ private:
 
   Value* emitInstrumentation(LLVMContext &C, IRBuilder<> &IRB,
                              Value *Original, Value *MutationFlags,
-                             bool also_havoc = false);
+                             bool is_gep = false);
   void instrumentOperands(Instruction *I);
   Instruction* instrumentResult(Instruction *I);
   // Value *fuzzInt(IRBuilder<> IRB, Instruction *I);
@@ -134,7 +134,7 @@ static bool updateOperand(Instruction *Inst, unsigned Idx, Instruction *Mat) {
 
 Value* AFLCoverage::emitInstrumentation(LLVMContext &C, IRBuilder<> &IRB,
                                         Value *Original, Value *MutationFlags,
-                                        bool also_havoc) {
+                                        bool is_gep) {
   
   Value *FuzzedVal = NULL;
 
@@ -207,7 +207,10 @@ Value* AFLCoverage::emitInstrumentation(LLVMContext &C, IRBuilder<> &IRB,
       shift_pos++;
     }
 
-    if ( also_havoc ) {
+    // If the instruction is a GEP, _avoid_
+    // adding havoc values (max int, random)
+
+    if ( !is_gep ) {
       
       // Create arbitrary precision int with all ones
       // except for sign bit, which is cleared
@@ -280,6 +283,8 @@ void AFLCoverage::instrumentOperands(Instruction *I) {
 
   User::op_iterator OI, OE;
 
+  bool is_gep = isa<GetElementPtrInst>(I);
+
   auto *DI = dyn_cast<CallInst>(I);
   int op_idx;
   for ( op_idx = 0,
@@ -297,6 +302,10 @@ void AFLCoverage::instrumentOperands(Instruction *I) {
       continue;
 
     Type *OT = Op->getType();
+
+    // Don't instrument GEP indices of struct types
+    if ( is_gep && op_idx == 0 && OT->isPointerTy() && dyn_cast<PointerType>(OT)->getElementType()->isStructTy() )
+      return;
 
     if (! (OT->isIntegerTy() /*|| OT->isPointerTy() || OT->isFloatingPointTy()*/) )
       continue;
@@ -329,7 +338,7 @@ void AFLCoverage::instrumentOperands(Instruction *I) {
     Value *InstEnabled = IRB.CreateICmpNE(MutationFlags, ConstantInt::get(Int16Ty, 1));
 
     TerminatorInst *CheckStatus = SplitBlockAndInsertIfThen(InstEnabled, I, false,
-            MDBuilder(C).createBranchWeights((1<<20)-1, 1));
+            MDBuilder(C).createBranchWeights(1, (1<<20)-1));
 
     IRB.SetInsertPoint(CheckStatus);
 #endif
@@ -337,7 +346,7 @@ void AFLCoverage::instrumentOperands(Instruction *I) {
     // If the instruction is a GEP, _avoid_
     // adding havoc values (max int, random)
 
-    FuzzedVal = emitInstrumentation(C, IRB, Op, MutationFlags, !isa<GetElementPtrInst>(I));
+    FuzzedVal = emitInstrumentation(C, IRB, Op, MutationFlags, is_gep);
 
 #ifdef branching_en
     IRB.SetInsertPoint(I);
@@ -358,7 +367,7 @@ void AFLCoverage::instrumentOperands(Instruction *I) {
     fprintf(map_key_fd, "\n%d:\t%s", inst_id, I->getOpcodeName());
 
     if ( isa<CallInst>(I) )
-      fprintf(map_key_fd, " (%s)", dyn_cast<CallInst>(I)->getCalledFunction()->getName());
+      fprintf(map_key_fd, " (%s)", dyn_cast<CallInst>(I)->getCalledFunction()->getName().str().c_str());
 
     fprintf(map_key_fd, ", operand %d", op_idx);
 
@@ -447,7 +456,7 @@ Instruction* AFLCoverage::instrumentResult(Instruction *I) {
   Value *InstEnabled = IRB.CreateICmpNE(MutationFlags, ConstantInt::get(Int16Ty, 1));
 
   TerminatorInst *CheckStatus = SplitBlockAndInsertIfThen(InstEnabled, NI, false,
-          MDBuilder(C).createBranchWeights((1<<20)-1, 1));
+          MDBuilder(C).createBranchWeights(1, (1<<20)-1));
 
   IRB.SetInsertPoint(CheckStatus);
 #endif
@@ -476,7 +485,7 @@ Instruction* AFLCoverage::instrumentResult(Instruction *I) {
   fprintf(map_key_fd, "\n%d:\t%s", inst_id, I->getOpcodeName());
 
   if ( isa<CallInst>(I) )
-    fprintf(map_key_fd, " (%s)", dyn_cast<CallInst>(I)->getCalledFunction()->getName());
+    fprintf(map_key_fd, " (%s)", dyn_cast<CallInst>(I)->getCalledFunction()->getName().str().c_str());
 
   std::string str;
   raw_string_ostream rso(str);
@@ -491,7 +500,7 @@ Instruction* AFLCoverage::instrumentResult(Instruction *I) {
 bool AFLCoverage::runOnModule(Module &M) {
 
   // File used for debugging  
-  map_key_fd = fopen("./map_key.txt", "a");
+  map_key_fd = fopen("./map_key.txt", "w");
 
   LLVMContext &C = M.getContext();
 
@@ -641,7 +650,7 @@ bool AFLCoverage::runOnModule(Module &M) {
 
         Type *IT = I.getType();
 
-        if (! (IT->isIntegerTy() || IT->isPointerTy() /*|| IT->isFloatingPointTy()*/) ) {
+        if (! (IT->isIntegerTy() /*|| IT->isPointerTy() || IT->isFloatingPointTy()*/) ) {
           continue;
         }
 

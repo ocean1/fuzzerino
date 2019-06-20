@@ -37,8 +37,10 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 
 #include <malloc.h>
+#include <fcntl.h>
 
 /* This is a somewhat ugly hack for the experimental 'trace-pc-guard' mode.
    Basically, we need to make sure that the forkserver is initialized after
@@ -62,6 +64,7 @@ __thread u32 __afl_prev_loc;
 /* "Rand" area gets filled by the thread itself every time we change fuzz
  * strategy or when all values have been used, for example filled with low/high
  * values, or random values */
+
 u16 *__gfz_map_area = NULL;
 u8 *__gfz_rand_area = NULL;
 u32 __gfz_rand_idx;
@@ -69,20 +72,28 @@ u32 __gfz_rand_idx;
 /* keep 4MB of map, it's quite a lot of space, and our test targets
    will happily work with this, we can later optimize by storing inst_inst
    and merging global vars in a LTO pass (or brutally patched with lief) */
+
 const ssize_t __gfz_map_size = 4 * 1024 * 1024;
 
 /* Running in persistent mode? */
 
 static u8 is_persistent;
 
-/* SHM setup. */
-
 // override free, generators are short lived programs (http://www.drdobbs.com/cpp/increasing-compiler-speed-by-over-75/240158941)
 // https://twitter.com/johnregehr/status/1073801738707070977
 // we could also override malloc to provide a little bit more space to reduce SEGFAULTs
+
 void free(void *ptr)
 {
 }
+
+/* Random file descriptor for populating __gfz_rand_area
+   and the appropriate number of locations of __gfz_map_area.
+ */
+
+FILE *rfd;
+
+/* SHM setup. */
 
 static void __afl_map_shm(void) {
 
@@ -128,12 +139,23 @@ static void __afl_start_forkserver(void) {
   if (write(FORKSRV_FD + 1, tmp, 4) != 4) return;
 
   int i = 0; // make a clean dry run with one sample
+  
+  // TODO: change this?
+  int n_locations = 0;
+  int idfd = open(IDTMPFILE, O_CREAT | O_RDWR,
+                  S_IRUSR | S_IWUSR | S_IRGRP);
+
+  if (read(idfd, &n_locations, sizeof(n_locations)) != sizeof(n_locations))
+    FATAL("[-] Cannot read number of locations!");
+
+  /* Forkserver loop. */
+
   while(1) {
     u8 *inststat = getenv("GFZ_STAT_VAL");
     u8 insval = (inststat == NULL) ? 1 : atoi(inststat);
+    
     u32 was_killed;
     int status;
-    //int a, b;
 
     /* Wait for parent by reading from the pipe. Abort if read fails. */
 
@@ -143,23 +165,23 @@ static void __afl_start_forkserver(void) {
        condition and afl-fuzz already issued SIGKILL, write off the old
        process. */
 
-    if ((child_stopped)) { //&& was_killed) {
+    if ( child_stopped ) { //&& was_killed) {
       child_stopped = 0;
       if (waitpid(child_pid, &status, 0) < 0)
         _exit(1);
     }
 
-    if (!child_stopped) {
+    if ( !child_stopped ) {
+
+      /* Read the appropriate amount of bytes to populate
+         the instrumented locations in __gfz_map_area.
+      */
+
+      if (fread(__gfz_map_area, n_locations * 2, 1, rfd) != 1) {
+        FATAL("[-] Unable to get enough rand bytes");
+      }
 
       /* Once woken up, create a clone of our process. */
-      // a = (i+rand()) % maxi;
-      // b = (i+rand()) % maxi;
-
-    if (i > 0)
-      __gfz_map_area[i] = insval;
-
-      //__gfz_map_area[a] = insval;
-      //__gfz_map_area[b] = insval;
 
       child_pid = fork();
       if (child_pid < 0)
@@ -168,21 +190,16 @@ static void __afl_start_forkserver(void) {
       /* In child process: close fds, resume execution. */
 
       if (!child_pid) {
-
         close(FORKSRV_FD);
         close(FORKSRV_FD + 1);
         return;
       }
 
-      __gfz_map_area[i] = 0;
-
-      //sprintf(cmd, cmdfmt, (unsigned long)time(NULL), i);
-      //(void)system(cmd);
-      //rename(oldp, cmd);
+      // sprintf(cmd, cmdfmt, (unsigned long)time(NULL), i);
+      // (void)system(cmd);
+      // rename(oldp, cmd);
 
       ++i;
-      //__gfz_map_area[a] = 0;
-      //__gfz_map_area[b] = 0;
 
     } else {
       /* Special handling for persistent mode: if the child is alive but
@@ -206,11 +223,26 @@ static void __afl_start_forkserver(void) {
     if (WIFSTOPPED(status))
       child_stopped = 1;
 
+    /* Dump map if signaled (crashed?) */
+    /*
+    if (WIFSIGNALED(status)) {
+      char filename[100];
+      sprintf(filename, "./gfz_map_%d", i);
+      
+      FILE *map = fopen(filename, "wb");
+
+      fwrite(__gfz_map_area, __gfz_map_size, 1, map);
+    }
+    */
+
     /* Relay wait status to pipe, then loop back. */
 
     if (write(FORKSRV_FD + 1, &status, 4) != 4) _exit(1);
 
-  }
+  } // end while(1)
+
+  fclose(rfd);
+
 }
 
 /* A simplified persistent mode handler, used as explained in README.llvm. */
@@ -263,19 +295,10 @@ int __afl_persistent_loop(unsigned int max_cnt) {
   return 0;
 }
 
-void fill_rand_area(void) {
-  FILE *rfd;
-
-  rfd = fopen("/dev/urandom", "r");
-
-  if (fread(__gfz_rand_area, RAND_POOL_SIZE, 1, rfd) != 1) {
-    FATAL("Unable to get enough rand bytes");
-  }
-  fclose(rfd);
-}
-
-/* This one can be called from user code when deferred forkserver mode
-    is enabled. */
+/* 
+   This one can be called from user code when deferred forkserver mode
+   is enabled.
+*/
 
 void __afl_manual_init(void) {
 
@@ -283,37 +306,58 @@ void __afl_manual_init(void) {
 
   if (!init_done) {
 
-    // __gfz_map_area = calloc(__gfz_map_size, 1);
-
-    // BEGIN TEMP
     __gfz_map_area = calloc(__gfz_map_size, 1);
 
-    FILE *map_file;
+    /*
 
-    if (!(map_file = fopen("./gfz.map", "rb")))
-    {
-        printf("Error! Could not open file\n");
-        exit(-1);
-    }
+      Code used for instrumentation testing.
+
+      It fills the map area with a custom map read from a file
+      called "gfz.map" in the current folder.
+
+    */
+
+    FILE *map_file = fopen("./gfz.map", "rb");
+
+    if (map_file) {
     
-    ssize_t n_bytes = fread(__gfz_map_area, __gfz_map_size, 1, map_file);
+      ssize_t n_bytes = fread(__gfz_map_area, __gfz_map_size, 1, map_file);
     
-    if (n_bytes <= 0) {
-        printf("ko (%ld)\n", n_bytes);
-        exit(-1);
-    }
-    else
+      if (n_bytes <= 0)
+        printf("[-] Error reading map. (%ld)\n", n_bytes);
+      else
         printf("[+] Map read.");
-    // END TEMP
+    
+    } else {
+    
+      /* If no custom map is present, just fill it with ones
+         to execute normal program behavior.
+       */
+
+      int i = 0;
+
+      for (i = 0; i < (__gfz_map_size / 2); ++i) {
+        __gfz_map_area[i] = 1;
+      }
+    
+    }
+
+    /* End code for instrumentation testing */
+
+    rfd = fopen("/dev/urandom", "r");
 
     __gfz_rand_area = malloc(RAND_POOL_SIZE);
     __gfz_rand_idx = 0;
-    fill_rand_area();
+    
+    if (fread(__gfz_rand_area, RAND_POOL_SIZE, 1, rfd) != 1) {
+      FATAL("Unable to get enough rand bytes");
+    }
 
     __afl_map_shm();
     __afl_start_forkserver();
     init_done = 1;
   }
+
 }
 
 /* Proper initialization routine. */
