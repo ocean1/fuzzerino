@@ -14,7 +14,6 @@ const int magic_len = 4;
 // default content if string hasn't been passed via cmdline
 char* dcontent = "THIS IS A G-FUZZING TEST BEWARE";
 
-
 void writefile(uint8_t *buf, uint32_t size){
 	FILE* fout;
 	fout = fopen("/dev/shm/fuzztest", "w"); // output file
@@ -47,5 +46,6 @@ int main(int argc, char **argv)
 	} else {
 		content = dcontent;
 	}
+	
 	createfmt(content);
 }

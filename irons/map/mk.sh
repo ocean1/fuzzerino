@@ -23,3 +23,19 @@ if [ $# -eq 1 ] && [ $1 == "-go" ]
   then
     GFZ_NUM_ITER=100000 AFL_SKIP_CPUFREQ=1 ../../afl/bin/afl-fuzz -i in -o out -m10000 -t5000 -G ./a.out 1 2 3
 fi
+
+# optional "-t1" command line option:
+#     Feed instrumented test program t1 to afl-fuzz in gFuzz mode
+
+if [ $# -eq 1 ] && [ $1 == "-t1" ]
+  then
+    GFZ_NUM_ITER=1000 AFL_SKIP_CPUFREQ=1 ../../afl/bin/afl-fuzz -i in -o out -m10000 -t5000 -G -g /dev/shm/fuzztest ../../tests/t1/gtest
+fi
+
+# optional "-t2" command line option:
+#     Feed instrumented test program t2 to afl-fuzz in gFuzz mode
+
+if [ $# -eq 1 ] && [ $1 == "-t2" ]
+  then
+    GFZ_NUM_ITER=1000 AFL_SKIP_CPUFREQ=1 ../../afl/bin/afl-fuzz -i in -o out -m10000 -t5000 -G -g /dev/shm/fuzztest ../../tests/t2/gtest
+fi

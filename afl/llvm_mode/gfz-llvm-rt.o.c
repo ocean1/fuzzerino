@@ -177,7 +177,7 @@ static void __afl_start_forkserver(void) {
          the instrumented locations in __gfz_map_area.
       */
 
-      if (fread(__gfz_map_area, n_locations * 2, 1, rfd) != 1) {
+      if (i > 0 && fread(__gfz_map_area, n_locations * 2, 1, rfd) != 1) {
         FATAL("[-] Unable to get enough rand bytes");
       }
 

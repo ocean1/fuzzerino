@@ -7717,6 +7717,54 @@ static void save_cmdline(u32 argc, char** argv) {
 
 }
 
+char *dirname (char *path)
+{
+  static const char dot[] = ".";
+  char *last_slash;
+  /* Find last '/'.  */
+  last_slash = path != NULL ? strrchr (path, '/') : NULL;
+  if (last_slash != NULL && last_slash != path && last_slash[1] == '\0')
+    {
+      /* Determine whether all remaining characters are slashes.  */
+      char *runp;
+      for (runp = last_slash; runp != path; --runp)
+        if (runp[-1] != '/')
+          break;
+      /* The '/' is the last character, we have to look further.  */
+      if (runp != path)
+        last_slash = memrchr (path, '/', runp - path);
+    }
+  if (last_slash != NULL)
+    {
+      /* Determine whether all remaining characters are slashes.  */
+      char *runp;
+      for (runp = last_slash; runp != path; --runp)
+        if (runp[-1] != '/')
+          break;
+      /* Terminate the path.  */
+      if (runp == path)
+        {
+          /* The last slash is the first character in the string.  We have to
+             return "/".  As a special case we have to return "//" if there
+             are exactly two slashes at the beginning of the string.  See
+             XBD 4.10 Path Name Resolution for more information.  */
+          if (last_slash == path + 1)
+            ++last_slash;
+          else
+            last_slash = path + 1;
+        }
+      else
+        last_slash = runp;
+      last_slash[0] = '\0';
+    }
+  else
+    /* This assignment is ill-designed but the XPG specs require to
+       return a string containing "." in any case no directory part is
+       found and so a static and constant string is required.  */
+    path = (char *) dot;
+  return path;
+}
+
 
 #ifndef AFL_LIB
 
@@ -8143,6 +8191,12 @@ gfuzz:
   u32 i = 0;
   u8 fault;
 
+  // Make generated dir in the same file system where gen_file is
+
+  u8 *gen_path = dirname(strdup(gen_file));
+  u8 *gen_dir = alloc_printf("%s/generated", gen_path);
+  if (mkdir(gen_dir, 0700)) WARNF("Unable to create '%s'", gen_dir);
+
   while (i < maxi) {
       show_stats();
       u32 timeout = exec_tmout;
@@ -8150,7 +8204,7 @@ gfuzz:
       fault = run_target(use_argv, timeout);
       
       if (gen_file) {
-        u8* fn = alloc_printf("%s/generated/%d", out_dir, i);
+        u8* fn = alloc_printf("%s/%d", gen_dir, i);
         rename(gen_file, fn);
       }
 
@@ -8171,6 +8225,8 @@ gfuzz:
   //write_bitmap();
   //write_stats_file(0, 0, 0);
   //save_auto();
+
+  ck_free(gen_dir);
 
   goto stop_fuzzing;
 
