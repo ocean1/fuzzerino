@@ -264,6 +264,28 @@ static struct queue_entry *queue,     /* Fuzzing queue (linked list)      */
 static struct queue_entry*
   top_rated[MAP_SIZE];                /* Top entries for bitmap bytes     */
 
+/* fuzzerino queue, each entry has an instr_indices that tells us
+ * which functions are we fuzzing, the value will tell us what kind
+ * of mutation we are doing on it */
+struct g_queue_entry {
+  u8 instr_indices[MAX_FUZZ_SIZE];      /* what instructions are we mutating? */
+}
+
+// we can recombine queue entries, to "mix" fuzzed instructions
+// select random instruction(s), put it in queue and fuzz
+// when done, recombine them and explore multiple combinations of instr
+// can we ensure all instructions are fuzzed?
+// we generate a set of "seed" instructions SI
+//
+// FI = set{functions that we "passed" in execution}
+// SI = set{instructions that can be fuzzed (with function)}
+//
+// func mutate SI, FI:
+//      for s, f in SI:
+
+static struct g_queue_entry* fuzzerino_queue[MQSIZE];
+
+
 struct extra_data {
   u8* data;                           /* Dictionary token data            */
   u32 len;                            /* Dictionary token length          */
