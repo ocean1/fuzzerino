@@ -265,6 +265,7 @@
 /* Environment variable used to pass SHM ID to the called program. */
 
 #define SHM_ENV_VAR         "__AFL_SHM_ID"
+#define GFZ_SHM_ENV_VAR         "__GFZ_SHM_ID"
 
 /* Other less interesting, internal-only variables. */
 
@@ -316,6 +317,10 @@
 #define MAP_SIZE_POW2       16
 #define MAP_SIZE            (1 << MAP_SIZE_POW2)
 
+/* size for map containing mutations (4MB) */
+#define GFZ_MAP_SIZE_POW2   22
+#define GFZ_MAP_SIZE        1000 //(1 << GFZ_MAP_SIZE_POW2)
+
 /* size for pool containing values to be used in mutations, 4KB seems good */
 #define RAND_POOL_SIZE_POW  12
 #define RAND_POOL_SIZE      (1 << RAND_POOL_SIZE_POW)
@@ -354,5 +359,6 @@
 #define IDTMPFILE "/dev/shm/gfzidfile"
 #define MAX_FSIZE 50*1024*1024 // 50 MB of file are enough for now .. :)
 
+#define GFZ_USE_SHM
 
 #endif /* ! _HAVE_CONFIG_H */

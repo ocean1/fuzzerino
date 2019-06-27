@@ -121,3 +121,135 @@ Value *Subs = IRB.CreateSub(Mask, ConstantInt::get(Int32Ty, -1));
 Value *SubStat = IRB.CreateAnd(MutationFlags, Subs);
 
 IRB.CreateStore(SubStat, MapPtrIdx);
+
+/* original queue gfz loop */
+
+  while (i < maxi) {
+      show_stats();
+      u32 timeout = exec_tmout;
+      
+      fault = run_target(use_argv, timeout);
+
+      if ( gen_file && fault == FAULT_NONE ) { // xxhash
+
+        last_len = 0;
+        last_md5 = md5(gen_file, &last_len);
+
+        if ( new_output(last_md5) ) {
+
+          // Add sample to front of queue
+          struct gfz_q_entry *new = (struct gfz_q_entry*) malloc(sizeof(struct gfz_q_entry));
+          new->len = last_len;
+          new->md5 = last_md5;
+          new->map = 0;
+          new->next = gfz_q;
+
+          gfz_q = new;
+
+          // Save output in gen_dir
+          u8 *fn = alloc_printf("%s/%d", gen_dir, i);
+          // rename(gen_file, fn);
+          ck_free(fn);
+
+        } else {
+
+          free(last_md5);
+      
+        }
+
+      }
+
+      switch (fault) {
+        case FAULT_TMOUT:
+          ++total_tmouts;
+          break;
+        case FAULT_CRASH:
+          ++total_crashes;
+          break;
+      }
+
+      if ( gfz_q ) {
+
+      }
+
+      ++i;
+
+  }
+
+/* Calculates the md5sum of a file given its file path. */
+
+char *md5(const char *filename, u32 *len) {
+  
+  unsigned char c[MD5_DIGEST_LENGTH];
+  int i;
+  MD5_CTX mdContext;
+  int bytes;
+  unsigned char data[1024];
+  char *filemd5 = (char*) malloc(33 *sizeof(char));
+
+  FILE *inFile = fopen (filename, "rb");
+  
+  if (inFile == NULL) {
+    perror(filename);
+    return 0;
+  }
+
+  MD5_Init(&mdContext);
+
+  while ((bytes = fread(data, 1, 1024, inFile)) != 0) {
+    MD5_Update(&mdContext, data, bytes);
+    
+    if (len) {
+      *len += bytes;
+    }
+  }
+  
+  MD5_Final(c, &mdContext);
+
+  for(i = 0; i < MD5_DIGEST_LENGTH; i++) {
+    sprintf(&filemd5[i*2], "%02x", (unsigned int)c[i]);
+  }
+
+  fclose(inFile);
+  return filemd5;
+
+}
+
+/* Returns 0 if the md5 is found in the queue, 1 otherwise. */
+
+int new_output(char *md5) {
+
+  struct gfz_q_entry *q = gfz_q;
+
+  while (q) {
+    
+    if ( !strncmp(md5, q->md5, MD5_DIGEST_LENGTH) )
+      return 0;
+
+    q = q->next;
+
+  }
+
+  return 1;
+
+}
+
+/* DEBUGGING STUFF */
+
+void log_gfz_q() {
+
+  struct gfz_q_entry *q = gfz_q;
+
+  fprintf(log_file, "\ncurrent queue status:");
+
+  if(!q) {
+    fprintf(log_file, "\n    empty.");
+    return;
+  }
+
+  while (q) {
+    fprintf(log_file, "\n    len: %u, md5: %s", q->len, q->md5);
+    q = q->next;
+  }
+
+}

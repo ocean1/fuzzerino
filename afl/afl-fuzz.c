@@ -56,6 +56,8 @@
 #include <sys/ioctl.h>
 #include <sys/file.h>
 
+#include <openssl/md5.h>
+
 #if defined(__APPLE__) || defined(__FreeBSD__) || defined (__OpenBSD__)
 #  include <sys/sysctl.h>
 #endif /* __APPLE__ || __FreeBSD__ || __OpenBSD__ */
@@ -79,11 +81,32 @@
 /* Lots of globals, but mostly for the status UI and other things where it
    really makes no sense to haul them around as function parameters. */
 
+/* gFuzz stuff! */
+
 FILE *log_file;
+
+EXP_ST u16* __gfz_map_ptr;               /* SHM w/ instrumentation bitmap (?)*/
+
+// u8* default_hash;                     /* default hash of the output       */
+
+// struct gfz_q_entry {
+
+//   u32 len;                            /* Output length                    */
+//   u8* hash;                           /* Output hash                      */
+//   u16* map;                           /* gFuzz mutation map               */
+//   struct gfz_q_entry *next;           /* Next element, if any             */
+
+// };
+
+// static struct gfz_q_entry *gfz_q,     /* gFuzz queue (linked list)        */
+//                           *gfz_q_cur; /* cur position within gFuzz queue  */
+
+/* Usual stuff */
 
 EXP_ST u8 *in_dir,                    /* Input directory with test cases  */
           *out_file,                  /* File to fuzz, if any             */
           *gen_file,                  /* Generated file (gFuzz mode)      */
+          *gen_dir,                   /* Generated directory (gFuzz mode) */
           *out_dir,                   /* Working & output directory       */
           *sync_dir,                  /* Synchronization directory        */
           *sync_id,                   /* Fuzzer ID                        */
@@ -149,6 +172,7 @@ EXP_ST u8  virgin_bits[MAP_SIZE],     /* Regions yet untouched by fuzzing */
 static u8  var_bytes[MAP_SIZE];       /* Bytes that appear to be variable */
 
 static s32 shm_id;                    /* ID of the SHM region             */
+static s32 gfz_shm_id;                /* ID of the SHM region (gFuzz mode)*/
 
 static volatile u8 stop_soon,         /* Ctrl-C pressed?                  */
                    clear_screen = 1,  /* Window resized?                  */
@@ -1210,6 +1234,13 @@ static void remove_shm(void) {
 
 }
 
+/* Get rid of shared memory (atexit handler). */
+
+static void gfz_remove_shm(void) {
+
+  shmctl(gfz_shm_id, IPC_RMID, NULL);
+
+}
 
 /* Compact trace bytes into a smaller bitmap. We effectively just drop the
    count information here. This is called only sporadically, for some
@@ -1342,7 +1373,6 @@ static void cull_queue(void) {
 
 }
 
-
 /* Configure shared memory and virgin_bits. This is called at startup. */
 
 EXP_ST void setup_shm(void) {
@@ -1362,10 +1392,10 @@ EXP_ST void setup_shm(void) {
 
   shm_str = alloc_printf("%d", shm_id);
 
-  /* If somebody is asking us to fuzz instrumented binaries in dumb mode,
-     we don't want them to detect instrumentation, since we won't be sending
-     fork server commands. This should be replaced with better auto-detection
-     later on, perhaps? */
+  // If somebody is asking us to fuzz instrumented binaries in dumb mode,
+  // we don't want them to detect instrumentation, since we won't be sending
+  // fork server commands. This should be replaced with better auto-detection
+  // later on, perhaps?
 
   if (!dumb_mode) setenv(SHM_ENV_VAR, shm_str, 1);
 
@@ -1377,6 +1407,34 @@ EXP_ST void setup_shm(void) {
 
 }
 
+/* Trying to put gfz map in shm... */
+
+EXP_ST void gfz_setup_shm(void) {
+
+  u8* shm_str;
+
+  gfz_shm_id = shmget(IPC_PRIVATE, GFZ_MAP_SIZE, IPC_CREAT | IPC_EXCL | 0600);
+
+  if (gfz_shm_id < 0) PFATAL("shmget() failed");
+
+  atexit(gfz_remove_shm);
+
+  shm_str = alloc_printf("%d", gfz_shm_id);
+
+  // If somebody is asking us to fuzz instrumented binaries in dumb mode,
+  // we don't want them to detect instrumentation, since we won't be sending
+  // fork server commands. This should be replaced with better auto-detection
+  // later on, perhaps?
+
+  setenv(GFZ_SHM_ENV_VAR, shm_str, 1);
+
+  ck_free(shm_str);
+
+  __gfz_map_ptr = shmat(gfz_shm_id, NULL, 0);
+  
+  if (!__gfz_map_ptr) PFATAL("shmat() failed");
+
+}
 
 /* Load postprocessor, if available. */
 
@@ -2028,7 +2086,7 @@ EXP_ST void init_forkserver(char** argv) {
 
       /* limit output file(s) size */
       if (gfuzz_mode){
-          setrlimit(RLIMIT_FSIZE, &r);
+        setrlimit(RLIMIT_FSIZE, &r);
       }
 
     }
@@ -7717,6 +7775,8 @@ static void save_cmdline(u32 argc, char** argv) {
 
 }
 
+/* dirname - return directory part of PATH. */
+
 char *dirname (char *path)
 {
   static const char dot[] = ".";
@@ -8037,6 +8097,11 @@ int main(int argc, char** argv) {
 
   setup_post();
   setup_shm();
+  
+#ifdef GFZ_USE_SHM
+  gfz_setup_shm();
+#endif /* GFZ_USE_SHM */
+
   init_count_class16();
 
   setup_dirs_fds();
@@ -8064,12 +8129,15 @@ int main(int argc, char** argv) {
 
   perform_dry_run(use_argv);
 
+  // if (gen_file)
+  //  default_md5 = md5(gen_file, 0);
+
   cull_queue();
 
   show_init_stats();
-
+  
   seek_to = find_start_position();
-
+  
   write_stats_file(0, 0, 0);
   save_auto();
 
@@ -8083,9 +8151,8 @@ int main(int argc, char** argv) {
     if (stop_soon) goto stop_fuzzing;
   }
 
-  if (gfuzz_mode) {
+  if (gfuzz_mode)
     goto gfuzz;
-  }
 
   while (1) {
 
@@ -8191,42 +8258,51 @@ gfuzz:
   u32 i = 0;
   u8 fault;
 
-  // Make generated dir in the same file system where gen_file is
+  if (gen_file) {
+    // Make generated dir in the same file system where
+    // gen_file is so that we can use "rename" function
+    
+    u8 *gen_path = dirname(strdup(gen_file));
+    gen_dir = alloc_printf("%s/generated", gen_path);
+    if (mkdir(gen_dir, 0700)) WARNF("Unable to create '%s'", gen_dir);
+    free(gen_path);
 
-  u8 *gen_path = dirname(strdup(gen_file));
-  u8 *gen_dir = alloc_printf("%s/generated", gen_path);
-  if (mkdir(gen_dir, 0700)) WARNF("Unable to create '%s'", gen_dir);
+    // Save *default* output in gen_dir
+    
+    u8 *fn = alloc_printf("%s/%d", gen_dir, i);
+    rename(gen_file, fn);
+    ck_free(fn);
+  }
 
   while (i < maxi) {
-      show_stats();
-      u32 timeout = exec_tmout;
-      
-      fault = run_target(use_argv, timeout);
-      
-      if (gen_file) {
-        u8* fn = alloc_printf("%s/%d", gen_dir, i);
-        rename(gen_file, fn);
-      }
+    
+    show_stats();
+    u32 timeout = exec_tmout;
+    
+    fault = run_target(use_argv, timeout);
 
-      switch (fault) {
-        case FAULT_TMOUT:
-          ++total_tmouts;
-          break;
-        case FAULT_CRASH:
-          ++total_crashes;
-          break;
-      }
+    if ( gen_file && fault == FAULT_NONE ) {
+      // Save output in gen_dir
+    
+      u8 *fn = alloc_printf("%s/%d", gen_dir, i);
+      rename(gen_file, fn);
+      ck_free(fn);
+    }
 
-      ++i;
+    switch (fault) {
+      case FAULT_TMOUT:
+        ++total_tmouts;
+        break;
+      case FAULT_CRASH:
+        ++total_crashes;
+        break;
+    }
+
+    ++i;
+
   }
 
   show_stats();
-
-  //write_bitmap();
-  //write_stats_file(0, 0, 0);
-  //save_auto();
-
-  ck_free(gen_dir);
 
   goto stop_fuzzing;
 

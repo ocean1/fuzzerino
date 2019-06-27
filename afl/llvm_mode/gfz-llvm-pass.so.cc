@@ -509,7 +509,7 @@ bool AFLCoverage::runOnModule(Module &M) {
   IntegerType *Int32Ty = IntegerType::getInt32Ty(C);
   
   GFZMapPtr = new GlobalVariable(M, PointerType::get(Int16Ty, 0), false,
-                                 GlobalValue::ExternalLinkage, 0, "__gfz_map_area");
+                                 GlobalValue::ExternalLinkage, 0, "__gfz_map_ptr");
 
   GFZRandPtr = new GlobalVariable(M, PointerType::get(Int8Ty, 0), false,
                                   GlobalValue::ExternalLinkage, 0, "__gfz_rand_area");

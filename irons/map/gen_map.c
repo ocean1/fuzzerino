@@ -3,7 +3,12 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "../../afl/config.h"
+
 #define KEEP_ORIGINAL 1      // 0000 0000 0000 0001
+
+/*
+
 #define PLUS_ONE      2      // 0000 0000 0000 0010
 #define MINUS_ONE     4      // 0000 0000 0000 0100
 #define INTERESTING_1 8      // 0000 0000 0000 1000
@@ -19,6 +24,8 @@
 #define RESERVED_1    8192   // 0010 0000 0000 0000
 #define RESERVED_2    16384  // 0100 0000 0000 0000
 #define RESERVED_3    32768  // 1000 0000 0000 0000
+
+*/
 
 #define MAX_WHITELIST 1024
 
@@ -37,9 +44,8 @@ int main(int argc, char *argv[]) {
 
     // Setup memory
     uint16_t *__gfz_map_area = NULL;
-    const ssize_t __gfz_map_size = 4 * 1024 * 1024;
 
-    __gfz_map_area = calloc(__gfz_map_size, 1);
+    __gfz_map_area = calloc(GFZ_MAP_SIZE, 1);
 
     // Parse arg
     int locations = strtol(argv[1], 0, 10);
@@ -101,7 +107,7 @@ int main(int argc, char *argv[]) {
         return -1;
     }
     
-    ssize_t n_bytes = fwrite(__gfz_map_area, __gfz_map_size, 1, map_file);
+    ssize_t n_bytes = fwrite(__gfz_map_area, GFZ_MAP_SIZE, 1, map_file);
 
     if (n_bytes <= 0) {
         printf("ko (%ld)\n", n_bytes);

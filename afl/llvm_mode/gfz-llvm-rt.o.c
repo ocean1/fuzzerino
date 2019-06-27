@@ -53,7 +53,7 @@
 #endif /* ^USE_TRACE_PC */
 
 /* Globals needed by the injected instrumentation. The __afl_area_initial region
-   is used for instrumentation output before __afl_map_shm() has a chance to
+   is used for instrumentation output before __gfz_map_shm() has a chance to
    run. It will end up as .comm, so it shouldn't be too wasteful. */
 
 u8 __afl_area_initial[MAP_SIZE];
@@ -61,19 +61,18 @@ u8 *__afl_area_ptr = __afl_area_initial;
 
 __thread u32 __afl_prev_loc;
 
-/* "Rand" area gets filled by the thread itself every time we change fuzz
- * strategy or when all values have been used, for example filled with low/high
- * values, or random values */
-
-u16 *__gfz_map_area = NULL;
-u8 *__gfz_rand_area = NULL;
-u32 __gfz_rand_idx;
-
 /* keep 4MB of map, it's quite a lot of space, and our test targets
    will happily work with this, we can later optimize by storing inst_inst
    and merging global vars in a LTO pass (or brutally patched with lief) */
 
-const ssize_t __gfz_map_size = 4 * 1024 * 1024;
+u16 *__gfz_map_ptr;
+
+/* "Rand" area gets filled by the thread itself every time we change fuzz
+ * strategy or when all values have been used, for example filled with low/high
+ * values, or random values */
+
+u8 *__gfz_rand_area = NULL;
+u32 __gfz_rand_idx;
 
 /* Running in persistent mode? */
 
@@ -88,8 +87,7 @@ void free(void *ptr)
 }
 
 /* Random file descriptor for populating __gfz_rand_area
-   and the appropriate number of locations of __gfz_map_area.
- */
+   and the appropriate number of locations of __gfz_map_ptr. */
 
 FILE *rfd;
 
@@ -99,9 +97,9 @@ static void __afl_map_shm(void) {
 
   u8 *id_str = getenv(SHM_ENV_VAR);
 
-  /* If we're running under AFL, attach to the appropriate region, replacing the
-     early-stage __afl_area_initial region that is needed to allow some really
-     hacky .init code to work correctly in projects such as OpenSSL. */
+  // If we're running under AFL, attach to the appropriate region, replacing the
+  // early-stage __afl_area_initial region that is needed to allow some really
+  // hacky .init code to work correctly in projects such as OpenSSL.
 
   if (id_str) {
 
@@ -109,28 +107,49 @@ static void __afl_map_shm(void) {
 
     __afl_area_ptr = shmat(shm_id, NULL, 0);
 
-    /* Whooooops. */
+    // Whooooops.
 
     if (__afl_area_ptr == (void *)-1)
       _exit(1);
 
-    /* Write something into the bitmap so that even with low AFL_INST_RATIO,
-       our parent doesn't give up on us. */
+    // Write something into the bitmap so that even with low AFL_INST_RATIO,
+    // our parent doesn't give up on us.
 
     __afl_area_ptr[0] = 1;
   }
 }
 
+/* Trying to put gfz map in shm... */
+
+static void __gfz_map_shm(void) {
+
+  u8 *id_str = getenv(GFZ_SHM_ENV_VAR);
+
+  // If we're running under AFL, attach to the appropriate region, replacing the
+  // early-stage __afl_area_initial region that is needed to allow some really
+  // hacky .init code to work correctly in projects such as OpenSSL.
+
+  if (id_str) {
+
+    u32 shm_id = atoi(id_str);
+
+    __gfz_map_ptr = shmat(shm_id, NULL, 0);
+
+    // Whooooops.
+
+    if (__gfz_map_ptr == (void *)-1) {
+      _exit(1);
+    }
+
+  }
+}
+
 /* Fork server logic. */
 
-static void __afl_start_forkserver(void) {
+static void __gfz_start_forkserver(void) {
 
   static u8 tmp[4];
   s32 child_pid;
-
-  //char *cmdfmt = "./outputs/%lu_fuzztest_%lu";
-	//char *oldp = "/dev/shm/fuzztest";
-  //char cmd[500];
   u8 child_stopped = 0;
 
   /* Phone home and tell the parent that we're OK. If parent isn't there,
@@ -151,8 +170,9 @@ static void __afl_start_forkserver(void) {
   /* Forkserver loop. */
 
   while(1) {
-    u8 *inststat = getenv("GFZ_STAT_VAL");
-    u8 insval = (inststat == NULL) ? 1 : atoi(inststat);
+
+    // u8 *inststat = getenv("GFZ_STAT_VAL");
+    // u8 insval = (inststat == NULL) ? 1 : atoi(inststat);
     
     u32 was_killed;
     int status;
@@ -174,10 +194,9 @@ static void __afl_start_forkserver(void) {
     if ( !child_stopped ) {
 
       /* Read the appropriate amount of bytes to populate
-         the instrumented locations in __gfz_map_area.
-      */
+         the instrumented locations in __gfz_map_ptr. */
 
-      if (i > 0 && fread(__gfz_map_area, n_locations * 2, 1, rfd) != 1) {
+      if (i > 0 && fread(__gfz_map_ptr, n_locations * 2, 1, rfd) != 1) {
         FATAL("[-] Unable to get enough rand bytes");
       }
 
@@ -194,10 +213,6 @@ static void __afl_start_forkserver(void) {
         close(FORKSRV_FD + 1);
         return;
       }
-
-      // sprintf(cmd, cmdfmt, (unsigned long)time(NULL), i);
-      // (void)system(cmd);
-      // rename(oldp, cmd);
 
       ++i;
 
@@ -222,18 +237,6 @@ static void __afl_start_forkserver(void) {
 
     if (WIFSTOPPED(status))
       child_stopped = 1;
-
-    /* Dump map if signaled (crashed?) */
-    /*
-    if (WIFSIGNALED(status)) {
-      char filename[100];
-      sprintf(filename, "./gfz_map_%d", i);
-      
-      FILE *map = fopen(filename, "wb");
-
-      fwrite(__gfz_map_area, __gfz_map_size, 1, map);
-    }
-    */
 
     /* Relay wait status to pipe, then loop back. */
 
@@ -300,13 +303,17 @@ int __afl_persistent_loop(unsigned int max_cnt) {
    is enabled.
 */
 
-void __afl_manual_init(void) {
+void __gfz_manual_init(void) {
 
   static u8 init_done;
 
   if (!init_done) {
 
-    __gfz_map_area = calloc(__gfz_map_size, 1);
+#ifdef GFZ_USE_SHM
+    __gfz_map_shm();
+#else
+    __gfz_map_ptr = calloc(GFZ_MAP_SIZE, 1);
+#endif
 
     /*
 
@@ -321,7 +328,7 @@ void __afl_manual_init(void) {
 
     if (map_file) {
     
-      ssize_t n_bytes = fread(__gfz_map_area, __gfz_map_size, 1, map_file);
+      ssize_t n_bytes = fread(__gfz_map_ptr, GFZ_MAP_SIZE, 1, map_file);
     
       if (n_bytes <= 0)
         printf("[-] Error reading map. (%ld)\n", n_bytes);
@@ -330,14 +337,13 @@ void __afl_manual_init(void) {
     
     } else {
     
-      /* If no custom map is present, just fill it with ones
-         to execute normal program behavior.
-       */
+      // If no custom map is present, just fill it with ones
+      // to execute normal program behavior.
 
       int i = 0;
 
-      for (i = 0; i < (__gfz_map_size / 2); ++i) {
-        __gfz_map_area[i] = 1;
+      for (i = 0; i < (GFZ_MAP_SIZE / 2); ++i) {
+        __gfz_map_ptr[i] = 1;
       }
     
     }
@@ -354,7 +360,7 @@ void __afl_manual_init(void) {
     }
 
     __afl_map_shm();
-    __afl_start_forkserver();
+    __gfz_start_forkserver();
     init_done = 1;
   }
 
@@ -362,14 +368,14 @@ void __afl_manual_init(void) {
 
 /* Proper initialization routine. */
 
-__attribute__((constructor(CONST_PRIO))) void __afl_auto_init(void) {
+__attribute__((constructor(CONST_PRIO))) void __gfz_auto_init(void) {
 
   is_persistent = !!getenv(PERSIST_ENV_VAR);
 
   if (getenv(DEFER_ENV_VAR))
     return;
 
-  __afl_manual_init();
+  __gfz_manual_init();
 }
 
 /* The following stuff deals with supporting -fsanitize-coverage=trace-pc-guard.
