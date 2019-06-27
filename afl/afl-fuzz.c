@@ -8274,10 +8274,30 @@ gfuzz:
     ck_free(fn);
   }
 
+#ifdef GFZ_USE_SHM
+
+  /* Read number of instrumented locations from IDTMPFILE
+     to know which portion of the map is actually used. */
+
+  int n_locations = 0;
+  int idfd = open(IDTMPFILE, O_CREAT | O_RDWR,
+                  S_IRUSR | S_IWUSR | S_IRGRP);
+
+  if (read(idfd, &n_locations, sizeof(n_locations)) != sizeof(n_locations))
+    FATAL("[-] Cannot read number of locations!");
+
+#endif
+
   while (i < maxi) {
     
     show_stats();
     u32 timeout = exec_tmout;
+
+#ifdef GFZ_USE_SHM
+
+    ck_read(dev_urandom_fd, __gfz_map_ptr, n_locations * 2, "/dev/urandom");
+
+#endif
     
     fault = run_target(use_argv, timeout);
 

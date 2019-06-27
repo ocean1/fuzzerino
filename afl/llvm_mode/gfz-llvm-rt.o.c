@@ -141,7 +141,12 @@ static void __gfz_map_shm(void) {
       _exit(1);
     }
 
+  } else {
+
+    __gfz_map_ptr = calloc(GFZ_MAP_SIZE, 1);
+  
   }
+
 }
 
 /* Fork server logic. */
@@ -159,13 +164,19 @@ static void __gfz_start_forkserver(void) {
 
   int i = 0; // make a clean dry run with one sample
   
-  // TODO: change this?
+#ifndef GFZ_USE_SHM
+
+  /* Read number of instrumented locations from IDTMPFILE
+     to know which portion of the map is actually used. */
+
   int n_locations = 0;
   int idfd = open(IDTMPFILE, O_CREAT | O_RDWR,
                   S_IRUSR | S_IWUSR | S_IRGRP);
 
   if (read(idfd, &n_locations, sizeof(n_locations)) != sizeof(n_locations))
     FATAL("[-] Cannot read number of locations!");
+
+#endif
 
   /* Forkserver loop. */
 
@@ -196,9 +207,13 @@ static void __gfz_start_forkserver(void) {
       /* Read the appropriate amount of bytes to populate
          the instrumented locations in __gfz_map_ptr. */
 
+#ifndef GFZ_USE_SHM
+
       if (i > 0 && fread(__gfz_map_ptr, n_locations * 2, 1, rfd) != 1) {
         FATAL("[-] Unable to get enough rand bytes");
       }
+
+#endif
 
       /* Once woken up, create a clone of our process. */
 
@@ -310,9 +325,13 @@ void __gfz_manual_init(void) {
   if (!init_done) {
 
 #ifdef GFZ_USE_SHM
+
     __gfz_map_shm();
+
 #else
+    
     __gfz_map_ptr = calloc(GFZ_MAP_SIZE, 1);
+
 #endif
 
     /*
