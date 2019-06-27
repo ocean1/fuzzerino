@@ -319,7 +319,7 @@
 
 /* size for map containing mutations (4MB) */
 #define GFZ_MAP_SIZE_POW2   22
-#define GFZ_MAP_SIZE        1000 //(1 << GFZ_MAP_SIZE_POW2)
+#define GFZ_MAP_SIZE        (1 << GFZ_MAP_SIZE_POW2)
 
 /* size for pool containing values to be used in mutations, 4KB seems good */
 #define RAND_POOL_SIZE_POW  12
