@@ -364,7 +364,7 @@ void __gfz_manual_init(void) {
       for (i = 0; i < (GFZ_MAP_SIZE / 2); ++i) {
         __gfz_map_ptr[i] = 1;
       }
-    
+
     }
 
     /* End code for instrumentation testing */

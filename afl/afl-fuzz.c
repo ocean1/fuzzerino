@@ -8286,6 +8286,8 @@ gfuzz:
   if (read(idfd, &n_locations, sizeof(n_locations)) != sizeof(n_locations))
     FATAL("[-] Cannot read number of locations!");
 
+  memset(__gfz_map_ptr, 0, GFZ_MAP_SIZE);
+
 #endif
 
   while (i < maxi) {
@@ -8295,7 +8297,10 @@ gfuzz:
 
 #ifdef GFZ_USE_SHM
 
-    ck_read(dev_urandom_fd, __gfz_map_ptr, n_locations * 2, "/dev/urandom");
+    // ck_read(dev_urandom_fd, __gfz_map_ptr, n_locations * 2, "/dev/urandom");
+    
+    // A little less random (actually it's deterministic)
+    __gfz_map_ptr[i % n_locations]++;
 
 #endif
     
