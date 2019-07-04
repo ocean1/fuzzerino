@@ -298,12 +298,13 @@ void AFLCoverage::instrumentOperands(Instruction *I) {
 
     auto *Op = dyn_cast<Value>(*OI);
     Op = Op ? Op : dyn_cast<Instruction>(*OI);
+    
     if (!Op)
       continue;
 
     Type *OT = Op->getType();
 
-    // Don't instrument GEP indices of struct types
+    // Don't instrument GEP indices of struct types!
     if ( is_gep && op_idx == 0 && OT->isPointerTy() && dyn_cast<PointerType>(OT)->getElementType()->isStructTy() )
       return;
 
@@ -330,7 +331,7 @@ void AFLCoverage::instrumentOperands(Instruction *I) {
     //
     // Whenever we need an integer constant we call
     //
-    //     ConstantInt::get(IntegerType::getIntNTy(C, bits), value))
+    //   ConstantInt::get(IntegerType::getIntNTy(C, bits), value))
     //
     Value *FuzzedVal = NULL;
 
@@ -526,7 +527,7 @@ bool AFLCoverage::runOnModule(Module &M) {
 
   if (isatty(2) && !getenv("AFL_QUIET")) {
     SAYF(cCYA "gfz-llvm-pass " cBRI VERSION cRST
-              " by <lszekeres@google.com>, <_ocean>\n");
+              " by <lszekeres@google.com>, <_ocean>, <limi7break>\n");
   } else {
     be_quiet = 1;
   }
@@ -599,19 +600,16 @@ bool AFLCoverage::runOnModule(Module &M) {
     fun_tot = 0;
     fun_sel = 0;
 
-    if (whitelist && (WhitelistSet.find(F.getName()) == WhitelistSet.end())) {
+    if (whitelist && (WhitelistSet.find(F.getName()) == WhitelistSet.end()))
       continue;
-    }
 
-    if (F.isIntrinsic()) {
+    if (F.isIntrinsic())
       continue;
-    }
 
     for (auto &BB : F) { // basic block loop
 
-      if (BB.getFirstInsertionPt() == BB.end()) {
+      if (BB.getFirstInsertionPt() == BB.end())
         continue;
-      }
 
       for (auto &I : BB) { // instruction loop
 
@@ -650,9 +648,8 @@ bool AFLCoverage::runOnModule(Module &M) {
 
         Type *IT = I.getType();
 
-        if (! (IT->isIntegerTy() /*|| IT->isPointerTy() || IT->isFloatingPointTy()*/) ) {
+        if (! (IT->isIntegerTy() /*|| IT->isPointerTy() || IT->isFloatingPointTy()*/) )
           continue;
-        }
 
         toInstrumentResult.push_back(&I);
 
@@ -662,13 +659,14 @@ bool AFLCoverage::runOnModule(Module &M) {
     if (fun_sel) {
       inst_fun++;
       
-      if (!be_quiet) {
+      if (!be_quiet)
         OKF("Function %s: selected %u/%u instructions.", F.getName().str().c_str(), fun_sel, fun_tot);
-      }
+
     } else {
-      if (!be_quiet) {
+
+      if (!be_quiet)
         OKF("Function %s: skipped.", F.getName().str().c_str());
-      }
+
     }
   
     mod_tot += fun_tot;
@@ -698,22 +696,22 @@ bool AFLCoverage::runOnModule(Module &M) {
   // Write info that needs to be maintained between modules to IDTMPFILE
 
   lseek(idfd, 0, SEEK_SET);
-  if (write(idfd, &inst_id, sizeof(inst_id)) != sizeof(inst_id)) {
+  
+  if (write(idfd, &inst_id, sizeof(inst_id)) != sizeof(inst_id))
     FATAL("Got a problem while writing current instruction id on %s", IDTMPFILE);
-  }
-  if (write(idfd, &tot, sizeof(tot)) != sizeof(tot)) {
+
+  if (write(idfd, &tot, sizeof(tot)) != sizeof(tot))
     FATAL("Got a problem while writing total instructions on %s", IDTMPFILE);
-  }
-  if (write(idfd, &sel, sizeof(sel)) != sizeof(sel)) {
+
+  if (write(idfd, &sel, sizeof(sel)) != sizeof(sel))
     FATAL("Got a problem while writing selected instructions on %s", IDTMPFILE);
-  }
+
   lock.l_type = F_UNLCK;
   fcntl(idfd, F_SETLKW, &lock);
 
-  if (!be_quiet && !inst_fun) {
+  if (!be_quiet && !inst_fun)
     WARNF("No instrumentation targets found.");
     // there's functions with 0 I/ 0 BB (external references?) check them out....
-  }
 
   fclose(map_key_fd);
 

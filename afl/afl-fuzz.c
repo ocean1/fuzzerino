@@ -85,21 +85,8 @@
 
 FILE *log_file;
 
-EXP_ST u16* __gfz_map_ptr;               /* SHM w/ instrumentation bitmap (?)*/
-
-// u8* default_hash;                     /* default hash of the output       */
-
-// struct gfz_q_entry {
-
-//   u32 len;                            /* Output length                    */
-//   u8* hash;                           /* Output hash                      */
-//   u16* map;                           /* gFuzz mutation map               */
-//   struct gfz_q_entry *next;           /* Next element, if any             */
-
-// };
-
-// static struct gfz_q_entry *gfz_q,     /* gFuzz queue (linked list)        */
-//                           *gfz_q_cur; /* cur position within gFuzz queue  */
+u16* __gfz_map_ptr;                   /* Instrumentation bitmap SHM       */
+int n_locations = 0;                  /* Number of instrumented locations */
 
 /* Usual stuff */
 
@@ -2085,7 +2072,8 @@ EXP_ST void init_forkserver(char** argv) {
 #endif /* ^RLIMIT_AS */
 
       /* limit output file(s) size */
-      if (gfuzz_mode){
+      if (gfuzz_mode) {
+        r.rlim_max = r.rlim_cur = GFZ_OUTPUT_LIMIT;
         setrlimit(RLIMIT_FSIZE, &r);
       }
 
@@ -7825,6 +7813,23 @@ char *dirname (char *path)
   return path;
 }
 
+/* Read number of instrumented locations from IDTMPFILE
+   to know which portion of the map is actually used. */
+
+void read_n_locations() {
+
+  int idfd = open(IDTMPFILE, O_CREAT | O_RDWR,
+                  S_IRUSR | S_IWUSR | S_IRGRP);
+
+  if (read(idfd, &n_locations, sizeof(n_locations)) != sizeof(n_locations))
+    FATAL("[-] Cannot read number of locations!");
+
+  close(idfd);
+
+  OKF("Number of instrumented locations: %d", n_locations);
+  OKF("Number of dry run executions: %d", n_locations * 8192);
+
+}
 
 #ifndef AFL_LIB
 
@@ -8102,6 +8107,9 @@ int main(int argc, char** argv) {
   gfz_setup_shm();
 #endif /* GFZ_USE_SHM */
 
+  if (gfuzz_mode)
+    read_n_locations();
+
   init_count_class16();
 
   setup_dirs_fds();
@@ -8128,9 +8136,6 @@ int main(int argc, char** argv) {
     use_argv = argv + optind;
 
   perform_dry_run(use_argv);
-
-  // if (gen_file)
-  //  default_md5 = md5(gen_file, 0);
 
   cull_queue();
 
@@ -8257,6 +8262,7 @@ gfuzz:
   maxi = (numiter == NULL) ? 500 : atoi(numiter);
   u32 i = 0;
   u8 fault;
+  struct stat st;
 
   if (gen_file) {
     // Make generated dir in the same file system where
@@ -8275,16 +8281,6 @@ gfuzz:
   }
 
 #ifdef GFZ_USE_SHM
-
-  /* Read number of instrumented locations from IDTMPFILE
-     to know which portion of the map is actually used. */
-
-  int n_locations = 0;
-  int idfd = open(IDTMPFILE, O_CREAT | O_RDWR,
-                  S_IRUSR | S_IWUSR | S_IRGRP);
-
-  if (read(idfd, &n_locations, sizeof(n_locations)) != sizeof(n_locations))
-    FATAL("[-] Cannot read number of locations!");
 
   memset(__gfz_map_ptr, 0, GFZ_MAP_SIZE);
 
@@ -8306,9 +8302,8 @@ gfuzz:
     
     fault = run_target(use_argv, timeout);
 
-    if ( gen_file && fault == FAULT_NONE ) {
+    if ( gen_file && fault == FAULT_NONE && !stat(gen_file, &st) && st.st_size != 0 ) {
       // Save output in gen_dir
-    
       u8 *fn = alloc_printf("%s/%d", gen_dir, i);
       rename(gen_file, fn);
       ck_free(fn);
@@ -8324,6 +8319,9 @@ gfuzz:
     }
 
     ++i;
+
+    if (gen_file)
+      remove(gen_file);
 
   }
 

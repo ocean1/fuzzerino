@@ -176,6 +176,8 @@ static void __gfz_start_forkserver(void) {
   if (read(idfd, &n_locations, sizeof(n_locations)) != sizeof(n_locations))
     FATAL("[-] Cannot read number of locations!");
 
+  close(idfd);
+
 #endif
 
   /* Forkserver loop. */
@@ -204,10 +206,10 @@ static void __gfz_start_forkserver(void) {
 
     if ( !child_stopped ) {
 
+#ifndef GFZ_USE_SHM
+
       /* Read the appropriate amount of bytes to populate
          the instrumented locations in __gfz_map_ptr. */
-
-#ifndef GFZ_USE_SHM
 
       if (i > 0 && fread(__gfz_map_ptr, n_locations * 2, 1, rfd) != 1) {
         FATAL("[-] Unable to get enough rand bytes");
@@ -395,6 +397,7 @@ __attribute__((constructor(CONST_PRIO))) void __gfz_auto_init(void) {
     return;
 
   __gfz_manual_init();
+
 }
 
 /* The following stuff deals with supporting -fsanitize-coverage=trace-pc-guard.

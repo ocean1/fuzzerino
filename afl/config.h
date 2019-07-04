@@ -265,7 +265,6 @@
 /* Environment variable used to pass SHM ID to the called program. */
 
 #define SHM_ENV_VAR         "__AFL_SHM_ID"
-#define GFZ_SHM_ENV_VAR         "__GFZ_SHM_ID"
 
 /* Other less interesting, internal-only variables. */
 
@@ -317,14 +316,6 @@
 #define MAP_SIZE_POW2       16
 #define MAP_SIZE            (1 << MAP_SIZE_POW2)
 
-/* size for map containing mutations (4MB) */
-#define GFZ_MAP_SIZE_POW2   22
-#define GFZ_MAP_SIZE        (1 << GFZ_MAP_SIZE_POW2)
-
-/* size for pool containing values to be used in mutations, 4KB seems good */
-#define RAND_POOL_SIZE_POW  12
-#define RAND_POOL_SIZE      (1 << RAND_POOL_SIZE_POW)
-
 /* Maximum allocator request size (keep well under INT_MAX): */
 
 #define MAX_ALLOC           0x40000000
@@ -356,8 +347,34 @@
 
 // #define IGNORE_FINDS
 
+
+
+/* gFuzz stuff! */
+
+/* Environment variable used to pass SHM ID to the called program. */
+
+#define GFZ_SHM_ENV_VAR     "__GFZ_SHM_ID"
+
+/* Size for map containing mutations (4MB) */
+
+#define GFZ_MAP_SIZE_POW2   22
+#define GFZ_MAP_SIZE        (1 << GFZ_MAP_SIZE_POW2)
+
+/* Size for pool containing values to be used in mutations, 4KB seems good */
+
+#define RAND_POOL_SIZE_POW  12
+#define RAND_POOL_SIZE      (1 << RAND_POOL_SIZE_POW)
+
+/* File for keeping track of instrumented locations */
+
 #define IDTMPFILE "/dev/shm/gfzidfile"
-#define MAX_FSIZE 50*1024*1024 // 50 MB of file are enough for now .. :)
+
+/* Output file size limit (1GB) */
+
+#define GFZ_OUTPUT_LIMIT_POW2 30
+#define GFZ_OUTPUT_LIMIT      (1 << GFZ_OUTPUT_LIMIT_POW2)
+
+/* Enable SHM synchronization of mutation map between fuzzer and forkserver */
 
 #define GFZ_USE_SHM
 

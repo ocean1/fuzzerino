@@ -80,3 +80,5 @@ scratch
 xray-log.*
 
 *.o
+
+map_key.txt
