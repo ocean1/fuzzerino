@@ -160,25 +160,47 @@ static void __gfz_start_forkserver(void) {
   /* Phone home and tell the parent that we're OK. If parent isn't there,
      assume we're not running in forkserver mode and just execute program. */
 
-  if (write(FORKSRV_FD + 1, tmp, 4) != 4) return;
+  if (write(FORKSRV_FD + 1, tmp, 4) != 4) {
+    
+    /*
+
+      Code used for instrumentation testing.
+
+      It fills the map area with a custom map read from a file
+      called "gfz.map" in the current folder.
+
+    */
+
+    FILE *map_file = fopen("./gfz.map", "rb");
+
+    if (map_file) {
+    
+      ssize_t n_bytes = fread(__gfz_map_ptr, GFZ_MAP_SIZE, 1, map_file);
+    
+      if (n_bytes <= 0)
+        printf("[-] Error reading map. (%ld)\n", n_bytes);
+      else
+        printf("[+] Map read.");
+    
+    } else {
+    
+      // If no custom map is present, just fill it with ones
+      // to execute normal program behavior.
+
+      int i = 0;
+
+      for (i = 0; i < (GFZ_MAP_SIZE / 2); ++i) {
+        __gfz_map_ptr[i] = 1;
+      }
+
+    }
+
+    /* End code for instrumentation testing */
+    
+    return;
+  }
 
   int i = 0; // make a clean dry run with one sample
-  
-#ifndef GFZ_USE_SHM
-
-  /* Read number of instrumented locations from IDTMPFILE
-     to know which portion of the map is actually used. */
-
-  int n_locations = 0;
-  int idfd = open(IDTMPFILE, O_CREAT | O_RDWR,
-                  S_IRUSR | S_IWUSR | S_IRGRP);
-
-  if (read(idfd, &n_locations, sizeof(n_locations)) != sizeof(n_locations))
-    FATAL("[-] Cannot read number of locations!");
-
-  close(idfd);
-
-#endif
 
   /* Forkserver loop. */
 
@@ -205,17 +227,6 @@ static void __gfz_start_forkserver(void) {
     }
 
     if ( !child_stopped ) {
-
-#ifndef GFZ_USE_SHM
-
-      /* Read the appropriate amount of bytes to populate
-         the instrumented locations in __gfz_map_ptr. */
-
-      if (i > 0 && fread(__gfz_map_ptr, n_locations * 2, 1, rfd) != 1) {
-        FATAL("[-] Unable to get enough rand bytes");
-      }
-
-#endif
 
       /* Once woken up, create a clone of our process. */
 
@@ -326,50 +337,7 @@ void __gfz_manual_init(void) {
 
   if (!init_done) {
 
-#ifdef GFZ_USE_SHM
-
     __gfz_map_shm();
-
-#else
-    
-    __gfz_map_ptr = calloc(GFZ_MAP_SIZE, 1);
-
-#endif
-
-    /*
-
-      Code used for instrumentation testing.
-
-      It fills the map area with a custom map read from a file
-      called "gfz.map" in the current folder.
-
-    */
-
-    FILE *map_file = fopen("./gfz.map", "rb");
-
-    if (map_file) {
-    
-      ssize_t n_bytes = fread(__gfz_map_ptr, GFZ_MAP_SIZE, 1, map_file);
-    
-      if (n_bytes <= 0)
-        printf("[-] Error reading map. (%ld)\n", n_bytes);
-      else
-        printf("[+] Map read.");
-    
-    } else {
-    
-      // If no custom map is present, just fill it with ones
-      // to execute normal program behavior.
-
-      int i = 0;
-
-      for (i = 0; i < (GFZ_MAP_SIZE / 2); ++i) {
-        __gfz_map_ptr[i] = 1;
-      }
-
-    }
-
-    /* End code for instrumentation testing */
 
     rfd = fopen("/dev/urandom", "r");
 

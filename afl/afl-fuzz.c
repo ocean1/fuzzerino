@@ -88,6 +88,8 @@ FILE *log_file;
 u16* __gfz_map_ptr;                   /* Instrumentation bitmap SHM       */
 int n_locations = 0;                  /* Number of instrumented locations */
 
+u16* __gfz_ban_ptr;                   /* Banned locations                 */
+
 /* Usual stuff */
 
 EXP_ST u8 *in_dir,                    /* Input directory with test cases  */
@@ -1420,6 +1422,8 @@ EXP_ST void gfz_setup_shm(void) {
   __gfz_map_ptr = shmat(gfz_shm_id, NULL, 0);
   
   if (!__gfz_map_ptr) PFATAL("shmat() failed");
+
+  memset(__gfz_map_ptr, 0, GFZ_MAP_SIZE);
 
 }
 
@@ -7827,7 +7831,16 @@ void read_n_locations() {
   close(idfd);
 
   OKF("Number of instrumented locations: %d", n_locations);
-  OKF("Number of dry run executions: %d", n_locations * 8192);
+
+  /* Allocate and initialize the map of banned locations. */
+
+  __gfz_ban_ptr = calloc(n_locations, sizeof(u16));
+
+  int i = 0;
+
+  for (i = 0; i < n_locations; ++i) {
+    __gfz_ban_ptr[i] = ~__gfz_ban_ptr[i];
+  }
 
 }
 
@@ -8101,11 +8114,8 @@ int main(int argc, char** argv) {
   check_cpu_governor();
 
   setup_post();
-  setup_shm();
-  
-#ifdef GFZ_USE_SHM
+  setup_shm();  
   gfz_setup_shm();
-#endif /* GFZ_USE_SHM */
 
   if (gfuzz_mode)
     read_n_locations();
@@ -8280,27 +8290,33 @@ gfuzz:
     ck_free(fn);
   }
 
-#ifdef GFZ_USE_SHM
+  /* Dry run. */
 
-  memset(__gfz_map_ptr, 0, GFZ_MAP_SIZE);
+  int dry_execs = n_locations * GFZ_N_MUTATIONS;
 
-#endif
+  OKF("Number of dry run executions: %d", dry_execs);
+
+  /*
+  for (i = 0; i < dry_execs; ++i) {
+    
+    show_stats();
+
+  }
+  */
+
+  /* Havoc phase. */
+
+  i = 0;
 
   while (i < maxi) {
     
     show_stats();
-    u32 timeout = exec_tmout;
 
-#ifdef GFZ_USE_SHM
-
-    // ck_read(dev_urandom_fd, __gfz_map_ptr, n_locations * 2, "/dev/urandom");
-    
-    // A little less random (actually it's deterministic)
     __gfz_map_ptr[i % n_locations]++;
 
-#endif
-    
-    fault = run_target(use_argv, timeout);
+    // TODO implement ban mechanism
+
+    fault = run_target(use_argv, exec_tmout);
 
     if ( gen_file && fault == FAULT_NONE && !stat(gen_file, &st) && st.st_size != 0 ) {
       // Save output in gen_dir

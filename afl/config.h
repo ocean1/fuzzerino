@@ -353,29 +353,27 @@
 
 /* Environment variable used to pass SHM ID to the called program. */
 
-#define GFZ_SHM_ENV_VAR     "__GFZ_SHM_ID"
+#define GFZ_SHM_ENV_VAR       "__GFZ_SHM_ID"
 
 /* Size for map containing mutations (4MB) */
 
-#define GFZ_MAP_SIZE_POW2   22
-#define GFZ_MAP_SIZE        (1 << GFZ_MAP_SIZE_POW2)
+#define GFZ_MAP_SIZE_POW2     22
+#define GFZ_MAP_SIZE          (1 << GFZ_MAP_SIZE_POW2)
 
 /* Size for pool containing values to be used in mutations, 4KB seems good */
 
-#define RAND_POOL_SIZE_POW  12
-#define RAND_POOL_SIZE      (1 << RAND_POOL_SIZE_POW)
+#define RAND_POOL_SIZE_POW    12
+#define RAND_POOL_SIZE        (1 << RAND_POOL_SIZE_POW)
 
 /* File for keeping track of instrumented locations */
 
-#define IDTMPFILE "/dev/shm/gfzidfile"
+#define IDTMPFILE             "/dev/shm/gfzidfile"
 
 /* Output file size limit (1GB) */
 
 #define GFZ_OUTPUT_LIMIT_POW2 30
 #define GFZ_OUTPUT_LIMIT      (1 << GFZ_OUTPUT_LIMIT_POW2)
 
-/* Enable SHM synchronization of mutation map between fuzzer and forkserver */
-
-#define GFZ_USE_SHM
+#define GFZ_N_MUTATIONS       13
 
 #endif /* ! _HAVE_CONFIG_H */
