@@ -70,15 +70,7 @@ class AFLCoverage : public ModulePass {
 
 public:
   static char ID;
-  AFLCoverage() : ModulePass(ID) {
-    // TODO debugging
-    printf("\n=== AFLCoverage ctor ===\n");
-  }
-
-  ~AFLCoverage() {
-    // TODO debugging
-    printf("\n=== AFLCoverage dtor ===\n");
-  }
+  AFLCoverage() : ModulePass(ID) {}
 
   bool runOnModule(Module &M) override;
 
@@ -370,8 +362,8 @@ void AFLCoverage::instrumentOperands(Instruction *I) {
     FuzzedVal = PHI;
 #endif
 
-    // Debugging stuff    
-
+    /* Debugging stuff */
+    /*
     fprintf(map_key_fd, "\n%d:\t%s", inst_id, I->getOpcodeName());
 
     if ( isa<CallInst>(I) )
@@ -383,6 +375,7 @@ void AFLCoverage::instrumentOperands(Instruction *I) {
     raw_string_ostream rso(str);
     OT->print(rso);
     fprintf(map_key_fd, ", type %s", rso.str().c_str());
+    */
 
     // Update operand and increase the id of the
     // instrumented location in the map
@@ -488,8 +481,8 @@ Instruction* AFLCoverage::instrumentResult(Instruction *I) {
 #endif
   FakeVal->eraseFromParent();
 
-  // Debugging stuff    
-
+  /* Debugging stuff */
+  /*
   fprintf(map_key_fd, "\n%d:\t%s", inst_id, I->getOpcodeName());
 
   if ( isa<CallInst>(I) )
@@ -499,6 +492,7 @@ Instruction* AFLCoverage::instrumentResult(Instruction *I) {
   raw_string_ostream rso(str);
   IT->print(rso);
   fprintf(map_key_fd, ", type %s", rso.str().c_str());
+  */
 
   inst_id++;
 
@@ -507,13 +501,8 @@ Instruction* AFLCoverage::instrumentResult(Instruction *I) {
 
 bool AFLCoverage::runOnModule(Module &M) {
 
-  // TODO debugging
-  printf("\n=== runOnModule called ===\n");
-
-  // GlobalVariable *porcodio = new GlobalVariable(M, );
-
   // File used for debugging  
-  map_key_fd = fopen("./map_key.txt", "w");
+  // map_key_fd = fopen("./map_key.txt", "w");
 
   LLVMContext &C = M.getContext();
 
@@ -725,7 +714,8 @@ bool AFLCoverage::runOnModule(Module &M) {
     WARNF("No instrumentation targets found.");
     // there's functions with 0 I/ 0 BB (external references?) check them out....
 
-  fclose(map_key_fd);
+  // Debugging
+  // fclose(map_key_fd);
 
   return true;
 

@@ -8363,30 +8363,6 @@ gfuzz:
 
   } // end location loop
 
-  /* TODO begin debug */
-  /*
-  fprintf(log_file, "\ndry run tmouts: %d", total_tmouts);
-  fprintf(log_file, "\ndry run crashes: %d", total_crashes);
-
-  FILE *map_file;
-
-  if (!(map_file = fopen("./gfz_ban.map", "wb")))
-  {
-      printf("Error! Could not open file\n");
-      return -1;
-  }
-  
-  ssize_t n_bytes = fwrite(__gfz_ban_ptr, n_locations * sizeof(u16), 1, map_file);
-
-  if (n_bytes <= 0) {
-      printf("ko (%ld)\n", n_bytes);
-      return -1;
-  }
-  else
-      printf("\n[+] Map written.\n");
-  */
-  /* end debug */
-
   /* 
 
     === Havoc. ===
