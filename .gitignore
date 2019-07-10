@@ -82,3 +82,6 @@ xray-log.*
 *.o
 
 map_key.txt
+
+irons/out
+irons/afl-fuzz.log
