@@ -86,8 +86,7 @@ void free(void *ptr)
 {
 }
 
-/* Random file descriptor for populating __gfz_rand_area
-   and the appropriate number of locations of __gfz_map_ptr. */
+/* Random file descriptor for populating __gfz_rand_area. */
 
 FILE *rfd;
 
@@ -341,10 +340,10 @@ void __gfz_manual_init(void) {
 
     rfd = fopen("/dev/urandom", "r");
 
-    __gfz_rand_area = malloc(RAND_POOL_SIZE);
+    __gfz_rand_area = malloc(GFZ_RAND_POOL_SIZE);
     __gfz_rand_idx = 0;
     
-    if (fread(__gfz_rand_area, RAND_POOL_SIZE, 1, rfd) != 1) {
+    if (fread(__gfz_rand_area, GFZ_RAND_POOL_SIZE, 1, rfd) != 1) {
       FATAL("Unable to get enough rand bytes");
     }
 

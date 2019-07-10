@@ -347,7 +347,6 @@ int main(int argc, char** argv) {
 
   }
 
-
   find_obj(argv[0]);
 
   edit_params(argc, argv);
@@ -355,6 +354,42 @@ int main(int argc, char** argv) {
   execvp(cc_params[0], (char**)cc_params);
 
   FATAL("Oops, failed to execute '%s' - check your PATH", cc_params[0]);
+
+  /*
+  pid_t pid;
+ 
+  pid = fork();
+  
+  if (pid == 0) {
+  
+    execvp(cc_params[0], (char**)cc_params);
+    FATAL("Oops, failed to execute '%s' - check your PATH", cc_params[0]);
+  
+  } else if (pid > 0) {
+  
+    waitpid(pid, NULL);
+
+    int n_locations;
+
+    int idfd = open(GFZ_IDFILE, O_CREAT | O_RDWR,
+                    S_IRUSR | S_IWUSR | S_IRGRP);
+
+    if (read(idfd, &n_locations, sizeof(n_locations)) != sizeof(n_locations))
+      FATAL("[-] Cannot read number of locations!");
+
+    close(idfd);
+
+    // TODO: super hacky way to embed the number of locations
+    //       into the instrumented binary
+
+
+
+  } else {
+  
+    FATAL("Oops, failed to fork gfz-clang-fast");
+  
+  }
+  */
 
   return 0;
 

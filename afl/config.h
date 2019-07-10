@@ -353,27 +353,46 @@
 
 /* Environment variable used to pass SHM ID to the called program. */
 
-#define GFZ_SHM_ENV_VAR       "__GFZ_SHM_ID"
+#define GFZ_SHM_ENV_VAR         "__GFZ_SHM_ID"
 
 /* Size for map containing mutations (4MB) */
 
-#define GFZ_MAP_SIZE_POW2     22
-#define GFZ_MAP_SIZE          (1 << GFZ_MAP_SIZE_POW2)
+#define GFZ_MAP_SIZE_POW2       22
+#define GFZ_MAP_SIZE            (1 << GFZ_MAP_SIZE_POW2)
 
 /* Size for pool containing values to be used in mutations, 4KB seems good */
 
-#define RAND_POOL_SIZE_POW    12
-#define RAND_POOL_SIZE        (1 << RAND_POOL_SIZE_POW)
+#define GFZ_RAND_POOL_SIZE_POW2 12
+#define GFZ_RAND_POOL_SIZE      (1 << GFZ_RAND_POOL_SIZE_POW2)
 
 /* File for keeping track of instrumented locations */
 
-#define IDTMPFILE             "/dev/shm/gfzidfile"
+#define GFZ_IDFILE              "/dev/shm/gfzidfile"
 
 /* Output file size limit (1GB) */
 
-#define GFZ_OUTPUT_LIMIT_POW2 30
-#define GFZ_OUTPUT_LIMIT      (1 << GFZ_OUTPUT_LIMIT_POW2)
+#define GFZ_OUTPUT_LIMIT_POW2   30
+#define GFZ_OUTPUT_LIMIT        (1 << GFZ_OUTPUT_LIMIT_POW2)
 
-#define GFZ_N_MUTATIONS       13
+/* Don't touch this! */
+
+#define GFZ_N_MUTATIONS         13
+
+#define GFZ_KEEP_ORIGINAL       1      // 0000 0000 0000 0001
+#define GFZ_PLUS_ONE            2      // 0000 0000 0000 0010
+#define GFZ_MINUS_ONE           4      // 0000 0000 0000 0100
+#define GFZ_INTERESTING_1       8      // 0000 0000 0000 1000
+#define GFZ_INTERESTING_2       16     // 0000 0000 0001 0000
+#define GFZ_INTERESTING_3       32     // 0000 0000 0010 0000
+#define GFZ_INTERESTING_4       64     // 0000 0000 0100 0000
+#define GFZ_INTERESTING_5       128    // 0000 0000 1000 0000
+#define GFZ_INTERESTING_6       256    // 0000 0001 0000 0000
+#define GFZ_INTERESTING_7       512    // 0000 0010 0000 0000
+#define GFZ_INTERESTING_8       1024   // 0000 0100 0000 0000
+#define GFZ_PLUS_MAX            2048   // 0000 1000 0000 0000
+#define GFZ_PLUS_RAND           4096   // 0001 0000 0000 0000
+#define GFZ_RESERVED_1          8192   // 0010 0000 0000 0000
+#define GFZ_RESERVED_2          16384  // 0100 0000 0000 0000
+#define GFZ_RESERVED_3          32768  // 1000 0000 0000 0000
 
 #endif /* ! _HAVE_CONFIG_H */

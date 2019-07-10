@@ -1423,7 +1423,13 @@ EXP_ST void gfz_setup_shm(void) {
   
   if (!__gfz_map_ptr) PFATAL("shmat() failed");
 
-  memset(__gfz_map_ptr, 0, GFZ_MAP_SIZE);
+  /* gFuzz map starts from all ones (normal program behavior). */
+
+  int i = 0;
+
+  for (i = 0; i < (GFZ_MAP_SIZE / 2); ++i) {
+    __gfz_map_ptr[i] = 1;
+  }
 
 }
 
@@ -7817,12 +7823,12 @@ char *dirname (char *path)
   return path;
 }
 
-/* Read number of instrumented locations from IDTMPFILE
+/* Read number of instrumented locations from GFZ_IDFILE
    to know which portion of the map is actually used. */
 
 void read_n_locations() {
 
-  int idfd = open(IDTMPFILE, O_CREAT | O_RDWR,
+  int idfd = open(GFZ_IDFILE, O_CREAT | O_RDWR,
                   S_IRUSR | S_IWUSR | S_IRGRP);
 
   if (read(idfd, &n_locations, sizeof(n_locations)) != sizeof(n_locations))
@@ -7831,6 +7837,13 @@ void read_n_locations() {
   close(idfd);
 
   OKF("Number of instrumented locations: %d", n_locations);
+  
+  /* KEEP_ORIGINAL is always enabled during dry run.
+     PLUS_RAND is always disabled during dry run, but it is NEVER banned.
+
+     This is why we consider (GFZ_N_MUTATIONS - 2). */
+
+  OKF("Number of dry run executions: %d", n_locations * (GFZ_N_MUTATIONS - 2));
 
   /* Allocate and initialize the map of banned locations. */
 
@@ -7861,7 +7874,7 @@ int main(int argc, char** argv) {
   struct timeval tv;
   struct timezone tz;
 
-  SAYF(cCYA "gfz-fuzz " cBRI VERSION cRST " by <lcamtuf@google.com>, _ocean\n");
+  SAYF(cCYA "gfz-fuzz " cBRI VERSION cRST " by <lcamtuf@google.com>, _ocean, limi7break\n");
 
   doc_path = access(DOC_PATH, F_OK) ? "docs" : DOC_PATH;
 
@@ -8275,12 +8288,14 @@ gfuzz:
   struct stat st;
 
   if (gen_file) {
-    // Make generated dir in the same file system where
+    // Make generated dirs in the same file system where
     // gen_file is so that we can use "rename" function
     
     u8 *gen_path = dirname(strdup(gen_file));
+    
     gen_dir = alloc_printf("%s/generated", gen_path);
     if (mkdir(gen_dir, 0700)) WARNF("Unable to create '%s'", gen_dir);
+    
     free(gen_path);
 
     // Save *default* output in gen_dir
@@ -8290,27 +8305,101 @@ gfuzz:
     ck_free(fn);
   }
 
-  /* Dry run. */
+  /* 
 
-  int dry_execs = n_locations * GFZ_N_MUTATIONS;
+    === Dry run. ===
 
-  OKF("Number of dry run executions: %d", dry_execs);
-
-  /*
-  for (i = 0; i < dry_execs; ++i) {
-    
-    show_stats();
-
-  }
   */
 
-  /* Havoc phase. */
+  int loc = 0;
+  int mut = 1;
+
+  for ( loc = 0; loc < n_locations; ++loc ) {
+
+    for ( mut = 2; mut < GFZ_PLUS_RAND; mut <<= 1 ) {
+
+      show_stats();
+
+      /* Enable mutation */
+
+      __gfz_map_ptr[loc] |= mut;
+
+      fault = run_target(use_argv, exec_tmout);
+
+      if ( fault == FAULT_NONE ) {
+
+        if ( gen_file && !stat(gen_file, &st) && st.st_size != 0 ) {
+          // Save output in gen_dir
+          u8 *fn = alloc_printf("%s/dry_%d_%d", gen_dir, loc, mut);
+          rename(gen_file, fn);
+          ck_free(fn);
+        }
+
+      } else {
+
+        /* Ban mutation */
+
+        __gfz_ban_ptr[loc] &= (~mut);
+
+      }
+
+      /* Disable mutation */
+
+      __gfz_map_ptr[loc] &= (~mut);
+
+      switch (fault) {
+        case FAULT_TMOUT:
+          ++total_tmouts;
+          break;
+        case FAULT_CRASH:
+          ++total_crashes;
+          break;
+      }
+
+      if (gen_file)
+        remove(gen_file);
+
+    } // end mutation loop
+
+  } // end location loop
+
+  /* TODO begin debug */
+  /*
+  fprintf(log_file, "\ndry run tmouts: %d", total_tmouts);
+  fprintf(log_file, "\ndry run crashes: %d", total_crashes);
+
+  FILE *map_file;
+
+  if (!(map_file = fopen("./gfz_ban.map", "wb")))
+  {
+      printf("Error! Could not open file\n");
+      return -1;
+  }
+  
+  ssize_t n_bytes = fwrite(__gfz_ban_ptr, n_locations * sizeof(u16), 1, map_file);
+
+  if (n_bytes <= 0) {
+      printf("ko (%ld)\n", n_bytes);
+      return -1;
+  }
+  else
+      printf("\n[+] Map written.\n");
+  */
+  /* end debug */
+
+  /* 
+
+    === Havoc. ===
+
+  */
 
   i = 0;
 
   while (i < maxi) {
     
     show_stats();
+
+    // ck_read(dev_urandom_fd, __gfz_map_ptr, n_locations * 2, "/dev/urandom");
 
     __gfz_map_ptr[i % n_locations]++;
 

@@ -70,7 +70,15 @@ class AFLCoverage : public ModulePass {
 
 public:
   static char ID;
-  AFLCoverage() : ModulePass(ID) {}
+  AFLCoverage() : ModulePass(ID) {
+    // TODO debugging
+    printf("\n=== AFLCoverage ctor ===\n");
+  }
+
+  ~AFLCoverage() {
+    // TODO debugging
+    printf("\n=== AFLCoverage dtor ===\n");
+  }
 
   bool runOnModule(Module &M) override;
 
@@ -92,7 +100,6 @@ private:
                              bool is_gep = false);
   void instrumentOperands(Instruction *I);
   Instruction* instrumentResult(Instruction *I);
-  // Value *fuzzInt(IRBuilder<> IRB, Instruction *I);
 };
 
 } // namespace
@@ -158,20 +165,20 @@ Value* AFLCoverage::emitInstrumentation(LLVMContext &C, IRBuilder<> &IRB,
     Value *KeepOriginal = IRB.CreateMul(
       Original,
       IRB.CreateAnd(MutationFlags,
-                    ConstantInt::get(IntegerType::getIntNTy(C, bits), 1)));
+                    ConstantInt::get(IntegerType::getIntNTy(C, bits), GFZ_KEEP_ORIGINAL)));
     
     // 1 * ((MutationFlags & 00000010) >> 1)
     Value *PlusOne = IRB.CreateMul(
       ConstantInt::get(IntegerType::getIntNTy(C, bits), 1),
       IRB.CreateLShr(IRB.CreateAnd(MutationFlags,
-                                   ConstantInt::get(IntegerType::getIntNTy(C, bits), 2)),
+                                   ConstantInt::get(IntegerType::getIntNTy(C, bits), GFZ_PLUS_ONE)),
                      ConstantInt::get(IntegerType::getIntNTy(C, bits), 1)));
 
     // -1 * ((MutationFlags & 00000100) >> 2)
     Value *MinusOne = IRB.CreateMul(
       ConstantInt::get(IntegerType::getIntNTy(C, bits), -1),
       IRB.CreateLShr(IRB.CreateAnd(MutationFlags,
-                                   ConstantInt::get(IntegerType::getIntNTy(C, bits), 4)),
+                                   ConstantInt::get(IntegerType::getIntNTy(C, bits), GFZ_MINUS_ONE)),
                      ConstantInt::get(IntegerType::getIntNTy(C, bits), 2)));
     
     // Add mutations together to obtain the new operand
@@ -222,7 +229,7 @@ Value* AFLCoverage::emitInstrumentation(LLVMContext &C, IRBuilder<> &IRB,
       Value *PlusMax = IRB.CreateMul(
         ConstantInt::get(C, max_int),
         IRB.CreateLShr(IRB.CreateAnd(MutationFlags,
-                                     ConstantInt::get(IntegerType::getIntNTy(C, bits), 2048)),
+                                     ConstantInt::get(IntegerType::getIntNTy(C, bits), GFZ_PLUS_MAX)),
                        ConstantInt::get(IntegerType::getIntNTy(C, bits), 11)));
 
       // Access random pool
@@ -241,7 +248,7 @@ Value* AFLCoverage::emitInstrumentation(LLVMContext &C, IRBuilder<> &IRB,
       Value *PlusRand = IRB.CreateMul(
         RandVal,
         IRB.CreateLShr(IRB.CreateAnd(MutationFlags,
-                                     ConstantInt::get(IntegerType::getIntNTy(C, bits), 4096)),
+                                     ConstantInt::get(IntegerType::getIntNTy(C, bits), GFZ_PLUS_RAND)),
                        ConstantInt::get(IntegerType::getIntNTy(C, bits), 12)));
       
       // Add all these values together to obtain the new operand
@@ -500,6 +507,11 @@ Instruction* AFLCoverage::instrumentResult(Instruction *I) {
 
 bool AFLCoverage::runOnModule(Module &M) {
 
+  // TODO debugging
+  printf("\n=== runOnModule called ===\n");
+
+  // GlobalVariable *porcodio = new GlobalVariable(M, );
+
   // File used for debugging  
   map_key_fd = fopen("./map_key.txt", "w");
 
@@ -537,7 +549,7 @@ bool AFLCoverage::runOnModule(Module &M) {
   struct flock lock;
   int idfd;
 
-  idfd = open(IDTMPFILE, O_CREAT | O_RDWR | O_NOATIME,
+  idfd = open(GFZ_IDFILE, O_CREAT | O_RDWR | O_NOATIME,
               S_IRUSR | S_IWUSR | S_IRGRP);
   memset(&lock, 0, sizeof(lock));
 
@@ -693,18 +705,18 @@ bool AFLCoverage::runOnModule(Module &M) {
 
   OKF("Total: instrumented %u locations.", inst_id);
 
-  // Write info that needs to be maintained between modules to IDTMPFILE
+  // Write info that needs to be maintained between modules to GFZ_IDFILE
 
   lseek(idfd, 0, SEEK_SET);
   
   if (write(idfd, &inst_id, sizeof(inst_id)) != sizeof(inst_id))
-    FATAL("Got a problem while writing current instruction id on %s", IDTMPFILE);
+    FATAL("Got a problem while writing current instruction id on %s", GFZ_IDFILE);
 
   if (write(idfd, &tot, sizeof(tot)) != sizeof(tot))
-    FATAL("Got a problem while writing total instructions on %s", IDTMPFILE);
+    FATAL("Got a problem while writing total instructions on %s", GFZ_IDFILE);
 
   if (write(idfd, &sel, sizeof(sel)) != sizeof(sel))
-    FATAL("Got a problem while writing selected instructions on %s", IDTMPFILE);
+    FATAL("Got a problem while writing selected instructions on %s", GFZ_IDFILE);
 
   lock.l_type = F_UNLCK;
   fcntl(idfd, F_SETLKW, &lock);

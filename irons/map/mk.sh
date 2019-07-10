@@ -23,6 +23,7 @@ GFZ_WHITE_LIST=1 ../../afl/bin/gfz-clang-fast -I. map_binary.c
 
 if [ $# -ge 1 ] && [ $1 == "-go" ]
   then
+    rm -f ./afl-fuzz.log && touch ./afl-fuzz.log
     GFZ_NUM_ITER=100000 AFL_SKIP_CPUFREQ=1 ../../afl/bin/afl-fuzz -i in -o out -m10000 -t5000 -G ./a.out 1 2 3
 fi
 
@@ -34,7 +35,7 @@ if [ $# -ge 1 ] && [ $1 == "-t1" ]
     rm -f /dev/shm/fuzztest
     rm -rf /dev/shm/generated
     rm -f ./afl-fuzz.log && touch ./afl-fuzz.log
-    GFZ_NUM_ITER=1000 AFL_SKIP_CPUFREQ=1 ../../afl/bin/afl-fuzz -i in -o out -m10000 -t5000 -G -g /dev/shm/fuzztest ../../tests/t1/gtest
+    GFZ_NUM_ITER=311296 AFL_SKIP_CPUFREQ=1 ../../afl/bin/afl-fuzz -i in -o out -m10000 -t5000 -G -g /dev/shm/fuzztest ../../tests/t1/gtest
     if [ $# -ge 2 ] && [ $2 == "--test" ]
       then
         ./test.sh -t1

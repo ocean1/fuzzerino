@@ -5,28 +5,6 @@
 
 #include "../../afl/config.h"
 
-#define KEEP_ORIGINAL 1      // 0000 0000 0000 0001
-
-/*
-
-#define PLUS_ONE      2      // 0000 0000 0000 0010
-#define MINUS_ONE     4      // 0000 0000 0000 0100
-#define INTERESTING_1 8      // 0000 0000 0000 1000
-#define INTERESTING_2 16     // 0000 0000 0001 0000
-#define INTERESTING_3 32     // 0000 0000 0010 0000
-#define INTERESTING_4 64     // 0000 0000 0100 0000
-#define INTERESTING_5 128    // 0000 0000 1000 0000
-#define INTERESTING_6 256    // 0000 0001 0000 0000
-#define INTERESTING_7 512    // 0000 0010 0000 0000
-#define INTERESTING_8 1024   // 0000 0100 0000 0000
-#define PLUS_MAX      2048   // 0000 1000 0000 0000
-#define PLUS_RAND     4096   // 0001 0000 0000 0000
-#define RESERVED_1    8192   // 0010 0000 0000 0000
-#define RESERVED_2    16384  // 0100 0000 0000 0000
-#define RESERVED_3    32768  // 1000 0000 0000 0000
-
-*/
-
 #define MAX_WHITELIST 1024
 
 int main(int argc, char *argv[]) {
@@ -54,7 +32,7 @@ int main(int argc, char *argv[]) {
 
         int i = 0;
         for (i = 0; i < locations; ++i) {
-            __gfz_map_area[i] = KEEP_ORIGINAL;
+            __gfz_map_area[i] = GFZ_KEEP_ORIGINAL;
         }
 
     } else {
@@ -93,7 +71,7 @@ int main(int argc, char *argv[]) {
 
         int k = 0;
         for (int k=0; k<cur_loc; ++k) {
-            __gfz_map_area[whitelist[k]] = KEEP_ORIGINAL;
+            __gfz_map_area[whitelist[k]] = GFZ_KEEP_ORIGINAL;
         }
 
     }
