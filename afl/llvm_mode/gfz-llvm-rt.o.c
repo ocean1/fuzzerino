@@ -74,6 +74,10 @@ u16 *__gfz_map_ptr;
 u8 *__gfz_rand_area = NULL;
 u32 __gfz_rand_idx;
 
+/* Number of instrumented locations in the target binary. */
+
+extern u32 __gfz_num_locs;
+
 /* Running in persistent mode? */
 
 static u8 is_persistent;
@@ -199,9 +203,14 @@ static void __gfz_start_forkserver(void) {
     return;
   }
 
-  int i = 0; // make a clean dry run with one sample
+  /* Send __gfz_num_locs to the fuzzer. */
+
+  if (write(FORKSRV_FD + 1, &__gfz_num_locs, sizeof(__gfz_num_locs)) != sizeof(__gfz_num_locs))
+    FATAL("Unable to write __gfz_num_locs to the fuzzer! (did you activate gFuzz mode?)");
 
   /* Forkserver loop. */
+
+  int i = 0;
 
   while(1) {
 

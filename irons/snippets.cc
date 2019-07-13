@@ -267,7 +267,7 @@ if (!(map_file = fopen("./gfz_ban.map", "wb")))
     return -1;
 }
 
-ssize_t n_bytes = fwrite(__gfz_ban_ptr, n_locations * sizeof(u16), 1, map_file);
+ssize_t n_bytes = fwrite(__gfz_ban_ptr, __gfz_num_locs * sizeof(u16), 1, map_file);
 
 if (n_bytes <= 0) {
     printf("ko (%ld)\n", n_bytes);

@@ -85,7 +85,7 @@ private:
   
   FILE *map_key_fd;
 
-  GlobalVariable *GFZMapPtr, *GFZRandPtr, *GFZRandIdx;
+  GlobalVariable *GFZMapPtr, *GFZRandPtr, *GFZRandIdx, *GFZNumLocs;
 
   Value* emitInstrumentation(LLVMContext &C, IRBuilder<> &IRB,
                              Value *Original, Value *MutationFlags,
@@ -519,6 +519,9 @@ bool AFLCoverage::runOnModule(Module &M) {
   GFZRandIdx = new GlobalVariable(M, Int32Ty, false,
                                   GlobalValue::ExternalLinkage, 0, "__gfz_rand_idx");
 
+  GFZNumLocs = new GlobalVariable(M, Int32Ty, false,
+                                  GlobalValue::WeakAnyLinkage, 0, "__gfz_num_locs");
+
   StringSet<> WhitelistSet;
   SmallVector<Instruction*, 64> toInstrumentOperands, toInstrumentResult;
 
@@ -713,6 +716,8 @@ bool AFLCoverage::runOnModule(Module &M) {
   if (!be_quiet && !inst_fun)
     WARNF("No instrumentation targets found.");
     // there's functions with 0 I/ 0 BB (external references?) check them out....
+
+  GFZNumLocs->setInitializer(ConstantInt::get(Int32Ty, inst_id));
 
   // Debugging
   // fclose(map_key_fd);

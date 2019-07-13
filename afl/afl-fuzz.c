@@ -86,9 +86,10 @@
 FILE *log_file;
 
 u16* __gfz_map_ptr;                   /* Instrumentation bitmap SHM       */
-int n_locations = 0;                  /* Number of instrumented locations */
+u32 __gfz_num_locs = 0;               /* Number of instrumented locations */
 
-u16* __gfz_ban_ptr;                   /* Banned locations                 */
+u16* __gfz_ban_ptr;                   /* Banned locations map             */
+u32 __gfz_num_band = 0;               /* Number of banned locations       */
 
 /* Usual stuff */
 
@@ -2188,6 +2189,34 @@ EXP_ST void init_forkserver(char** argv) {
 
   if (rlen == 4) {
     OKF("All right - fork server is up.");
+
+    if (gfuzz_mode) {
+      rlen = read(fsrv_st_fd, &__gfz_num_locs, sizeof(__gfz_num_locs));
+
+      if (rlen == sizeof(__gfz_num_locs)) {
+        OKF("Number of instrumented locations: %d", __gfz_num_locs);
+        
+        /* KEEP_ORIGINAL is always enabled during dry run.
+           PLUS_RAND is always disabled during dry run, but it is NEVER banned.
+
+           This is why we consider (GFZ_N_MUTATIONS - 2). */
+
+        OKF("Number of dry run executions: %d", __gfz_num_locs * (GFZ_N_MUTATIONS - 2));
+
+        /* Allocate and initialize the map of banned locations. */
+
+        __gfz_ban_ptr = calloc(__gfz_num_locs, sizeof(u16));
+
+        int i = 0;
+
+        for (i = 0; i < __gfz_num_locs; ++i) {
+          __gfz_ban_ptr[i] = ~__gfz_ban_ptr[i];
+        }
+      } else {
+        FATAL("Unable to read __gfz_num_locs from the forkserver!");
+      }
+    }
+
     return;
   }
 
@@ -4208,10 +4237,16 @@ static void show_stats(void) {
 
   SAYF(bV bSTOP " stage execs : " cRST "%-21s " bSTG bV bSTOP, tmp);
 
-  sprintf(tmp, "%s (%0.02f%%)", DI(queued_with_cov),
-          ((double)queued_with_cov) * 100 / queued_paths);
+  // sprintf(tmp, "%s (%0.02f%%)", DI(queued_with_cov),
+  //         ((double)queued_with_cov) * 100 / queued_paths);
 
-  SAYF("  new edges on : " cRST "%-22s " bSTG bV "\n", tmp);
+  /* gFuzz mode */
+
+  sprintf(tmp, "%s (%0.02f%%)", DI(__gfz_num_band),
+          (double)__gfz_num_band * 100 / (__gfz_num_locs * (GFZ_N_MUTATIONS - 2)));
+
+  // SAYF("  new edges on : " cRST "%-22s " bSTG bV "\n", tmp);
+  SAYF("   banned muts : " cRST "%-22s " bSTG bV "\n", tmp);
 
   sprintf(tmp, "%s (%s%s unique)", DI(total_crashes), DI(unique_crashes),
           (unique_crashes >= KEEP_UNIQUE_CRASH) ? "+" : "");
@@ -7823,40 +7858,6 @@ char *dirname (char *path)
   return path;
 }
 
-/* Read number of instrumented locations from GFZ_IDFILE
-   to know which portion of the map is actually used. */
-
-void read_n_locations() {
-
-  int idfd = open(GFZ_IDFILE, O_CREAT | O_RDWR,
-                  S_IRUSR | S_IWUSR | S_IRGRP);
-
-  if (read(idfd, &n_locations, sizeof(n_locations)) != sizeof(n_locations))
-    FATAL("[-] Cannot read number of locations!");
-
-  close(idfd);
-
-  OKF("Number of instrumented locations: %d", n_locations);
-  
-  /* KEEP_ORIGINAL is always enabled during dry run.
-     PLUS_RAND is always disabled during dry run, but it is NEVER banned.
-
-     This is why we consider (GFZ_N_MUTATIONS - 2). */
-
-  OKF("Number of dry run executions: %d", n_locations * (GFZ_N_MUTATIONS - 2));
-
-  /* Allocate and initialize the map of banned locations. */
-
-  __gfz_ban_ptr = calloc(n_locations, sizeof(u16));
-
-  int i = 0;
-
-  for (i = 0; i < n_locations; ++i) {
-    __gfz_ban_ptr[i] = ~__gfz_ban_ptr[i];
-  }
-
-}
-
 #ifndef AFL_LIB
 
 /* Main entry point */
@@ -8130,9 +8131,6 @@ int main(int argc, char** argv) {
   setup_shm();  
   gfz_setup_shm();
 
-  if (gfuzz_mode)
-    read_n_locations();
-
   init_count_class16();
 
   setup_dirs_fds();
@@ -8314,7 +8312,7 @@ gfuzz:
   int loc = 0;
   int mut = 1;
 
-  for ( loc = 0; loc < n_locations; ++loc ) {
+  for ( loc = 0; loc < __gfz_num_locs; ++loc ) {
 
     for ( mut = 2; mut < GFZ_PLUS_RAND; mut <<= 1 ) {
 
@@ -8340,6 +8338,7 @@ gfuzz:
         /* Ban mutation */
 
         __gfz_ban_ptr[loc] &= (~mut);
+        __gfz_num_band++;
 
       }
 
@@ -8375,9 +8374,9 @@ gfuzz:
     
     show_stats();
 
-    // ck_read(dev_urandom_fd, __gfz_map_ptr, n_locations * 2, "/dev/urandom");
+    // ck_read(dev_urandom_fd, __gfz_map_ptr, __gfz_num_locs * 2, "/dev/urandom");
 
-    __gfz_map_ptr[i % n_locations]++;
+    __gfz_map_ptr[i % __gfz_num_locs]++;
 
     // TODO implement ban mechanism
 

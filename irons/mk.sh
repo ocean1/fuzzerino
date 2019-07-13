@@ -56,3 +56,19 @@ if [ $# -ge 1 ] && [ $1 == "-t2" ]
         ./test.sh -t2
     fi
 fi
+
+# optional "-fg" command line option:
+#     Compile and test fuzzgoat
+# TODO
+
+if [ $# -ge 1 ] && [ $1 == "-fg" ]
+  then
+    rm -f /dev/shm/fuzztest
+    rm -rf /dev/shm/generated
+    rm -f ./afl-fuzz.log && touch ./afl-fuzz.log
+    GFZ_NUM_ITER=1000 AFL_SKIP_CPUFREQ=1 ../afl/bin/afl-fuzz -i in -o out -m10000 -t5000 -G -g /dev/shm/fuzztest ../tests/t2/gtest
+    if [ $# -ge 2 ] && [ $2 == "--test" ]
+      then
+        ./test.sh -t2
+    fi
+fi
