@@ -89,7 +89,7 @@ u16* __gfz_map_ptr;                   /* Instrumentation bitmap SHM       */
 u32 __gfz_num_locs = 0;               /* Number of instrumented locations */
 
 u16* __gfz_ban_ptr;                   /* Banned locations map             */
-u32 __gfz_num_band = 0;               /* Number of banned locations       */
+u32 __gfz_num_ban = 0;                /* Number of banned locations       */
 
 /* Usual stuff */
 
@@ -2195,10 +2195,9 @@ EXP_ST void init_forkserver(char** argv) {
 
       if (rlen == sizeof(__gfz_num_locs)) {
         OKF("Number of instrumented locations: %d", __gfz_num_locs);
-        
+
         /* KEEP_ORIGINAL is always enabled during dry run.
            PLUS_RAND is always disabled during dry run, but it is NEVER banned.
-
            This is why we consider (GFZ_N_MUTATIONS - 2). */
 
         OKF("Number of dry run executions: %d", __gfz_num_locs * (GFZ_N_MUTATIONS - 2));
@@ -4242,8 +4241,8 @@ static void show_stats(void) {
 
   /* gFuzz mode */
 
-  sprintf(tmp, "%s (%0.02f%%)", DI(__gfz_num_band),
-          (double)__gfz_num_band * 100 / (__gfz_num_locs * (GFZ_N_MUTATIONS - 2)));
+  sprintf(tmp, "%s (%0.02f%%)", DI(__gfz_num_ban),
+          (double)__gfz_num_ban * 100 / (__gfz_num_locs * (GFZ_N_MUTATIONS - 2)));
 
   // SAYF("  new edges on : " cRST "%-22s " bSTG bV "\n", tmp);
   SAYF("   banned muts : " cRST "%-22s " bSTG bV "\n", tmp);
@@ -7858,6 +7857,36 @@ char *dirname (char *path)
   return path;
 }
 
+void read_num_locs() {
+
+  int idfd = open(GFZ_IDFILE, O_CREAT | O_RDWR,
+                  S_IRUSR | S_IWUSR | S_IRGRP);
+
+  if (read(idfd, &__gfz_num_locs, sizeof(__gfz_num_locs)) != sizeof(__gfz_num_locs))
+    FATAL("[-] Cannot read number of locations!");
+
+  close(idfd);
+
+  OKF("Number of instrumented locations: %d", __gfz_num_locs);
+
+  /* KEEP_ORIGINAL is always enabled during dry run.
+     PLUS_RAND is always disabled during dry run, but it is NEVER banned.
+     This is why we consider (GFZ_N_MUTATIONS - 2). */
+
+  OKF("Number of dry run executions: %d", __gfz_num_locs * (GFZ_N_MUTATIONS - 2));
+
+  /* Allocate and initialize the map of banned locations. */
+
+  __gfz_ban_ptr = calloc(__gfz_num_locs, sizeof(u16));
+
+  int i = 0;
+
+  for (i = 0; i < __gfz_num_locs; ++i) {
+    __gfz_ban_ptr[i] = ~__gfz_ban_ptr[i];
+  }
+
+}
+
 #ifndef AFL_LIB
 
 /* Main entry point */
@@ -8131,6 +8160,10 @@ int main(int argc, char** argv) {
   setup_shm();  
   gfz_setup_shm();
 
+  // TODO
+  // if (gfuzz_mode)
+  //   read_num_locs();
+
   init_count_class16();
 
   setup_dirs_fds();
@@ -8338,7 +8371,7 @@ gfuzz:
         /* Ban mutation */
 
         __gfz_ban_ptr[loc] &= (~mut);
-        __gfz_num_band++;
+        __gfz_num_ban++;
 
       }
 

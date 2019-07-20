@@ -58,7 +58,7 @@ endif
 
 ifndef AFL_TRACE_PC
   PROGS      = $(OUTDIR)/afl-clang-fast $(OUTDIR)/afl-llvm-pass.so $(OUTDIR)/afl-llvm-rt.o $(OUTDIR)/afl-llvm-rt-32.o $(OUTDIR)/afl-llvm-rt-64.o
-  PROGS      += $(OUTDIR)/gfz-clang-fast $(OUTDIR)/gfz-llvm-pass.so $(OUTDIR)/gfz-llvm-rt.o $(OUTDIR)/gfz-llvm-rt-32.o $(OUTDIR)/gfz-llvm-rt-64.o
+  PROGS      += $(OUTDIR)/gfz-clang-fast $(OUTDIR)/gfz-ld $(OUTDIR)/gfz-llvm-pass.so $(OUTDIR)/gfz-llvm-rt.o $(OUTDIR)/gfz-llvm-rt-32.o $(OUTDIR)/gfz-llvm-rt-64.o
 else
   PROGS      = $(OUTDIR)/afl-clang-fast $(OUTDIR)/afl-llvm-rt.o $(OUTDIR)/afl-llvm-rt-32.o $(OUTDIR)/afl-llvm-rt-64.o
 endif
@@ -98,6 +98,10 @@ $(OUTDIR)/afl-llvm-rt-%.o: afl-llvm-rt.o.c | test_deps
 $(OUTDIR)/gfz-clang-fast: gfz-clang-fast.c | test_deps
 	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS)
 	ln -sf gfz-clang-fast $(OUTDIR)/gfz-clang-fast++
+
+$(OUTDIR)/gfz-ld: gfz-ld.c | test_deps
+	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS)
+	ln -sf gfz-ld $(OUTDIR)/ld
 
 $(OUTDIR)/gfz-llvm-pass.so: gfz-llvm-pass.so.cc | test_deps
 	$(CXX) $(CLANG_CFL) -shared $< -o $@ $(CLANG_LFL)

@@ -76,7 +76,8 @@ u32 __gfz_rand_idx;
 
 /* Number of instrumented locations in the target binary. */
 
-extern u32 __gfz_num_locs;
+extern u32 __gfz_num_locs_defsym;
+u32 __gfz_num_locs;
 
 /* Running in persistent mode? */
 
@@ -204,6 +205,8 @@ static void __gfz_start_forkserver(void) {
   }
 
   /* Send __gfz_num_locs to the fuzzer. */
+
+  __gfz_num_locs = (u32) &__gfz_num_locs_defsym; // ugly hack
 
   if (write(FORKSRV_FD + 1, &__gfz_num_locs, sizeof(__gfz_num_locs)) != sizeof(__gfz_num_locs))
     FATAL("Unable to write __gfz_num_locs to the fuzzer! (did you activate gFuzz mode?)");

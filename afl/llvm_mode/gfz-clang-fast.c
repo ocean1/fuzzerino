@@ -32,6 +32,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>
 
 static u8*  obj_path;               /* Path to runtime libraries         */
 static u8** cc_params;              /* Parameters passed to the real CC  */
@@ -305,6 +306,13 @@ static void edit_params(u32 argc, char** argv) {
 
     }
 
+    /* Add obj_path to search path for binaries and object files used implicitly. 
+       This replaces the linker with gfz-ld wrapper for injecting the number of
+       instrumented locations. */
+
+    cc_params[cc_par_cnt++] = "-B";
+    cc_params[cc_par_cnt++] = obj_path;
+
   }
 
   cc_params[cc_par_cnt] = NULL;
@@ -319,9 +327,9 @@ int main(int argc, char** argv) {
   if (isatty(2) && !getenv("AFL_QUIET")) {
 
 #ifdef USE_TRACE_PC
-    SAYF(cCYA "gfz-clang-fast [tpcg] " cBRI VERSION  cRST " by <lszekeres@google.com>\n");
+    SAYF(cCYA "gfz-clang-fast [tpcg] " cBRI VERSION  cRST " by <lszekeres@google.com>, <limi7break>\n");
 #else
-    SAYF(cCYA "gfz-clang-fast " cBRI VERSION  cRST " by <lszekeres@google.com>\n");
+    SAYF(cCYA "gfz-clang-fast " cBRI VERSION  cRST " by <lszekeres@google.com>, <limi7break>\n");
 #endif /* ^USE_TRACE_PC */
 
   }
@@ -354,42 +362,6 @@ int main(int argc, char** argv) {
   execvp(cc_params[0], (char**)cc_params);
 
   FATAL("Oops, failed to execute '%s' - check your PATH", cc_params[0]);
-
-  /*
-  pid_t pid;
- 
-  pid = fork();
-  
-  if (pid == 0) {
-  
-    execvp(cc_params[0], (char**)cc_params);
-    FATAL("Oops, failed to execute '%s' - check your PATH", cc_params[0]);
-  
-  } else if (pid > 0) {
-  
-    waitpid(pid, NULL);
-
-    int n_locations;
-
-    int idfd = open(GFZ_IDFILE, O_CREAT | O_RDWR,
-                    S_IRUSR | S_IWUSR | S_IRGRP);
-
-    if (read(idfd, &n_locations, sizeof(n_locations)) != sizeof(n_locations))
-      FATAL("[-] Cannot read number of locations!");
-
-    close(idfd);
-
-    // TODO: super hacky way to embed the number of locations
-    //       into the instrumented binary
-
-
-
-  } else {
-  
-    FATAL("Oops, failed to fork gfz-clang-fast");
-  
-  }
-  */
 
   return 0;
 

@@ -85,7 +85,7 @@ private:
   
   FILE *map_key_fd;
 
-  GlobalVariable *GFZMapPtr, *GFZRandPtr, *GFZRandIdx, *GFZNumLocs;
+  GlobalVariable *GFZMapPtr, *GFZRandPtr, *GFZRandIdx;
 
   Value* emitInstrumentation(LLVMContext &C, IRBuilder<> &IRB,
                              Value *Original, Value *MutationFlags,
@@ -363,11 +363,10 @@ void AFLCoverage::instrumentOperands(Instruction *I) {
 #endif
 
     /* Debugging stuff */
-    /*
     fprintf(map_key_fd, "\n%d:\t%s", inst_id, I->getOpcodeName());
 
-    if ( isa<CallInst>(I) )
-      fprintf(map_key_fd, " (%s)", dyn_cast<CallInst>(I)->getCalledFunction()->getName().str().c_str());
+    //if ( isa<CallInst>(I) )
+    //  fprintf(map_key_fd, " (%s)", dyn_cast<CallInst>(I)->getCalledFunction()->getName().str().c_str());
 
     fprintf(map_key_fd, ", operand %d", op_idx);
 
@@ -375,7 +374,6 @@ void AFLCoverage::instrumentOperands(Instruction *I) {
     raw_string_ostream rso(str);
     OT->print(rso);
     fprintf(map_key_fd, ", type %s", rso.str().c_str());
-    */
 
     // Update operand and increase the id of the
     // instrumented location in the map
@@ -482,17 +480,15 @@ Instruction* AFLCoverage::instrumentResult(Instruction *I) {
   FakeVal->eraseFromParent();
 
   /* Debugging stuff */
-  /*
   fprintf(map_key_fd, "\n%d:\t%s", inst_id, I->getOpcodeName());
 
-  if ( isa<CallInst>(I) )
-    fprintf(map_key_fd, " (%s)", dyn_cast<CallInst>(I)->getCalledFunction()->getName().str().c_str());
+  //if ( isa<CallInst>(I) )
+  //  fprintf(map_key_fd, " (%s)", dyn_cast<CallInst>(I)->getCalledFunction()->getName().str().c_str());
 
   std::string str;
   raw_string_ostream rso(str);
   IT->print(rso);
   fprintf(map_key_fd, ", type %s", rso.str().c_str());
-  */
 
   inst_id++;
 
@@ -502,7 +498,9 @@ Instruction* AFLCoverage::instrumentResult(Instruction *I) {
 bool AFLCoverage::runOnModule(Module &M) {
 
   // File used for debugging  
-  // map_key_fd = fopen("./map_key.txt", "w");
+  map_key_fd = fopen("./map_key.txt", "a");
+
+  fprintf(map_key_fd, "\n=== %s ===", M.getName().str().c_str());
 
   LLVMContext &C = M.getContext();
 
@@ -518,9 +516,6 @@ bool AFLCoverage::runOnModule(Module &M) {
 
   GFZRandIdx = new GlobalVariable(M, Int32Ty, false,
                                   GlobalValue::ExternalLinkage, 0, "__gfz_rand_idx");
-
-  GFZNumLocs = new GlobalVariable(M, Int32Ty, false,
-                                  GlobalValue::WeakAnyLinkage, 0, "__gfz_num_locs");
 
   StringSet<> WhitelistSet;
   SmallVector<Instruction*, 64> toInstrumentOperands, toInstrumentResult;
@@ -717,10 +712,8 @@ bool AFLCoverage::runOnModule(Module &M) {
     WARNF("No instrumentation targets found.");
     // there's functions with 0 I/ 0 BB (external references?) check them out....
 
-  GFZNumLocs->setInitializer(ConstantInt::get(Int32Ty, inst_id));
-
   // Debugging
-  // fclose(map_key_fd);
+  fclose(map_key_fd);
 
   return true;
 
