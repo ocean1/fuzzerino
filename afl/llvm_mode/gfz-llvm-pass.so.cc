@@ -24,8 +24,6 @@
 #define AFL_LLVM_PASS
 #define MESSAGES_TO_STDOUT
 
-#define branching_en
-
 #include "../config.h"
 #include "../debug.h"
 
@@ -49,6 +47,7 @@
 #include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
+#include "llvm/IR/DataLayout.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_os_ostream.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
@@ -85,11 +84,13 @@ private:
   
   FILE *map_key_fd;
 
-  GlobalVariable *GFZMapPtr, *GFZRandPtr, *GFZRandIdx;
+  DataLayout *DL;
+
+  GlobalVariable *GFZMapPtr, *GFZRandPtr, *GFZRandIdx, *GFZPtrBuf;
 
   Value* emitInstrumentation(LLVMContext &C, IRBuilder<> &IRB,
                              Value *Original, Value *MutationFlags,
-                             bool is_gep = false);
+                             bool isGEP = false);
   void instrumentOperands(Instruction *I);
   Instruction* instrumentResult(Instruction *I);
 };
@@ -131,13 +132,84 @@ static bool updateOperand(Instruction *Inst, unsigned Idx, Instruction *Mat) {
   return true;
 }
 
+/* Returns NULL if the pointer is *not*
+   a GEPOperator or the result of a GetElementPtrInst. */
+
+Type* getPointeeTy(Value *Op) {
+
+  if ( isa<GEPOperator>(Op) )
+    return dyn_cast<PointerType>(
+             dyn_cast<GEPOperator>(Op)->getPointerOperandType()
+           )->getElementType();
+
+  if ( isa<GetElementPtrInst>(Op) )
+    return dyn_cast<PointerType>(
+             dyn_cast<GetElementPtrInst>(Op)->getPointerOperandType()
+           )->getElementType();
+
+  return NULL;
+
+}
+
+/* TODO write doc */
+
+bool checkPointer(Value *Op) {
+
+  Type *PointeeTy = getPointeeTy(Op);
+
+  if ( !PointeeTy ) {
+    /* Not GEPOperator or result of GEP.
+       TODO: this way "load"-ed pointers are not instrumented
+             but is a load _always_ paired with a GEP??*/
+    return false;
+  } else {
+    std::string str;
+    raw_string_ostream rso(str);
+    PointeeTy->print(rso);
+    //printf("\n        (checkPointer) PointeeTy: %s", rso.str().c_str());
+  }
+
+  if ( !PointeeTy->isSized() ) {
+    //printf("\n        (checkPointer) balzo, not sized");
+    return false;
+  }
+
+  // TODO implement this!
+  // Multiple dereferencing... but for example argv is i8**,
+  // probably cases like those are tricky
+  if ( PointeeTy->isPointerTy() ) {
+    //printf("\n        (checkPointer) balzo, is pointer in turn");
+    return false;
+  }
+
+  // this could hide dynamic allocation...
+  if ( PointeeTy->isIntegerTy() ) {
+    //printf("\n        (checkPointer) balzo, is int");
+    unsigned bits = PointeeTy->getIntegerBitWidth();
+    return false;
+  }
+
+  //printf("\n        (checkPointer) ok");
+  return true;
+
+}
+
 Value* AFLCoverage::emitInstrumentation(LLVMContext &C, IRBuilder<> &IRB,
                                         Value *Original, Value *MutationFlags,
-                                        bool is_gep) {
+                                        bool isGEP) {
   
   Value *FuzzedVal = NULL;
 
   Type *Ty = Original->getType();
+
+  // Very verbose part due to all the nested mul(s), lshr(s),
+  // and(s), also the integer constants that should have the
+  // correct bit width.
+  //
+  // Whenever we need an integer constant we call
+  //
+  //   ConstantInt::get(IntegerType::getIntNTy(C, bits), value))
+  //
 
   if ( Ty->isIntegerTy() ) {
 
@@ -209,7 +281,7 @@ Value* AFLCoverage::emitInstrumentation(LLVMContext &C, IRBuilder<> &IRB,
     // If the instruction is a GEP, _avoid_
     // adding havoc values (max int, random)
 
-    if ( !is_gep ) {
+    if ( !isGEP ) {
       
       // Create arbitrary precision int with all ones
       // except for sign bit, which is cleared
@@ -250,11 +322,12 @@ Value* AFLCoverage::emitInstrumentation(LLVMContext &C, IRBuilder<> &IRB,
   
   } else if ( Ty->isPointerTy() ) {
 
-    // TODO
-    //
-    // probably it only makes sense to act on the
-    // pointed buffer, but can I get info on it?
-  
+    Type *PointeeTy = getPointeeTy(Original);
+    
+    IRB.CreateMemCpy(Original,
+                     IRB.CreateLoad(GFZPtrBuf),
+                     DL->getTypeStoreSize(PointeeTy), 0);
+
   } else if ( Ty->isFloatingPointTy() ) {
   
     // TODO
@@ -279,10 +352,16 @@ void AFLCoverage::instrumentOperands(Instruction *I) {
   // val = insertFuzzVal(I, OI);
   // updateOp(OI, val);
   // Value *inval = dyn_cast<Value*>(OI);
-
+  
   User::op_iterator OI, OE;
 
-  bool is_gep = isa<GetElementPtrInst>(I);
+  bool isGEP = isa<GetElementPtrInst>(I);
+
+  // Don't instrument GEP indices of struct types!
+  if ( isGEP && dyn_cast<PointerType>(
+                  dyn_cast<GetElementPtrInst>(I)->getPointerOperandType()
+                    )->getElementType()->isStructTy() )
+    return;
 
   auto *DI = dyn_cast<CallInst>(I);
   int op_idx;
@@ -303,12 +382,32 @@ void AFLCoverage::instrumentOperands(Instruction *I) {
 
     Type *OT = Op->getType();
 
-    // Don't instrument GEP indices of struct types!
-    if ( is_gep && op_idx == 0 && OT->isPointerTy() && dyn_cast<PointerType>(OT)->getElementType()->isStructTy() )
-      return;
-
-    if (! (OT->isIntegerTy() /*|| OT->isPointerTy() || OT->isFloatingPointTy()*/) )
+    if (! (OT->isIntegerTy() || OT->isPointerTy() /*|| OT->isFloatingPointTy()*/) )
       continue;
+
+    // Don't instrument _pointer_ operands of GEP instructions,
+    // at least until the point where the result is used
+    if ( isGEP && OT->isPointerTy() )
+      continue;
+
+    if ( OT->isPointerTy() && !checkPointer(Op) ) {
+      /*
+      std::string str;
+      raw_string_ostream rso(str);
+      I->print(rso);
+      printf("\ninstruction %s", rso.str().c_str());
+
+      std::string strr;
+      raw_string_ostream rsoo(strr);
+      Op->print(rsoo);
+      printf("\n    operand %d: %s", op_idx, rsoo.str().c_str());
+
+      bool checkResult = checkPointer(Op);
+
+      printf("\n    checkPointer: %s", checkResult ? "true" : "false");
+      */
+      continue;
+    }
 
     IRBuilder<> IRB(I);
 
@@ -324,63 +423,37 @@ void AFLCoverage::instrumentOperands(Instruction *I) {
     // See documentation for details.
     Value *MutationFlags = IRB.CreateLoad(MapPtrIdx);
 
-    // Very verbose part due to all the nested mul(s), lshr(s),
-    // and(s), also the integer constants that should have the
-    // correct bit width.
-    //
-    // Whenever we need an integer constant we call
-    //
-    //   ConstantInt::get(IntegerType::getIntNTy(C, bits), value))
-    //
     Value *FuzzedVal = NULL;
 
-#ifdef branching_en
+    // if ( MutationFlags != 1 )
     Value *InstEnabled = IRB.CreateICmpNE(MutationFlags, ConstantInt::get(Int16Ty, 1));
 
     TerminatorInst *CheckStatus = SplitBlockAndInsertIfThen(InstEnabled, I, false,
             MDBuilder(C).createBranchWeights(1, (1<<20)-1));
 
+    // "then" block - executed if location is active
     IRB.SetInsertPoint(CheckStatus);
-#endif
+    FuzzedVal = emitInstrumentation(C, IRB, Op, MutationFlags, isGEP);
 
-    // If the instruction is a GEP, _avoid_
-    // adding havoc values (max int, random)
+    if (FuzzedVal != NULL) {
+      // Common block - executed anyway
+      IRB.SetInsertPoint(I);
+      PHINode *PHI = IRB.CreatePHI(OT, 2);
+      
+      BasicBlock *LoadBlock = MapPtr->getParent();
+      PHI->addIncoming(Op, LoadBlock);
+      
+      BasicBlock *ThenBlock = dyn_cast<Instruction>(FuzzedVal)->getParent();
+      PHI->addIncoming(FuzzedVal, ThenBlock);
 
-    FuzzedVal = emitInstrumentation(C, IRB, Op, MutationFlags, is_gep);
+      FuzzedVal = PHI;
+      
+      updateOperand(I, op_idx, dyn_cast<Instruction>(FuzzedVal));
+    }
 
-#ifdef branching_en
-    IRB.SetInsertPoint(I);
-
-    PHINode *PHI = IRB.CreatePHI(OT, 2);
-    
-    BasicBlock *LoadBlock = MapPtr->getParent();
-    PHI->addIncoming(Op, LoadBlock);
-    
-    BasicBlock *ThenBlock = dyn_cast<Instruction>(FuzzedVal)->getParent();
-    PHI->addIncoming(FuzzedVal, ThenBlock);
-
-    FuzzedVal = PHI;
-#endif
-
-    /* Debugging stuff */
-    fprintf(map_key_fd, "\n%d:\t%s", inst_id, I->getOpcodeName());
-
-    //if ( isa<CallInst>(I) )
-    //  fprintf(map_key_fd, " (%s)", dyn_cast<CallInst>(I)->getCalledFunction()->getName().str().c_str());
-
-    fprintf(map_key_fd, ", operand %d", op_idx);
-
-    std::string str;
-    raw_string_ostream rso(str);
-    OT->print(rso);
-    fprintf(map_key_fd, ", type %s", rso.str().c_str());
-
-    // Update operand and increase the id of the
-    // instrumented location in the map
-    
-    updateOperand(I, op_idx, dyn_cast<Instruction>(FuzzedVal));
     inst_id++;
 
+    /*
     // TODO: Custom mutations for each type of instruction?
     if ( isa<ExtractElementInst>(I) ) {
       // 2nd operand only (integer, index)
@@ -397,6 +470,23 @@ void AFLCoverage::instrumentOperands(Instruction *I) {
     } else if ( isa<AtomicRMWInst>(I) ) {
       // operand 3, whatever 1st class value
     }
+    */
+
+    /* BEGIN debugging stuff */
+    
+    fprintf(map_key_fd, "\n%d:\t%s", inst_id-1, I->getOpcodeName());
+
+    //if ( isa<CallInst>(I) )
+    //  fprintf(map_key_fd, " (%s)", dyn_cast<CallInst>(I)->getCalledFunction()->getName().str().c_str());
+
+    fprintf(map_key_fd, ", operand %d", op_idx);
+
+    std::string str;
+    raw_string_ostream rso(str);
+    OT->print(rso);
+    fprintf(map_key_fd, ", type %s", rso.str().c_str());
+
+    /* END debugging stuff */
 
   } // end op loop
 } // end instrumentOperands
@@ -412,7 +502,7 @@ Instruction* AFLCoverage::instrumentResult(Instruction *I) {
 
   Type *IT = I->getType();
   
-  if (! (IT->isIntegerTy() /*|| IT->isPointerTy() || IT->isFloatingPointTy()*/) )
+  if (! (IT->isIntegerTy() /*|| IT->isFloatingPointTy()*/) )
     return NULL;
 
   Instruction *NI = I->getNextNode();
@@ -441,30 +531,20 @@ Instruction* AFLCoverage::instrumentResult(Instruction *I) {
   // See documentation for details.
   Value *MutationFlags = IRB.CreateLoad(MapPtrIdx);
 
-  // Very verbose part due to all the nested mul(s), lshr(s),
-  // and(s), also the integer constants that should have the
-  // correct bit width.
-  //
-  // Whenever we need an integer constant we call
-  //
-  //     ConstantInt::get(IntegerType::getIntNTy(C, bits), value))
-  //
   Value *FuzzedVal = NULL;
 
-#ifdef branching_en
+  // if ( MutationFlags != 1 )
   Value *InstEnabled = IRB.CreateICmpNE(MutationFlags, ConstantInt::get(Int16Ty, 1));
 
   TerminatorInst *CheckStatus = SplitBlockAndInsertIfThen(InstEnabled, NI, false,
           MDBuilder(C).createBranchWeights(1, (1<<20)-1));
 
+  // "then" block - executed if location is active
   IRB.SetInsertPoint(CheckStatus);
-#endif
-
   FuzzedVal = emitInstrumentation(C, IRB, I, MutationFlags);
 
-#ifdef branching_en
+  // Common block - executed anyway
   IRB.SetInsertPoint(NI);
-
   PHINode *PHI = IRB.CreatePHI(IT, 2);
   
   BasicBlock *LoadBlock = MapPtr->getParent();
@@ -474,13 +554,13 @@ Instruction* AFLCoverage::instrumentResult(Instruction *I) {
   PHI->addIncoming(FuzzedVal, ThenBlock);
 
   FakeVal->replaceAllUsesWith(PHI);
-#else
-  FakeVal->replaceAllUsesWith(FuzzedVal);
-#endif
   FakeVal->eraseFromParent();
 
-  /* Debugging stuff */
-  fprintf(map_key_fd, "\n%d:\t%s", inst_id, I->getOpcodeName());
+  inst_id++;
+
+  /* BEGIN debugging stuff */
+  
+  fprintf(map_key_fd, "\n%d:\t%s", inst_id-1, I->getOpcodeName());
 
   //if ( isa<CallInst>(I) )
   //  fprintf(map_key_fd, " (%s)", dyn_cast<CallInst>(I)->getCalledFunction()->getName().str().c_str());
@@ -490,7 +570,7 @@ Instruction* AFLCoverage::instrumentResult(Instruction *I) {
   IT->print(rso);
   fprintf(map_key_fd, ", type %s", rso.str().c_str());
 
-  inst_id++;
+  /* END debugging stuff */
 
   return NI;
 } // end instrumentResult
@@ -507,6 +587,8 @@ bool AFLCoverage::runOnModule(Module &M) {
   IntegerType *Int8Ty = IntegerType::getInt8Ty(C);
   IntegerType *Int16Ty = IntegerType::getInt16Ty(C);
   IntegerType *Int32Ty = IntegerType::getInt32Ty(C);
+
+  DL = new DataLayout(&M);
   
   GFZMapPtr = new GlobalVariable(M, PointerType::get(Int16Ty, 0), false,
                                  GlobalValue::ExternalLinkage, 0, "__gfz_map_ptr");
@@ -516,6 +598,9 @@ bool AFLCoverage::runOnModule(Module &M) {
 
   GFZRandIdx = new GlobalVariable(M, Int32Ty, false,
                                   GlobalValue::ExternalLinkage, 0, "__gfz_rand_idx");
+
+  GFZPtrBuf = new GlobalVariable(M, PointerType::get(Int8Ty, 0), false,
+                                 GlobalValue::ExternalLinkage, 0, "__gfz_ptr_buf");
 
   StringSet<> WhitelistSet;
   SmallVector<Instruction*, 64> toInstrumentOperands, toInstrumentResult;

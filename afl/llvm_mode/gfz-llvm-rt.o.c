@@ -22,6 +22,7 @@
 #include "../config.h"
 #include "../debug.h"
 #include "../types.h"
+#include "../pmparser.h"
 
 #include <assert.h>
 #include <signal.h>
@@ -30,6 +31,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <time.h>
+#include <errno.h>
 
 #include <sys/mman.h>
 #include <sys/resource.h>
@@ -78,6 +80,10 @@ u32 __gfz_rand_idx;
 
 extern u32 __gfz_num_locs_defsym;
 u32 __gfz_num_locs;
+
+/* Buffer for pointer instrumentaton */
+
+u8 *__gfz_ptr_buf = "deadbeefdeadbeefdeadbeef";
 
 /* Running in persistent mode? */
 
@@ -337,6 +343,43 @@ int __afl_persistent_loop(unsigned int max_cnt) {
   return 0;
 }
 
+/*
+  Parses /proc/self/maps and calls mprotect on all the
+  memory regions in order to make everything writable.
+  (actually rwx)
+
+  This is to have less crashes when instrumenting pointers
+  and buffers.
+
+  Generators are short lived programs.
+  See above where free is overwritten.
+
+  Process memory map parsing library from:
+
+  https://github.com/ouadev/proc_maps_parser
+*/
+
+void __gfz_make_writable() {
+
+  procmaps_iterator* maps = pmparser_parse(-1);
+
+  if (maps == NULL){
+    WARNF("[map]: cannot parse the memory map");
+    return;
+  }
+
+  procmaps_struct* maps_tmp = NULL;
+  
+  while( (maps_tmp = pmparser_next(maps)) != NULL){
+    mprotect(maps_tmp->addr_start,
+             maps_tmp->addr_end - maps_tmp->addr_start,
+             PROT_READ|PROT_WRITE|PROT_EXEC);
+  }
+
+  pmparser_free(maps);
+
+}
+
 /* 
    This one can be called from user code when deferred forkserver mode
    is enabled.
@@ -360,6 +403,7 @@ void __gfz_manual_init(void) {
     }
 
     __afl_map_shm();
+    __gfz_make_writable();
     __gfz_start_forkserver();
     init_done = 1;
   }

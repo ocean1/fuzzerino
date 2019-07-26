@@ -47,7 +47,7 @@ endif
 
 COMM_HDR    = alloc-inl.h config.h debug.h types.h
 
-all: test_x86 $(PROGS) $(OUTDIR)/afl-as setup_links test_build all_done
+all: test_x86 $(PROGS) $(OUTDIR)/afl-as pmparser setup_links test_build all_done
 
 ifndef AFL_NO_X86
 
@@ -73,6 +73,9 @@ setup_links:
 $(OUTDIR)/afl-as: afl-as.c afl-as.h $(COMM_HDR) | test_x86
 	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS)
 	ln -sf afl-as $(OUTDIR)/as
+
+pmparser: pmparser.c
+	$(CC) $(CFLAGS) $< -c -o $(OUTDIR)/$@.o
 
 ifndef AFL_NO_X86
 

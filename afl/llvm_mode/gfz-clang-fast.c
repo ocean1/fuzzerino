@@ -306,6 +306,14 @@ static void edit_params(u32 argc, char** argv) {
 
     }
 
+    /*
+      Link process memory map parsing library from:
+         
+         https://github.com/ouadev/proc_maps_parser
+    */
+
+    cc_params[cc_par_cnt++] = alloc_printf("%s/pmparser.o", obj_path);
+
     /* Add obj_path to search path for binaries and object files used implicitly. 
        This replaces the linker with gfz-ld wrapper for injecting the number of
        instrumented locations. */

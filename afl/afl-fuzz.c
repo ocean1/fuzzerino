@@ -8403,15 +8403,17 @@ gfuzz:
 
   i = 0;
 
+  int ban_idx = 0;
+
   while (i < maxi) {
     
     show_stats();
 
-    // ck_read(dev_urandom_fd, __gfz_map_ptr, __gfz_num_locs * 2, "/dev/urandom");
+    ck_read(dev_urandom_fd, __gfz_map_ptr, __gfz_num_locs * 2, "/dev/urandom");
 
-    __gfz_map_ptr[i % __gfz_num_locs]++;
-
-    // TODO implement ban mechanism
+    for (ban_idx = 0; ban_idx < __gfz_num_locs; ++ban_idx) {
+      __gfz_map_ptr[ban_idx] &= __gfz_ban_ptr[ban_idx];
+    }
 
     fault = run_target(use_argv, exec_tmout);
 
