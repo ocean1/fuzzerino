@@ -91,8 +91,10 @@ private:
   Value* emitInstrumentation(LLVMContext &C, IRBuilder<> &IRB,
                              Value *Original, Value *MutationFlags,
                              bool isGEP = false);
-  void instrumentOperands(Instruction *I);
-  Instruction* instrumentResult(Instruction *I);
+  void instrumentOperands(Instruction *I,
+                          Type::TypeID TyID = Type::TypeID::IntegerTyID);
+  Instruction* instrumentResult(Instruction *I,
+                                Type::TypeID TyID = Type::TypeID::IntegerTyID);
 };
 
 } // namespace
@@ -338,7 +340,7 @@ Value* AFLCoverage::emitInstrumentation(LLVMContext &C, IRBuilder<> &IRB,
 
 }
 
-void AFLCoverage::instrumentOperands(Instruction *I) {
+void AFLCoverage::instrumentOperands(Instruction *I, Type::TypeID TyID) {
   
   Function *F = I->getFunction();
   Module *M = F->getParent();
@@ -382,7 +384,7 @@ void AFLCoverage::instrumentOperands(Instruction *I) {
 
     Type *OT = Op->getType();
 
-    if (! (OT->isIntegerTy() || OT->isPointerTy() /*|| OT->isFloatingPointTy()*/) )
+    if ( OT->getTypeID() != TyID )
       continue;
 
     // Don't instrument _pointer_ operands of GEP instructions,
@@ -390,24 +392,11 @@ void AFLCoverage::instrumentOperands(Instruction *I) {
     if ( isGEP && OT->isPointerTy() )
       continue;
 
-    if ( OT->isPointerTy() && !checkPointer(Op) ) {
-      /*
-      std::string str;
-      raw_string_ostream rso(str);
-      I->print(rso);
-      printf("\ninstruction %s", rso.str().c_str());
-
-      std::string strr;
-      raw_string_ostream rsoo(strr);
-      Op->print(rsoo);
-      printf("\n    operand %d: %s", op_idx, rsoo.str().c_str());
-
-      bool checkResult = checkPointer(Op);
-
-      printf("\n    checkPointer: %s", checkResult ? "true" : "false");
-      */
+    // If the pointer is not 'eligible' for instrumentation,
+    // continue now, _before_ emitting the IR for loading from
+    // gfz map, etc...
+    if ( OT->isPointerTy() && !checkPointer(Op) )
       continue;
-    }
 
     IRBuilder<> IRB(I);
 
@@ -491,7 +480,7 @@ void AFLCoverage::instrumentOperands(Instruction *I) {
   } // end op loop
 } // end instrumentOperands
 
-Instruction* AFLCoverage::instrumentResult(Instruction *I) {
+Instruction* AFLCoverage::instrumentResult(Instruction *I, Type::TypeID TyID) {
 
   Function *F = I->getFunction();
   Module *M = F->getParent();
@@ -502,7 +491,7 @@ Instruction* AFLCoverage::instrumentResult(Instruction *I) {
 
   Type *IT = I->getType();
   
-  if (! (IT->isIntegerTy() /*|| IT->isFloatingPointTy()*/) )
+  if ( IT->getTypeID() != TyID )
     return NULL;
 
   Instruction *NI = I->getNextNode();
@@ -769,11 +758,18 @@ bool AFLCoverage::runOnModule(Module &M) {
   // Pass the selected instructions to the 
   // corresponding instrumenting functions
 
-  for (auto I: toInstrumentResult)
-    instrumentResult(I);
+  std::vector<Type::TypeID> TyIDs = { Type::TypeID::IntegerTyID,
+                                      Type::TypeID::PointerTyID };
 
-  for (auto I: toInstrumentOperands)
-    instrumentOperands(I);
+  for ( auto TyID : TyIDs ) {
+    
+    for (auto I: toInstrumentResult)
+      instrumentResult(I, TyID);
+
+    for (auto I: toInstrumentOperands)
+      instrumentOperands(I, TyID);
+  
+  }
 
   OKF("Total: instrumented %u locations.", inst_id);
 
