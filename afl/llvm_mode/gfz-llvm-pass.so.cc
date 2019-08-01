@@ -346,11 +346,19 @@ Value* AFLCoverage::emitInstrumentation(LLVMContext &C, IRBuilder<> &IRB,
     Original = IRB.CreateZExtOrBitCast(Original,
       PointerType::getUnqual(IntegerType::getInt32Ty(C)));
 
+    /* Load length and stride */
+
     // Len = ((MutationFlags & 11000000) >> 6)
     Value *Len = IRB.CreateLShr(
       IRB.CreateAnd(MutationFlags,
                     ConstantInt::get(IntegerType::getInt32Ty(C), 192)),
       ConstantInt::get(IntegerType::getInt32Ty(C), 6));
+
+    // Stride = ((MutationFlags & 1111111100000000) >> 8)
+    Value *Stride = IRB.CreateLShr(
+      IRB.CreateAnd(MutationFlags,
+                    ConstantInt::get(IntegerType::getInt32Ty(C), 65280)),
+      ConstantInt::get(IntegerType::getInt32Ty(C), 8));
 
     // ?? * ((MutationFlags & 00000010) >> 1)
     /*Value *BitFlip = IRB.CreateMul(
@@ -382,12 +390,26 @@ Value* AFLCoverage::emitInstrumentation(LLVMContext &C, IRBuilder<> &IRB,
                                    ConstantInt::get(IntegerType::getInt32Ty(C), GFZ_INTERESTING)),
                      ConstantInt::get(IntegerType::getInt32Ty(C), 4)));*/
 
-    // Xor original buffer content and mutations together
-    // to obtain the new buffer content
+    /* Apply stride - 1 byte version*/
+
+    Original = IRB.CreatePointerCast(
+      IRB.CreateGEP(IRB.CreatePointerCast(Original,
+                                          PointerType::getUnqual(IntegerType::getInt8Ty(C))),
+                    Stride),
+      Original->getType());
+
+    /* Apply stride - 4 byte version */
+
+    // Original = IRB.CreateGEP(Original, Stride);
+
+    /* Xor original buffer content and mutations together
+       to obtain the new buffer content */
+    
     Value *ToStore = IRB.CreateXor(IRB.CreateLoad(Original),
                        ByteFlip);
 
-    // Store new buffer content    
+    /* Store new buffer content */
+    
     IRB.CreateStore(ToStore, Original);
 
   } else if ( Ty->isFloatingPointTy() ) {
