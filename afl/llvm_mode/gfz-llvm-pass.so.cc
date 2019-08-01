@@ -153,7 +153,8 @@ Type* getPointeeTy(Value *Op) {
 
 }
 
-/* TODO write doc */
+/* This function decides which pointers get instrumented
+   and which don't, by enforcing some heuristics. */
 
 bool checkPointer(Value *Op) {
 
@@ -324,11 +325,70 @@ Value* AFLCoverage::emitInstrumentation(LLVMContext &C, IRBuilder<> &IRB,
   
   } else if ( Ty->isPointerTy() ) {
 
+    Value *CustomBuf = NULL;
+
+    /*
+      
+      TODO: CUSTOM BUFFER
+
     Type *PointeeTy = getPointeeTy(Original);
     
     IRB.CreateMemCpy(Original,
                      IRB.CreateLoad(GFZPtrBuf),
                      DL->getTypeStoreSize(PointeeTy), 0);
+    */
+
+    /* Cast stuff */
+
+    MutationFlags = IRB.CreateIntCast(MutationFlags,
+      IntegerType::getInt32Ty(C), false);
+
+    Original = IRB.CreateZExtOrBitCast(Original,
+      PointerType::getUnqual(IntegerType::getInt32Ty(C)));
+
+    // Len = ((MutationFlags & 11000000) >> 6)
+    Value *Len = IRB.CreateLShr(
+      IRB.CreateAnd(MutationFlags,
+                    ConstantInt::get(IntegerType::getInt32Ty(C), 192)),
+      ConstantInt::get(IntegerType::getInt32Ty(C), 6));
+
+    // ?? * ((MutationFlags & 00000010) >> 1)
+    /*Value *BitFlip = IRB.CreateMul(
+      ConstantInt::get(IntegerType::getInt32Ty(C), ??),
+      IRB.CreateLShr(IRB.CreateAnd(MutationFlags,
+                                   ConstantInt::get(IntegerType::getInt32Ty(C), GFZ_BITFLIP)),
+                     ConstantInt::get(IntegerType::getInt32Ty(C), 1)));*/
+
+    // (0xFFFFFFFF >> (Len * 8)) * ((MutationFlags & 00000100) >> 2)
+    Value *ByteFlip = IRB.CreateMul(
+      IRB.CreateLShr(ConstantInt::get(IntegerType::getInt32Ty(C), 0xFFFFFFFF),
+                     IRB.CreateMul(Len,
+                                   ConstantInt::get(IntegerType::getInt32Ty(C), 8))),
+      IRB.CreateLShr(IRB.CreateAnd(MutationFlags,
+                                   ConstantInt::get(IntegerType::getInt32Ty(C), GFZ_BYTEFLIP)),
+                     ConstantInt::get(IntegerType::getInt32Ty(C), 2)));
+
+    // ?? * ((MutationFlags & 00001000) >> 3)
+    /*Value *Arith = IRB.CreateMul(
+      ??,
+      IRB.CreateLShr(IRB.CreateAnd(MutationFlags,
+                                   ConstantInt::get(IntegerType::getInt32Ty(C), GFZ_ARITH)),
+                     ConstantInt::get(IntegerType::getInt32Ty(C), 3)));*/
+
+    // ?? * ((MutationFlags & 00010000) >> 4)
+    /*Value *Interesting = IRB.CreateMul(
+      ??,
+      IRB.CreateLShr(IRB.CreateAnd(MutationFlags,
+                                   ConstantInt::get(IntegerType::getInt32Ty(C), GFZ_INTERESTING)),
+                     ConstantInt::get(IntegerType::getInt32Ty(C), 4)));*/
+
+    // Xor original buffer content and mutations together
+    // to obtain the new buffer content
+    Value *ToStore = IRB.CreateXor(IRB.CreateLoad(Original),
+                       ByteFlip);
+
+    // Store new buffer content    
+    IRB.CreateStore(ToStore, Original);
 
   } else if ( Ty->isFloatingPointTy() ) {
   

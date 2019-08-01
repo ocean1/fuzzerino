@@ -1,6 +1,6 @@
 #!/bin/bash
 
-rm -rf ./out/generated/* || true
+rm -rf ./out/generated || true
 mv /dev/shm/generated ./out/ || true
 
 if [ $# -eq 1 ] && [ $1 == "-t1" ]

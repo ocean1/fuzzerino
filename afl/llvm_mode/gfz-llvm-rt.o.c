@@ -69,6 +69,10 @@ __thread u32 __afl_prev_loc;
 
 u16 *__gfz_map_ptr;
 
+/* Buffer for ptr instrumentation */
+
+u8 *__gfz_ptr_buf;
+
 /* "Rand" area gets filled by the thread itself every time we change fuzz
  * strategy or when all values have been used, for example filled with low/high
  * values, or random values */
@@ -80,10 +84,6 @@ u32 __gfz_rand_idx;
 
 extern u32 __gfz_num_locs_defsym;
 u32 __gfz_num_locs;
-
-/* Buffer for pointer instrumentaton */
-
-u8 *__gfz_ptr_buf = "deadbeefdeadbeefdeadbeef";
 
 /* Running in persistent mode? */
 
@@ -129,9 +129,12 @@ static void __afl_map_shm(void) {
   }
 }
 
-/* Trying to put gfz map in shm... */
+/* Attach __gfz_map_ptr and __gfz_ptr_buf to shm, in order to
+   be able to control them 'from the outside' (i.e. the fuzzer) */
 
 static void __gfz_map_shm(void) {
+
+  /* Attach __gfz_map_ptr */
 
   u8 *id_str = getenv(GFZ_SHM_ENV_VAR);
 
@@ -156,6 +159,71 @@ static void __gfz_map_shm(void) {
     __gfz_map_ptr = calloc(GFZ_MAP_SIZE, 1);
   
   }
+
+  /* Attach __gfz_ptr_buf */
+
+  id_str = getenv(GFZ_SHM_PTR_ENV_VAR);
+
+  if (id_str) {
+
+    u32 shm_id = atoi(id_str);
+
+    __gfz_ptr_buf = shmat(shm_id, NULL, 0);
+
+    // Whooooops.
+
+    if (__gfz_ptr_buf == (void *)-1) {
+      _exit(1);
+    }
+
+  } else {
+
+    __gfz_ptr_buf = malloc(GFZ_PTR_BUF_SIZE);
+
+    int i = 0;
+
+    for (i = 0; i < GFZ_PTR_BUF_SIZE; ++i) {
+      __gfz_ptr_buf[i] = 'A';
+    }
+  
+  }
+
+}
+
+/*
+  Parses /proc/self/maps and calls mprotect on all the
+  memory regions in order to make everything writable.
+  (actually rwx)
+
+  This is to have less crashes when instrumenting pointers
+  and buffers.
+
+  Generators are short lived programs.
+  See above where free is overwritten.
+
+  Process memory map parsing library from:
+
+  https://github.com/ouadev/proc_maps_parser
+*/
+
+void __gfz_make_writable() {
+
+  procmaps_iterator* maps = pmparser_parse(-1);
+
+  if (maps == NULL){
+    WARNF("[map]: cannot parse the memory map");
+    return;
+  }
+
+  procmaps_struct* maps_tmp = NULL;
+  
+  while( (maps_tmp = pmparser_next(maps)) != NULL){
+    mprotect(maps_tmp->addr_start,
+             maps_tmp->addr_end - maps_tmp->addr_start,
+             PROT_READ|PROT_WRITE|PROT_EXEC);
+  }
+
+  pmparser_free(maps);
 
 }
 
@@ -191,11 +259,16 @@ static void __gfz_start_forkserver(void) {
         printf("[-] Error reading map. (%ld)\n", n_bytes);
       else
         printf("[+] Map read.");
+
+      /* When a custom map is present, make the whole process
+         memory writable, just as if we were fuzzing. */
+
+      __gfz_make_writable();
     
     } else {
     
-      // If no custom map is present, just fill it with ones
-      // to execute normal program behavior.
+      /* If no custom map is present, just fill it with ones
+         to execute normal program behavior. */
 
       int i = 0;
 
@@ -203,12 +276,18 @@ static void __gfz_start_forkserver(void) {
         __gfz_map_ptr[i] = 1;
       }
 
+      /* Don't change rwx of the process memory in this case
+         so that the instrumentation is fairly transparent
+         and the program can still be used normally when
+         NOT fuzzing, or testing with a custom map. */
+
     }
 
     /* End code for instrumentation testing */
-    
     return;
   }
+
+  __gfz_make_writable();
 
   /* Send __gfz_num_locs to the fuzzer. */
 
@@ -343,43 +422,6 @@ int __afl_persistent_loop(unsigned int max_cnt) {
   return 0;
 }
 
-/*
-  Parses /proc/self/maps and calls mprotect on all the
-  memory regions in order to make everything writable.
-  (actually rwx)
-
-  This is to have less crashes when instrumenting pointers
-  and buffers.
-
-  Generators are short lived programs.
-  See above where free is overwritten.
-
-  Process memory map parsing library from:
-
-  https://github.com/ouadev/proc_maps_parser
-*/
-
-void __gfz_make_writable() {
-
-  procmaps_iterator* maps = pmparser_parse(-1);
-
-  if (maps == NULL){
-    WARNF("[map]: cannot parse the memory map");
-    return;
-  }
-
-  procmaps_struct* maps_tmp = NULL;
-  
-  while( (maps_tmp = pmparser_next(maps)) != NULL){
-    mprotect(maps_tmp->addr_start,
-             maps_tmp->addr_end - maps_tmp->addr_start,
-             PROT_READ|PROT_WRITE|PROT_EXEC);
-  }
-
-  pmparser_free(maps);
-
-}
-
 /* 
    This one can be called from user code when deferred forkserver mode
    is enabled.
@@ -403,7 +445,6 @@ void __gfz_manual_init(void) {
     }
 
     __afl_map_shm();
-    __gfz_make_writable();
     __gfz_start_forkserver();
     init_done = 1;
   }
