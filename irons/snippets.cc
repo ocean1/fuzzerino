@@ -35,10 +35,7 @@ FuzzedVal = IRB.CreateAdd(KeepOriginal,
 
 FuzzedVal = IRB.CreateIntToPtr(FuzzedVal, OT);
 
-/*
-  Increase idx to access random pool
-  
-*/
+/* Increase idx to access random pool */
 Value *Incr = IRB.CreateAdd(RandIdx, ConstantInt::get(Int32Ty, 1));
 Incr = IRB.CreateURem(Incr, ConstantInt::get(Int32Ty, 4096));
 IRB.CreateStore(Incr, GFZRandIdx);
