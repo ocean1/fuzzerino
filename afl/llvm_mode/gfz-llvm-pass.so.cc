@@ -299,17 +299,18 @@ Value* AFLCoverage::emitInstrumentation(LLVMContext &C, IRBuilder<> &IRB,
                                      ConstantInt::get(IntegerType::getIntNTy(C, bits), GFZ_PLUS_MAX)),
                        ConstantInt::get(IntegerType::getIntNTy(C, bits), 11)));
 
-      // Access random pool
-      // Index increase is *not* performed here because we want to
-      // avoid branches, to increase it only if the "PLUS_RAND" mutation
-      // is enabled. The parent process "knows" if it is enabled from
-      // the outside, so the increase can be performed there if needed.
+      /* Access random pool */
       PointerType *PT = PointerType::getUnqual(Ty);
       LoadInst *RandIdx = IRB.CreateLoad(GFZRandIdx);
       LoadInst *RandPtr = IRB.CreateLoad(GFZRandPtr);
       Value *RandPtrCast = IRB.CreateZExtOrBitCast(RandPtr, PT);
       Value *RandPtrIdx = IRB.CreateGEP(RandPtrCast, RandIdx);
       LoadInst *RandVal = IRB.CreateLoad(RandPtrIdx);
+
+      /* Increase idx to access random pool */
+      Value *Incr = IRB.CreateAdd(RandIdx, ConstantInt::get(IntegerType::getInt32Ty(C), 1));
+      Incr = IRB.CreateURem(Incr, ConstantInt::get(IntegerType::getInt32Ty(C), 4096));
+      IRB.CreateStore(Incr, GFZRandIdx);
 
       // rand() * ((MutationFlags & 00010000) >> 4)
       Value *PlusRand = IRB.CreateMul(
@@ -325,18 +326,32 @@ Value* AFLCoverage::emitInstrumentation(LLVMContext &C, IRBuilder<> &IRB,
   
   } else if ( Ty->isPointerTy() ) {
 
-    Value *CustomBuf = NULL;
+    // ((MutationFlags & 0010 0000) >> 5)
+    Value *CustomBuf = IRB.CreateLShr(
+      IRB.CreateAnd(MutationFlags,
+                    ConstantInt::get(IntegerType::getInt16Ty(C), GFZ_CUSTOM_BUF)),
+      ConstantInt::get(IntegerType::getInt16Ty(C), 5));
 
-    /*
-      
-      TODO: CUSTOM BUFFER
+    Value *CustomBufEnabled = IRB.CreateICmpNE(CustomBuf,
+                                               ConstantInt::get(IntegerType::getInt16Ty(C), 0));
+
+    TerminatorInst *ThenTerm = NULL;
+    TerminatorInst *ElseTerm = NULL;
+
+    SplitBlockAndInsertIfThenElse(CustomBufEnabled, &(*(IRB.GetInsertPoint())),
+      &ThenTerm, &ElseTerm, MDBuilder(C).createBranchWeights(1, (1<<20)-1));
+
+    // "then" block - executed if GFZ_CUSTOM_BUF is active
+    IRB.SetInsertPoint(ThenTerm);
 
     Type *PointeeTy = getPointeeTy(Original);
     
     IRB.CreateMemCpy(Original,
                      IRB.CreateLoad(GFZPtrBuf),
                      DL->getTypeStoreSize(PointeeTy), 0);
-    */
+
+    // "else" block - every other ptr mutation
+    IRB.SetInsertPoint(ElseTerm);
 
     /* Cast stuff */
 
@@ -348,26 +363,27 @@ Value* AFLCoverage::emitInstrumentation(LLVMContext &C, IRBuilder<> &IRB,
 
     /* Load length and stride */
 
-    // Len = ((MutationFlags & 11000000) >> 6)
+    // Len = ((MutationFlags & 0000 0001 1100 0000) >> 6)
     Value *Len = IRB.CreateLShr(
       IRB.CreateAnd(MutationFlags,
-                    ConstantInt::get(IntegerType::getInt32Ty(C), 192)),
+                    ConstantInt::get(IntegerType::getInt32Ty(C), 448)),
       ConstantInt::get(IntegerType::getInt32Ty(C), 6));
 
-    // Stride = ((MutationFlags & 1111111100000000) >> 8)
+    // Stride = ((MutationFlags & 1111 1110 0000 0000) >> 9)
     Value *Stride = IRB.CreateLShr(
       IRB.CreateAnd(MutationFlags,
-                    ConstantInt::get(IntegerType::getInt32Ty(C), 65280)),
-      ConstantInt::get(IntegerType::getInt32Ty(C), 8));
+                    ConstantInt::get(IntegerType::getInt32Ty(C), 65024)),
+      ConstantInt::get(IntegerType::getInt32Ty(C), 9));
 
-    // ?? * ((MutationFlags & 00000010) >> 1)
-    /*Value *BitFlip = IRB.CreateMul(
-      ConstantInt::get(IntegerType::getInt32Ty(C), ??),
+    // (0xFF >> Len) * ((MutationFlags & 0000 0010) >> 1)
+    Value *BitFlip = IRB.CreateMul(
+      IRB.CreateLShr(ConstantInt::get(IntegerType::getInt32Ty(C), 0xFF),
+                     Len),
       IRB.CreateLShr(IRB.CreateAnd(MutationFlags,
                                    ConstantInt::get(IntegerType::getInt32Ty(C), GFZ_BITFLIP)),
-                     ConstantInt::get(IntegerType::getInt32Ty(C), 1)));*/
+                     ConstantInt::get(IntegerType::getInt32Ty(C), 1)));
 
-    // (0xFFFFFFFF >> (Len * 8)) * ((MutationFlags & 00000100) >> 2)
+    // (0xFFFFFFFF >> (Len * 8)) * ((MutationFlags & 0000 0100) >> 2)
     Value *ByteFlip = IRB.CreateMul(
       IRB.CreateLShr(ConstantInt::get(IntegerType::getInt32Ty(C), 0xFFFFFFFF),
                      IRB.CreateMul(Len,
@@ -376,12 +392,13 @@ Value* AFLCoverage::emitInstrumentation(LLVMContext &C, IRBuilder<> &IRB,
                                    ConstantInt::get(IntegerType::getInt32Ty(C), GFZ_BYTEFLIP)),
                      ConstantInt::get(IntegerType::getInt32Ty(C), 2)));
 
-    // ?? * ((MutationFlags & 00001000) >> 3)
-    /*Value *Arith = IRB.CreateMul(
-      ??,
+    // (Len + 1) * ((MutationFlags & 00001000) >> 3)
+    Value *Arith = IRB.CreateMul(
+      IRB.CreateAdd(Len,
+                    ConstantInt::get(IntegerType::getInt32Ty(C), 1)),
       IRB.CreateLShr(IRB.CreateAnd(MutationFlags,
                                    ConstantInt::get(IntegerType::getInt32Ty(C), GFZ_ARITH)),
-                     ConstantInt::get(IntegerType::getInt32Ty(C), 3)));*/
+                     ConstantInt::get(IntegerType::getInt32Ty(C), 3)));
 
     // ?? * ((MutationFlags & 00010000) >> 4)
     /*Value *Interesting = IRB.CreateMul(
@@ -398,15 +415,19 @@ Value* AFLCoverage::emitInstrumentation(LLVMContext &C, IRBuilder<> &IRB,
                     Stride),
       Original->getType());
 
-    /* Apply stride - 4 byte version */
+    /* Apply stride - 4 byte version
+       not suitable for bitflips - they'd skip 3 bytes */
 
     // Original = IRB.CreateGEP(Original, Stride);
 
     /* Xor original buffer content and mutations together
        to obtain the new buffer content */
     
-    Value *ToStore = IRB.CreateXor(IRB.CreateLoad(Original),
-                       ByteFlip);
+    Value *ToStore = IRB.CreateAdd(
+                       IRB.CreateXor(
+                         IRB.CreateLoad(Original),
+                           IRB.CreateXor(BitFlip, ByteFlip)),
+                       Arith);
 
     /* Store new buffer content */
     
@@ -414,7 +435,37 @@ Value* AFLCoverage::emitInstrumentation(LLVMContext &C, IRBuilder<> &IRB,
 
   } else if ( Ty->isFloatingPointTy() ) {
   
-    // TODO
+    // Op * (MutationFlags & 00000001)
+    Value *KeepOriginal = IRB.CreateFMul(
+      Original,
+      IRB.CreateUIToFP(
+        IRB.CreateAnd(MutationFlags,
+                      ConstantInt::get(IntegerType::getInt16Ty(C), GFZ_KEEP_ORIGINAL)),
+        Original->getType()));
+    
+    // 1 * ((MutationFlags & 00000010) >> 1)
+    Value *PlusOne = IRB.CreateFMul(
+      ConstantFP::get(Original->getType(), 1.0),
+      IRB.CreateUIToFP(
+        IRB.CreateLShr(
+          IRB.CreateAnd(MutationFlags,
+                        ConstantInt::get(IntegerType::getInt16Ty(C), GFZ_PLUS_ONE)),
+          ConstantInt::get(IntegerType::getInt16Ty(C), 1)),
+        Original->getType()));
+
+    // -1 * ((MutationFlags & 00000100) >> 2)
+    Value *MinusOne = IRB.CreateFMul(
+      ConstantFP::get(Original->getType(), -1.0),
+      IRB.CreateUIToFP(
+        IRB.CreateLShr(
+          IRB.CreateAnd(MutationFlags,
+                        ConstantInt::get(IntegerType::getInt16Ty(C), GFZ_MINUS_ONE)),
+          ConstantInt::get(IntegerType::getInt16Ty(C), 2)),
+        Original->getType()));
+    
+    // Add mutations together to obtain the new operand
+    FuzzedVal = IRB.CreateFAdd(KeepOriginal,
+                  IRB.CreateFAdd(PlusOne, MinusOne));
 
   }
 
@@ -803,7 +854,7 @@ bool AFLCoverage::runOnModule(Module &M) {
 
         Type *IT = I.getType();
 
-        if (! (IT->isIntegerTy() /*|| IT->isPointerTy() || IT->isFloatingPointTy()*/) )
+        if (! (IT->isIntegerTy() || IT->isFloatingPointTy() ) )
           continue;
 
         toInstrumentResult.push_back(&I);
@@ -841,6 +892,12 @@ bool AFLCoverage::runOnModule(Module &M) {
   // corresponding instrumenting functions
 
   std::vector<Type::TypeID> TyIDs = { Type::TypeID::IntegerTyID,
+                                      Type::TypeID::HalfTyID,
+                                      Type::TypeID::FloatTyID,
+                                      Type::TypeID::DoubleTyID,
+                                      Type::TypeID::X86_FP80TyID,
+                                      Type::TypeID::FP128TyID,
+                                      Type::TypeID::PPC_FP128TyID,
                                       Type::TypeID::PointerTyID };
 
   for ( auto TyID : TyIDs ) {

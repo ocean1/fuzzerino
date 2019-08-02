@@ -419,13 +419,13 @@
 #define GFZ_CUSTOM_BUF          32     // 0000 0000 0010 0000
 #define GFZ_LEN_1               64     // 0000 0000 0100 0000
 #define GFZ_LEN_2               128    // 0000 0000 1000 0000
-#define GFZ_STRIDE_LEN_1        256    // 0000 0001 0000 0000
-#define GFZ_STRIDE_LEN_2        512    // 0000 0010 0000 0000
-#define GFZ_STRIDE_LEN_3        1024   // 0000 0100 0000 0000
-#define GFZ_STRIDE_LEN_4        2048   // 0000 1000 0000 0000
-#define GFZ_STRIDE_LEN_5        4096   // 0001 0000 0000 0000
-#define GFZ_STRIDE_LEN_6        8192   // 0010 0000 0000 0000
-#define GFZ_STRIDE_LEN_7        16384  // 0100 0000 0000 0000
-#define GFZ_STRIDE_LEN_8        32768  // 1000 0000 0000 0000
+#define GFZ_LEN_3               256    // 0000 0001 0000 0000
+#define GFZ_STRIDE_LEN_1        512    // 0000 0010 0000 0000
+#define GFZ_STRIDE_LEN_2        1024   // 0000 0100 0000 0000
+#define GFZ_STRIDE_LEN_3        2048   // 0000 1000 0000 0000
+#define GFZ_STRIDE_LEN_4        4096   // 0001 0000 0000 0000
+#define GFZ_STRIDE_LEN_5        8192   // 0010 0000 0000 0000
+#define GFZ_STRIDE_LEN_6        16384  // 0100 0000 0000 0000
+#define GFZ_STRIDE_LEN_7        32768  // 1000 0000 0000 0000
 
 #endif /* ! _HAVE_CONFIG_H */

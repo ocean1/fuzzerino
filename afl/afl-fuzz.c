@@ -1462,7 +1462,7 @@ EXP_ST void gfz_setup_shm(void) {
   /* gFuzz ptr buf starts from all 'A's. */
 
   for (i = 0; i < GFZ_PTR_BUF_SIZE; ++i) {
-    __gfz_ptr_buf[i] = 'P';
+    __gfz_ptr_buf[i] = 'A';
   }
 
 }
