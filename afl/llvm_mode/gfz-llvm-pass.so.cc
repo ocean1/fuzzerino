@@ -473,6 +473,26 @@ Value* AFLCoverage::emitInstrumentation(LLVMContext &C, IRBuilder<> &IRB,
 
 }
 
+bool isOrContainsStructTy(Type *Ty) {
+
+  if ( Ty->isStructTy() ) {
+    return true;
+  }
+
+  bool result = false;
+  unsigned numContainedTys = Ty->getNumContainedTypes();
+
+  if ( numContainedTys > 0 ) {
+    unsigned i = 0;
+
+    for (i = 0; i < numContainedTys; ++i)
+      result = result || isOrContainsStructTy(Ty->getContainedType(i));
+  }
+
+  return result;
+
+}
+
 void AFLCoverage::instrumentOperands(Instruction *I, Type::TypeID TyID) {
   
   Function *F = I->getFunction();
@@ -493,10 +513,15 @@ void AFLCoverage::instrumentOperands(Instruction *I, Type::TypeID TyID) {
   bool isGEP = isa<GetElementPtrInst>(I);
 
   // Don't instrument GEP indices of struct types!
-  if ( isGEP && dyn_cast<PointerType>(
-                  dyn_cast<GetElementPtrInst>(I)->getPointerOperandType()
-                    )->getElementType()->isStructTy() )
-    return;
+  if ( isGEP ) {
+
+    Type *X = dyn_cast<PointerType>(
+                dyn_cast<GetElementPtrInst>(I)->getPointerOperandType()
+                  )->getElementType();
+
+    if ( isOrContainsStructTy(X) ) return;
+
+  }
 
   auto *DI = dyn_cast<CallInst>(I);
   int op_idx;
@@ -837,7 +862,7 @@ bool AFLCoverage::runOnModule(Module &M) {
              isa<CastInst>(I) || isa<PHINode>(I) ||
              isa<VAArgInst>(I) || isa<LandingPadInst>(I) ||
              isa<CatchPadInst>(I) || isa<CleanupPadInst>(I) ||
-             isa<IntrinsicInst>(I) ) {
+             isa<IntrinsicInst>(I) /*|| isa<GetElementPtrInst>(I)*/ ) {
           continue;
         }
 

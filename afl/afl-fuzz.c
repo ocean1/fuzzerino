@@ -8422,7 +8422,7 @@ gfuzz:
   i = 0;
   stage_name = "havoc";
 
-  while (i < maxi) {
+  while ( (numiter == NULL) || (i < maxi) ) {
     
     show_stats();
 

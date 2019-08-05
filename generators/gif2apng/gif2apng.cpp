@@ -56,6 +56,8 @@ unsigned short swap16(unsigned short data) {return((data & 0xFF) << 8) | ((data 
 unsigned int swap32(unsigned int data) {return((data & 0xFF) << 24) | ((data & 0xFF00) << 8) | ((data >> 8) & 0xFF00) | ((data >> 24) & 0xFF);}
 #endif
 
+#define __fuzz __attribute__((section(".fuzzables")))
+
 typedef struct { unsigned char *p; unsigned int size; int x, y, w, h, valid; } OP;
 typedef struct { unsigned int num; unsigned char r, g, b, a; } COLORS;
 
@@ -72,7 +74,7 @@ unsigned char   png_Software[24] = { 83, 111, 102, 116, 119,  97, 114, 101, '\0'
                                     103, 105, 102,  50,  97, 112, 110, 103,
                                      46, 115, 102,  46, 110, 101, 116};
 
-int cmp_colors( const void *arg1, const void *arg2 )
+__fuzz int cmp_colors( const void *arg1, const void *arg2 )
 {
   if ( ((COLORS*)arg1)->a != ((COLORS*)arg2)->a )
     return (int)(((COLORS*)arg1)->a) - (int)(((COLORS*)arg2)->a);
@@ -257,7 +259,7 @@ void write_IDATs(FILE * f, int frame, unsigned char * data, unsigned int length,
   }
 }
 
-void deflate_rect_fin(int deflate_method, int iter, unsigned char * zbuf, int * zsize, int bpp, int stride, unsigned char * rows, int zbuf_size, int n)
+__fuzz void deflate_rect_fin(int deflate_method, int iter, unsigned char * zbuf, int * zsize, int bpp, int stride, unsigned char * rows, int zbuf_size, int n)
 {
   int j;
   int rowbytes = op[n].w*bpp;
@@ -304,7 +306,7 @@ void deflate_rect_fin(int deflate_method, int iter, unsigned char * zbuf, int * 
   }
 }
 
-void deflate_rect_op(unsigned char * p, int x, int y, int w, int h, int bpp, int stride, unsigned char * row_buf, int zbuf_size, int n)
+__fuzz void deflate_rect_op(unsigned char * p, int x, int y, int w, int h, int bpp, int stride, unsigned char * row_buf, int zbuf_size, int n)
 {
   int j;
   unsigned char * row  = p + y*stride + x*bpp;
@@ -330,7 +332,7 @@ void deflate_rect_op(unsigned char * p, int x, int y, int w, int h, int bpp, int
   deflateReset(&op_zstream);
 }
 
-void get_rect(int w, int h, unsigned char *pimage1, unsigned char *pimage2, unsigned char *ptemp, int bpp, int stride, unsigned char * row_buf, int zbuf_size, int has_tcolor, int tcolor, int n)
+__fuzz void get_rect(int w, int h, unsigned char *pimage1, unsigned char *pimage2, unsigned char *ptemp, int bpp, int stride, unsigned char * row_buf, int zbuf_size, int has_tcolor, int tcolor, int n)
 {
   int   i, j, x0, y0, w0, h0;
   int   x_min = w-1;
