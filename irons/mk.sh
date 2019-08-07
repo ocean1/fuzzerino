@@ -50,7 +50,7 @@ if [ ! -z "$run" ]; then
     rm -f /dev/shm/fuzztest
     rm -rf /dev/shm/generated
     rm -f ./afl-fuzz.log && touch ./afl-fuzz.log
-    GFZ_NUM_ITER=311296 ../afl/bin/afl-fuzz -i in -o out -m10000 -t5000 -G -g /dev/shm/fuzztest ../tests/t1/gtest
+    GFZ_NUM_ITER=311296 ../afl/bin/afl-fuzz -b gfz_ban_map -i in -o out -m10000 -t5000 -G -g /dev/shm/fuzztest ../tests/t1/gtest
     if [ "$test" == "true" ]; then
       ./test.sh -t1
     fi
@@ -58,7 +58,7 @@ if [ ! -z "$run" ]; then
     rm -f /dev/shm/fuzztest
     rm -rf /dev/shm/generated
     rm -f ./afl-fuzz.log && touch ./afl-fuzz.log
-    GFZ_NUM_ITER=1000 ../afl/bin/afl-fuzz -i in -o out -m10000 -t5000 -G -g /dev/shm/fuzztest ../tests/t2/gtest
+    GFZ_NUM_ITER=1000 ../afl/bin/afl-fuzz -b gfz_ban_map -i in -o out -m10000 -t5000 -G -g /dev/shm/fuzztest ../tests/t2/gtest
     if [ "$test" == "true" ]; then
       ./test.sh -t2
     fi
