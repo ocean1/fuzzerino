@@ -169,30 +169,23 @@ bool checkPointer(Value *Op) {
     std::string str;
     raw_string_ostream rso(str);
     PointeeTy->print(rso);
-    //printf("\n        (checkPointer) PointeeTy: %s", rso.str().c_str());
   }
 
-  if ( !PointeeTy->isSized() ) {
-    //printf("\n        (checkPointer) balzo, not sized");
+  if ( !PointeeTy->isSized() )
     return false;
-  }
 
   // TODO implement this!
   // Multiple dereferencing... but for example argv is i8**,
   // probably cases like those are tricky
-  if ( PointeeTy->isPointerTy() ) {
-    //printf("\n        (checkPointer) balzo, is pointer in turn");
+  if ( PointeeTy->isPointerTy() )
     return false;
-  }
 
-  // this could hide dynamic allocation...
+  // this could be dynamic allocation...
   if ( PointeeTy->isIntegerTy() ) {
-    //printf("\n        (checkPointer) balzo, is int");
     unsigned bits = PointeeTy->getIntegerBitWidth();
     return false;
   }
 
-  //printf("\n        (checkPointer) ok");
   return true;
 
 }
@@ -547,7 +540,7 @@ void AFLCoverage::instrumentOperands(Instruction *I, Type::TypeID TyID) {
 
     // Don't instrument _pointer_ operands of GEP instructions,
     // at least until the point where the result is used
-    if ( isGEP && OT->isPointerTy() )
+    if ( OT->isPointerTy() && isGEP )
       continue;
 
     // If the pointer is not 'eligible' for instrumentation,
@@ -623,6 +616,7 @@ void AFLCoverage::instrumentOperands(Instruction *I, Type::TypeID TyID) {
     
     fprintf(map_key_fd, "\n%d:\t%s", inst_id-1, I->getOpcodeName());
 
+    //this sometimes crashes for nullptr dereference...
     //if ( isa<CallInst>(I) )
     //  fprintf(map_key_fd, " (%s)", dyn_cast<CallInst>(I)->getCalledFunction()->getName().str().c_str());
 
@@ -709,6 +703,7 @@ Instruction* AFLCoverage::instrumentResult(Instruction *I, Type::TypeID TyID) {
   
   fprintf(map_key_fd, "\n%d:\t%s", inst_id-1, I->getOpcodeName());
 
+  //this sometimes crashes for nullptr dereference...
   //if ( isa<CallInst>(I) )
   //  fprintf(map_key_fd, " (%s)", dyn_cast<CallInst>(I)->getCalledFunction()->getName().str().c_str());
 
@@ -862,7 +857,7 @@ bool AFLCoverage::runOnModule(Module &M) {
              isa<CastInst>(I) || isa<PHINode>(I) ||
              isa<VAArgInst>(I) || isa<LandingPadInst>(I) ||
              isa<CatchPadInst>(I) || isa<CleanupPadInst>(I) ||
-             isa<IntrinsicInst>(I) /*|| isa<GetElementPtrInst>(I)*/ ) {
+             isa<IntrinsicInst>(I) ) {
           continue;
         }
 

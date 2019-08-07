@@ -432,7 +432,6 @@ int main(int argc, char** argv)
   char             szIn[256];
   char             szOut[256];
   char           * szOpt;
-  char           * szExt;
   FILE           * f1;
   FILE           * f2;
   unsigned char    data[1024];
@@ -746,6 +745,8 @@ int main(int argc, char** argv)
         break;
     }
     /* First GIF scan - end */
+
+    __AFL_INIT();
 
     printf("%d frames.\n", frames);
 

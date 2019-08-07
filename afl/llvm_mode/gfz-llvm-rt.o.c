@@ -374,7 +374,7 @@ static void __gfz_start_forkserver(void) {
 
 /* A simplified persistent mode handler, used as explained in README.llvm. */
 
-int __afl_persistent_loop(unsigned int max_cnt) {
+int __gfz_persistent_loop(unsigned int max_cnt) {
 
   static u8 first_pass = 1;
   static u32 cycle_cnt;

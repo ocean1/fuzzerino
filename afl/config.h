@@ -382,7 +382,6 @@
 
 /* Dry run stuff */
 
-#define GFZ_DRY_RUN             /* Enable dry run and ban map */
 #define GFZ_BAN_RATIO           0.3   /* TODO tune this value */
 #define GFZ_BAN_TMOUT_SEC       30    /* TODO tune this value */
 
