@@ -160,16 +160,11 @@ bool checkPointer(Value *Op) {
 
   Type *PointeeTy = getPointeeTy(Op);
 
-  if ( !PointeeTy ) {
-    /* Not GEPOperator or result of GEP.
-       TODO: this way "load"-ed pointers are not instrumented
-             but is a load _always_ paired with a GEP??*/
+  /* Not GEPOperator or result of GEP.
+     TODO: this way "load"-ed pointers are not instrumented
+           but is a load _always_ paired with a GEP??*/
+  if ( PointeeTy == NULL )
     return false;
-  } else {
-    std::string str;
-    raw_string_ostream rso(str);
-    PointeeTy->print(rso);
-  }
 
   if ( !PointeeTy->isSized() )
     return false;
@@ -182,7 +177,7 @@ bool checkPointer(Value *Op) {
 
   // this could be dynamic allocation...
   if ( PointeeTy->isIntegerTy() ) {
-    unsigned bits = PointeeTy->getIntegerBitWidth();
+    // unsigned bits = PointeeTy->getIntegerBitWidth();
     return false;
   }
 
@@ -338,7 +333,7 @@ Value* AFLCoverage::emitInstrumentation(LLVMContext &C, IRBuilder<> &IRB,
     IRB.SetInsertPoint(ThenTerm);
 
     Type *PointeeTy = getPointeeTy(Original);
-    
+
     IRB.CreateMemCpy(Original,
                      IRB.CreateLoad(GFZPtrBuf),
                      DL->getTypeStoreSize(PointeeTy), 0);
@@ -508,11 +503,17 @@ void AFLCoverage::instrumentOperands(Instruction *I, Type::TypeID TyID) {
   // Don't instrument GEP indices of struct types!
   if ( isGEP ) {
 
-    Type *X = dyn_cast<PointerType>(
-                dyn_cast<GetElementPtrInst>(I)->getPointerOperandType()
-                  )->getElementType();
+    GetElementPtrInst *GEPI = dyn_cast<GetElementPtrInst>(I);
+    if ( GEPI == NULL ) return;
 
-    if ( isOrContainsStructTy(X) ) return;
+    Type *POT = GEPI->getPointerOperandType();
+    if ( POT == NULL ) return;
+
+    PointerType *PPOT = dyn_cast<PointerType>(POT);
+    if ( PPOT == NULL ) return;
+
+    Type *X = PPOT->getElementType();
+    if ( X == NULL || isOrContainsStructTy(X) ) return;
 
   }
 
@@ -540,12 +541,11 @@ void AFLCoverage::instrumentOperands(Instruction *I, Type::TypeID TyID) {
 
     // Don't instrument _pointer_ operands of GEP instructions,
     // at least until the point where the result is used
-    if ( OT->isPointerTy() && isGEP )
+    if ( isGEP && OT->isPointerTy() )
       continue;
 
     // If the pointer is not 'eligible' for instrumentation,
-    // continue now, _before_ emitting the IR for loading from
-    // gfz map, etc...
+    // skip emitting the IR for loading from gfz map, etc...
     if ( OT->isPointerTy() && !checkPointer(Op) )
       continue;
 
@@ -653,6 +653,11 @@ Instruction* AFLCoverage::instrumentResult(Instruction *I, Type::TypeID TyID) {
 
   // Don't instrument results of instructions that are not used anywhere...
   if ( I->getNumUses() == 0 )
+    return NULL;
+
+  // If the pointer is not 'eligible' for instrumentation,
+  // skip emitting the IR for loading from gfz map, etc...
+  if ( IT->isPointerTy() && !checkPointer(I) )
     return NULL;
 
   IRBuilder<> IRB(NI);
@@ -767,14 +772,12 @@ bool AFLCoverage::runOnModule(Module &M) {
               S_IRUSR | S_IWUSR | S_IRGRP);
   memset(&lock, 0, sizeof(lock));
 
-  // Whitelist functions
+  // Whitelist functions: scan for functions explicitly marked as fuzzable
   
   char *whitelist = getenv("GFZ_WHITE_LIST");
 
-  // Scan for functions explicitly marked as fuzzable
-  
   for (auto &F : M) if (F.getSection() == ".fuzzables")
-      WhitelistSet.insert(F.getName());
+    WhitelistSet.insert(F.getName());
 
   // Read executed functions from llvm xray yaml
   
@@ -800,9 +803,6 @@ bool AFLCoverage::runOnModule(Module &M) {
   int mod_sel = 0;
   int fun_tot = 0;
   int fun_sel = 0;
-
-  // TODO: implement skipping of functions and modules by implementing
-  // a #pragma nofuzz and __attribute(nofuzz)
 
   // ugly hack, don't want to implement an LTO pass,
   // keep track of current ID in a locked file

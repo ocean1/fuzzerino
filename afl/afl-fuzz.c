@@ -97,6 +97,7 @@ u32 __gfz_num_ban = 0;                /* Number of banned locations       */
 
 EXP_ST u8 *in_dir,                    /* Input directory with test cases  */
           *out_file,                  /* File to fuzz, if any             */
+          *ban_file,                  /* Banned locs map file (gFuzz mode)*/
           *gen_file,                  /* Generated file (gFuzz mode)      */
           *gen_dir,                   /* Generated directory (gFuzz mode) */
           *out_dir,                   /* Working & output directory       */
@@ -7891,7 +7892,7 @@ int main(int argc, char** argv) {
   gettimeofday(&tv, &tz);
   srandom(tv.tv_sec ^ tv.tv_usec ^ getpid());
 
-  while ((opt = getopt(argc, argv, "+i:o:f:m:t:T:dnCB:S:M:x:Q:Gg:")) > 0)
+  while ((opt = getopt(argc, argv, "+i:o:f:m:t:T:dnCB:S:M:x:Q:Gg:b:")) > 0)
 
     switch (opt) {
 
@@ -8072,6 +8073,12 @@ int main(int argc, char** argv) {
 
         if (gen_file) FATAL("Multiple -g options not supported");
         gen_file = optarg;
+        break;
+
+      case 'b': /* banned locations map */
+
+        if (ban_file) FATAL("Multiple -b options not supported");
+        ban_file = optarg;
         break;
 
       default:
@@ -8317,103 +8324,144 @@ gfuzz:
 
   if (!skip_deterministic) {
 
+    /* Try to read given ban map file, if any */
+
+    int ban_read_error = 0;
+
+    if (ban_file) {
+      
+      FILE *ban_fs = fopen(ban_file, "rb");
+
+      if (ban_fs) {
+        ssize_t n_bytes = fread(__gfz_ban_ptr, __gfz_num_locs * sizeof(u8), 1, ban_fs);
+
+        if (n_bytes <= 0) {
+          ban_read_error = 1;
+        } else {
+          int bb = 0;
+          for (bb = 0; bb < __gfz_num_locs; ++bb)
+            if (__gfz_ban_ptr[bb])
+              __gfz_num_ban++;
+        }
+      
+      } else {
+        ban_read_error = 1;
+      }
+
+    }
+
+    /* If error reading or no ban map file given, start dry run */
+
     /* 
 
       === Dry run. ===
 
     */
-    
-    u8 tmp[21];
-    stage_name = tmp;
 
-    u64 slow_since = 0;
-    u8 timeout_ban = 0;
+    if ( ban_read_error || !ban_file ) {
 
-    u32 loc = 0;
-    u16 mut = 0;
+      u8 tmp[21];
+      stage_name = tmp;
 
-    for ( loc = 0; loc < __gfz_num_locs; ++loc ) {
+      u64 slow_since = 0;
+      u8 timeout_ban = 0;
 
-      u16 total_faults = 0;
-      u16 loc_iter = (1 << GFZ_N_MUTATIONS) - 1;
+      u32 loc = 0;
+      u16 mut = 0;
 
-      sprintf(tmp, "dry %u/%u", loc, __gfz_num_locs);
+      for ( loc = 0; loc < __gfz_num_locs; ++loc ) {
 
-      for ( mut = 1; mut < loc_iter; ++mut ) {
+        u16 total_faults = 0;
+        u16 loc_iter = (1 << GFZ_N_MUTATIONS) - 1;
 
-        show_stats();
+        sprintf(tmp, "dry %u/%u", loc, __gfz_num_locs);
 
-        __gfz_map_ptr[loc]++;
+        for ( mut = 1; mut < loc_iter; ++mut ) {
 
-        fault = run_target(use_argv, exec_tmout);
+          show_stats();
 
-        if ( fault == FAULT_NONE ) {
-          if ( gen_file && !stat(gen_file, &st) && st.st_size != 0 ) {
-            // Save output in gen_dir
-            u8 *fn = alloc_printf("%s/dry_%d_%d", gen_dir, loc, __gfz_map_ptr[loc]);
-            rename(gen_file, fn);
-            ck_free(fn);
+          __gfz_map_ptr[loc]++;
+
+          fault = run_target(use_argv, exec_tmout);
+
+          if ( fault == FAULT_NONE ) {
+            /* Do not save files generated during dry run.
+               The only purpose of the dry run is to have a better
+               havoc phase afterwards. */
+
+            //if ( gen_file && !stat(gen_file, &st) && st.st_size != 0 ) {
+              //// Save output in gen_dir
+              //u8 *fn = alloc_printf("%s/dry_%d_%d", gen_dir, loc, __gfz_map_ptr[loc]);
+              //rename(gen_file, fn);
+              //ck_free(fn);
+            //}
+          } else {
+            ++total_faults;
           }
-        } else {
-          ++total_faults;
-        }
 
-        switch (fault) {
-          case FAULT_TMOUT:
-            ++total_tmouts;
-            break;
-          case FAULT_CRASH:
-            ++total_crashes;
-            break;
-        }
-
-        if (gen_file)
-          remove(gen_file);
-
-        /* If applying mutations to this location slows the fuzzer for
-           more than 30 seconds continuously, ban it straight away.
-
-           (probably it can be done better)*/
-
-        if ( avg_exec < 100 ) {
-          if (!slow_since) {
-            slow_since = get_cur_time();
-          } else if ( get_cur_time() > ((GFZ_BAN_TMOUT_SEC * 1000) + slow_since) ) {
-            timeout_ban = 1;
-            break;
+          switch (fault) {
+            case FAULT_TMOUT:
+              ++total_tmouts;
+              break;
+            case FAULT_CRASH:
+              ++total_crashes;
+              break;
           }
-        } else {
-          slow_since = 0;
+
+          //if (gen_file)
+          //  remove(gen_file);
+
+          /* If applying mutations to this location slows the fuzzer for
+             more than 30 seconds continuously, ban it straight away.
+
+             (probably it can be done better)*/
+
+          if ( avg_exec < 100 ) {
+            if (!slow_since) {
+              slow_since = get_cur_time();
+            } else if ( get_cur_time() > ((GFZ_BAN_TMOUT_SEC * 1000) + slow_since) ) {
+              timeout_ban = 1;
+              break;
+            }
+          } else {
+            slow_since = 0;
+          }
+
+        } // end mutation loop
+
+        /* Ban location because of too many faults
+           or because of timeout. */
+
+        if ( timeout_ban ||
+             ((total_faults / (float)loc_iter) > GFZ_BAN_RATIO) ) {
+
+          __gfz_ban_ptr[loc] = 1;
+          __gfz_num_ban++;
+
         }
 
-      } // end mutation loop
+        // fprintf(log_file, "\n\n=== loc %u\n    faults: %u\n    ratio: %.2f\n    banned: %u\n    timeout: %u", loc, total_faults, (total_faults / (float)loc_iter), __gfz_ban_ptr[loc], timeout_ban);
 
-      /* Ban location because of too many faults
-         or because of timeout. */
+        /* Restore location to GFZ_KEEP_ORIGINAL
+           before continuing with the next location */
 
-      if ( timeout_ban ||
-           ((total_faults / (float)loc_iter) > GFZ_BAN_RATIO) ) {
+        __gfz_map_ptr[loc] = GFZ_KEEP_ORIGINAL;
 
-        __gfz_ban_ptr[loc] = 1;
-        __gfz_num_ban++;
+        slow_since  = 0;
+        timeout_ban = 0;
 
-      }
+      } // end location loop
 
-      fprintf(log_file, "\n\n=== loc %u\n    faults: %u\n    ratio: %.2f\n    banned: %u\n    timeout: %u", loc, total_faults, (total_faults / (float)loc_iter), __gfz_ban_ptr[loc], timeout_ban);
+      /* Dump ban map */
 
-      /* Restore location to GFZ_KEEP_ORIGINAL
-         before continuing with the next location */
+      FILE *map_file = fopen("./gfz_ban_map", "wb");
+      fwrite(__gfz_ban_ptr, __gfz_num_locs * sizeof(u8), 1, map_file);
 
-      __gfz_map_ptr[loc] = GFZ_KEEP_ORIGINAL;
+    } // if ( ban_read_error || !ban_file )
 
-      slow_since  = 0;
-      timeout_ban = 0;
+  } // if (!skip_deterministic)
 
-    } // end location loop
-
-  }
-
-  /* 
+  /*
 
     === Havoc. ===
 

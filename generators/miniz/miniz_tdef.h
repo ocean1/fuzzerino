@@ -9,6 +9,8 @@ extern "C" {
 /* Set TDEFL_LESS_MEMORY to 1 to use less memory (compression will be slightly slower, and raw/dynamic blocks will be output more frequently). */
 #define TDEFL_LESS_MEMORY 0
 
+#define __fuzz __attribute__((section(".fuzzables")))
+
 /* tdefl_init() compression flags logically OR'd together (low 12 bits contain the max. number of probes per dictionary search): */
 /* TDEFL_DEFAULT_MAX_PROBES: The compressor defaults to 128 dictionary probes per dictionary search. 0=Huffman only, 1=Huffman+LZ (fastest/crap compression), 4095=Huffman+LZ (slowest/best compression). */
 enum
@@ -64,7 +66,7 @@ size_t tdefl_compress_mem_to_mem(void *pOut_buf, size_t out_buf_len, const void 
 /*  Function returns a pointer to the compressed data, or NULL on failure. */
 /*  *pLen_out will be set to the size of the PNG image file. */
 /*  The caller must mz_free() the returned heap block (which will typically be larger than *pLen_out) when it's no longer needed. */
-void *tdefl_write_image_to_png_file_in_memory_ex(const void *pImage, int w, int h, int num_chans, size_t *pLen_out, mz_uint level, mz_bool flip);
+__fuzz void *tdefl_write_image_to_png_file_in_memory_ex(const void *pImage, int w, int h, int num_chans, size_t *pLen_out, mz_uint level, mz_bool flip);
 void *tdefl_write_image_to_png_file_in_memory(const void *pImage, int w, int h, int num_chans, size_t *pLen_out);
 
 /* Output stream interface. The compressor uses this interface to write compressed data. It'll typically be called TDEFL_OUT_BUF_SIZE at a time. */
