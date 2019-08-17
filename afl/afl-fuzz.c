@@ -85,13 +85,26 @@
 
 FILE *log_file;
 
+struct gfz_data __gfz_data;           /* gFuzz struct received from rt    */
+                                      /* contains:                        */
+                                      /*     __gfz_map_locs               */
+                                      /*     __gfz_branch_locs            */
+                                      /*     __gfz_total_bbs              */
+
 u16* __gfz_map_ptr;                   /* Instrumentation bitmap SHM       */
-u32 __gfz_num_locs = 0;               /* Number of instrumented locations */
+u32  __gfz_map_locs = 0;              /* Number of instrumented locations */
 
-u8* __gfz_ptr_buf;                    /* Buffer for ptr instrumentaton    */
+u8*  __gfz_branch_ptr;                /* Branch instrumentation bitmap SHM*/
+u32  __gfz_branch_locs = 0;           /* Number of instrumented branches  */
 
-u8* __gfz_ban_ptr;                    /* Banned locations map             */
-u32 __gfz_num_ban = 0;                /* Number of banned locations       */
+u8*  __gfz_ptr_buf;                   /* Buffer for ptr dict instrum.     */
+
+u8*  __gfz_cov_map;                   /* Generator coverage bitmap SHM    */
+u32  __gfz_total_bbs = 0;             /* Total basic blocks               */
+u32  __gfz_covered = 0;               /* Covered basic blocks             */
+
+u8*  __gfz_ban_ptr;                   /* Banned locations map             */
+u32  __gfz_ban_locs = 0;              /* Number of banned locations       */
 
 /* Usual stuff */
 
@@ -166,7 +179,9 @@ static u8  var_bytes[MAP_SIZE];       /* Bytes that appear to be variable */
 
 static s32 shm_id;                    /* ID of the SHM region             */
 static s32 gfz_map_shm_id;            /* ID of map SHM region (gFuzz mode)*/
+static s32 gfz_bnc_shm_id;            /* ID of bnc SHM region (gFuzz mode)*/
 static s32 gfz_ptr_shm_id;            /* ID of ptr SHM region (gFuzz mode)*/
+static s32 gfz_cov_shm_id;            /* ID of cov SHM region (gFuzz mode)*/
 
 static volatile u8 stop_soon,         /* Ctrl-C pressed?                  */
                    clear_screen = 1,  /* Window resized?                  */
@@ -1230,12 +1245,14 @@ static void remove_shm(void) {
 
 }
 
-/* Get rid of shared memory (atexit handler). */
+/* Get rid of shared memories (atexit handler). */
 
 static void gfz_remove_shm(void) {
 
   shmctl(gfz_map_shm_id, IPC_RMID, NULL);
+  shmctl(gfz_bnc_shm_id, IPC_RMID, NULL);
   shmctl(gfz_ptr_shm_id, IPC_RMID, NULL);
+  shmctl(gfz_cov_shm_id, IPC_RMID, NULL);
 
 }
 
@@ -1404,10 +1421,10 @@ EXP_ST void setup_shm(void) {
 
 }
 
-/* Setup shm for __gfz_map_ptr and __gfz_ptr_buf, in order to
-   be able to control them 'from the outside' (i.e. here)
+/* Setup the four SHMs in order to be able to control
+   them 'from the outside' (i.e. here)
 
-   The fuzzed binary will attach to this shm during
+   The fuzzed binary will attach to these SHMs during
    initialization in the runtime. */
 
 EXP_ST void gfz_setup_shm(void) {
@@ -1415,27 +1432,20 @@ EXP_ST void gfz_setup_shm(void) {
   u8* shm_str;
   int i = 0;
 
-  /* Setup shm for __gfz_map_ptr. */
-
-  gfz_map_shm_id = shmget(IPC_PRIVATE, GFZ_MAP_SIZE, IPC_CREAT | IPC_EXCL | 0600);
-
-  if (gfz_map_shm_id < 0) PFATAL("shmget() failed");
+  /* Setup atexit handler. */
 
   atexit(gfz_remove_shm);
 
+  /* Setup shm for __gfz_map_ptr. */
+
+  gfz_map_shm_id = shmget(IPC_PRIVATE, GFZ_MAP_SIZE, IPC_CREAT | IPC_EXCL | 0600);
+  if (gfz_map_shm_id < 0) PFATAL("shmget() failed");
+
   shm_str = alloc_printf("%d", gfz_map_shm_id);
-
-  // If somebody is asking us to fuzz instrumented binaries in dumb mode,
-  // we don't want them to detect instrumentation, since we won't be sending
-  // fork server commands. This should be replaced with better auto-detection
-  // later on, perhaps?
-
-  setenv(GFZ_SHM_ENV_VAR, shm_str, 1);
-
+  setenv(GFZ_MAP_SHM_ENV_VAR, shm_str, 1);
   ck_free(shm_str);
 
   __gfz_map_ptr = shmat(gfz_map_shm_id, NULL, 0);
-  
   if (!__gfz_map_ptr) PFATAL("shmat() failed");
 
   /* gFuzz map starts from all ones (normal program behavior). */
@@ -1444,26 +1454,58 @@ EXP_ST void gfz_setup_shm(void) {
     __gfz_map_ptr[i] = 1;
   }
 
+  /* Setup shm for __gfz_branch_ptr. */
+
+  gfz_bnc_shm_id = shmget(IPC_PRIVATE, GFZ_BNC_MAP_SIZE, IPC_CREAT | IPC_EXCL | 0600);
+  if (gfz_bnc_shm_id < 0) PFATAL("shmget() failed");
+
+  shm_str = alloc_printf("%d", gfz_bnc_shm_id);
+  setenv(GFZ_BNC_SHM_ENV_VAR, shm_str, 1);
+  ck_free(shm_str);
+
+  __gfz_branch_ptr = shmat(gfz_bnc_shm_id, NULL, 0);
+  if (!__gfz_branch_ptr) PFATAL("shmat() failed");
+
+  /* gFuzz branch map starts from all ones (normal program behavior). */
+
+  for (i = 0; i < GFZ_BNC_MAP_SIZE; ++i) {
+    __gfz_branch_ptr[i] = 1;
+  }
+
   /* Setup shm for __gfz_ptr_buf. */
 
   gfz_ptr_shm_id = shmget(IPC_PRIVATE, GFZ_PTR_BUF_SIZE, IPC_CREAT | IPC_EXCL | 0600);
-
   if (gfz_ptr_shm_id < 0) PFATAL("shmget() failed");
 
   shm_str = alloc_printf("%d", gfz_ptr_shm_id);
-
-  setenv(GFZ_SHM_PTR_ENV_VAR, shm_str, 1);
-
+  setenv(GFZ_PTR_SHM_ENV_VAR, shm_str, 1);
   ck_free(shm_str);
 
   __gfz_ptr_buf = shmat(gfz_ptr_shm_id, NULL, 0);
-  
   if (!__gfz_ptr_buf) PFATAL("shmat() failed");
 
   /* gFuzz ptr buf starts from all 'A's. */
 
   for (i = 0; i < GFZ_PTR_BUF_SIZE; ++i) {
     __gfz_ptr_buf[i] = 'A';
+  }
+
+  /* Setup shm for __gfz_cov_map. */
+
+  gfz_cov_shm_id = shmget(IPC_PRIVATE, GFZ_COV_MAP_SIZE, IPC_CREAT | IPC_EXCL | 0600);
+  if (gfz_cov_shm_id < 0) PFATAL("shmget() failed");
+
+  shm_str = alloc_printf("%d", gfz_cov_shm_id);
+  setenv(GFZ_COV_SHM_ENV_VAR, shm_str, 1);
+  ck_free(shm_str);
+
+  __gfz_cov_map = shmat(gfz_cov_shm_id, NULL, 0);
+  if (!__gfz_cov_map) PFATAL("shmat() failed");
+
+  /* gFuzz cov map starts from all 0s. */
+
+  for (i = 0; i < GFZ_COV_MAP_SIZE; ++i) {
+    __gfz_cov_map[i] = 0;
   }
 
 }
@@ -2225,18 +2267,23 @@ EXP_ST void init_forkserver(char** argv) {
     OKF("All right - fork server is up.");
 
     if (gfuzz_mode) {
-      rlen = read(fsrv_st_fd, &__gfz_num_locs, sizeof(__gfz_num_locs));
+      rlen = read(fsrv_st_fd, &__gfz_data, sizeof(struct gfz_data));
 
-      if (rlen == sizeof(__gfz_num_locs)) {
-        OKF("Number of instrumented locations: %d", __gfz_num_locs);
-        OKF("Number of dry run executions: %d", (1 << GFZ_N_MUTATIONS) * __gfz_num_locs);
+      if (rlen == sizeof(struct gfz_data)) {
+        __gfz_map_locs    = __gfz_data.gfz_map_locs;
+        __gfz_branch_locs = __gfz_data.gfz_branch_locs;
+        __gfz_total_bbs   = __gfz_data.gfz_total_bbs;
+
+        OKF("Number of instrumented locations: %d", __gfz_map_locs);
+        OKF("Number of instrumented branches: %u", __gfz_branch_locs);
+        OKF("Number of basic blocks: %u", __gfz_total_bbs);
 
         /* Allocate and zero-initialize the map of banned locations. */
 
-        __gfz_ban_ptr = calloc(__gfz_num_locs, sizeof(u8));
+        __gfz_ban_ptr = calloc(__gfz_map_locs, sizeof(u8));
 
       } else {
-        FATAL("Unable to read __gfz_num_locs from the forkserver!");
+        FATAL("Unable to read __gfz_data from the forkserver!");
       }
     }
 
@@ -4207,18 +4254,18 @@ static void show_stats(void) {
        "   uniq hangs : " cRST "%-6s " bSTG bV "\n",
        DTD(cur_ms, last_hang_time), tmp);
 
-  SAYF(bVR bH bSTOP cCYA " cycle progress " bSTG bH20 bHB bH bSTOP cCYA
+  SAYF(bVR bH bSTOP cCYA " gfuzz mode " bSTG bH2 bH2 bH20 bHB bH bSTOP cCYA
        " map coverage " bSTG bH bHT bH20 bH2 bH bVL "\n");
 
   /* This gets funny because we want to print several variable-length variables
      together, but then cram them into a fixed-width field - so we need to
      put them in a temporary buffer first. */
 
-  sprintf(tmp, "%s%s (%0.02f%%)", DI(current_entry),
-          queue_cur->favored ? "" : "*",
-          ((double)current_entry * 100) / queued_paths);
+  //sprintf(tmp, "%s%s (%0.02f%%)", DI(current_entry),
+  //        queue_cur->favored ? "" : "*",
+  //        ((double)current_entry * 100) / queued_paths);
 
-  SAYF(bV bSTOP "  now processing : " cRST "%-17s " bSTG bV bSTOP, tmp);
+  SAYF(bV bSTOP "   locations : " cRST "%-21s " bSTG bV bSTOP, DI(__gfz_map_locs));
 
   sprintf(tmp, "%0.02f%% / %0.02f%%", ((double)queue_cur->bitmap_size) * 
           100 / MAP_SIZE, t_byte_ratio);
@@ -4226,22 +4273,25 @@ static void show_stats(void) {
   SAYF("    map density : %s%-21s " bSTG bV "\n", t_byte_ratio > 70 ? cLRD : 
        ((t_bytes < 200 && !dumb_mode) ? cPIN : cRST), tmp);
 
-  sprintf(tmp, "%s (%0.02f%%)", DI(cur_skipped_paths),
-          ((double)cur_skipped_paths * 100) / queued_paths);
+  //sprintf(tmp, "%s (%0.02f%%)", DI(cur_skipped_paths),
+  //        ((double)cur_skipped_paths * 100) / queued_paths);
 
-  SAYF(bV bSTOP " paths timed out : " cRST "%-17s " bSTG bV, tmp);
+  SAYF(bV bSTOP "    branches : " cRST "%-21s " bSTG bV, DI(__gfz_branch_locs));
 
   sprintf(tmp, "%0.02f bits/tuple",
           t_bytes ? (((double)t_bits) / t_bytes) : 0);
 
   SAYF(bSTOP " count coverage : " cRST "%-21s " bSTG bV "\n", tmp);
 
-  SAYF(bVR bH bSTOP cCYA " gfuzz mode " bSTG bH20 bH2 bH2 bHT bH20 bH20 bVL "\n");
+  sprintf(tmp, "%s/%s (%0.02f%%)", DI(__gfz_covered), DI(__gfz_total_bbs),
+          (double)__gfz_covered * 100 / __gfz_total_bbs);
+
+  SAYF(bV bSTOP " bb coverage : " cRST "%-22s" bSTG bLB bH20 bH20 bVL "\n", tmp);
 
   /* Yeah... it's still going on... halp? */
 
-  sprintf(tmp, "%s (%0.02f%%)", DI(__gfz_num_ban),
-          (double)__gfz_num_ban * 100 / __gfz_num_locs);
+  sprintf(tmp, "%s (%0.02f%%)", DI(__gfz_ban_locs),
+          (double)__gfz_ban_locs * 100 / __gfz_map_locs);
 
   SAYF(bV bSTOP "  now trying : " cRST "%-21s " bSTG " " bSTOP 
        "   banned locs : " cRST "%-22s " bSTG bV "\n", stage_name, tmp);
@@ -4291,8 +4341,7 @@ static void show_stats(void) {
   sprintf(tmp, "%s", DI(total_tmouts));
   SAYF(bSTG " " bSTOP "  total tmouts : " cRST "%-22s " bSTG bV "\n", tmp);
 
-  /* TODO implement last line: */
-  SAYF(bV "%-78s" bV "\n", "");
+  SAYF(bV bSTOP "%-78s" bSTG bV "\n", "");
 
   /* Aaaalmost there... hold on! */
 
@@ -8333,15 +8382,15 @@ gfuzz:
       FILE *ban_fs = fopen(ban_file, "rb");
 
       if (ban_fs) {
-        ssize_t n_bytes = fread(__gfz_ban_ptr, __gfz_num_locs * sizeof(u8), 1, ban_fs);
+        ssize_t n_bytes = fread(__gfz_ban_ptr, __gfz_map_locs * sizeof(u8), 1, ban_fs);
 
         if (n_bytes <= 0) {
           ban_read_error = 1;
         } else {
           int bb = 0;
-          for (bb = 0; bb < __gfz_num_locs; ++bb)
+          for (bb = 0; bb < __gfz_map_locs; ++bb)
             if (__gfz_ban_ptr[bb])
-              __gfz_num_ban++;
+              __gfz_ban_locs++;
         }
       
       } else {
@@ -8363,99 +8412,67 @@ gfuzz:
       u8 tmp[21];
       stage_name = tmp;
 
-      u64 slow_since = 0;
-      u8 timeout_ban = 0;
-
+      u32 branch = 0;
       u32 loc = 0;
-      u16 mut = 0;
+      u32 mut = 0;
 
-      for ( loc = 0; loc < __gfz_num_locs; ++loc ) {
+      for ( branch = 0; branch < __gfz_branch_locs; ++branch ) {
+        
+        __gfz_branch_ptr[branch]++;
 
-        u16 total_faults = 0;
-        u16 loc_iter = (1 << GFZ_N_MUTATIONS) - 1;
+        for ( loc = 0; loc < __gfz_map_locs; ++loc ) {
 
-        sprintf(tmp, "dry %u/%u", loc, __gfz_num_locs);
+          sprintf(tmp, "dry %u/%u", branch, loc);
+          
+          for ( mut = 0; mut < GFZ_BNC_DRY_EXECS; ++mut ) {
 
-        for ( mut = 1; mut < loc_iter; ++mut ) {
+            show_stats();
 
-          show_stats();
+            __gfz_map_ptr[loc] = UR(65536);
 
-          __gfz_map_ptr[loc]++;
+            fault = run_target(use_argv, exec_tmout);
 
-          fault = run_target(use_argv, exec_tmout);
-
-          if ( fault == FAULT_NONE ) {
-            /* Do not save files generated during dry run.
-               The only purpose of the dry run is to have a better
-               havoc phase afterwards. */
-
-            //if ( gen_file && !stat(gen_file, &st) && st.st_size != 0 ) {
-              //// Save output in gen_dir
-              //u8 *fn = alloc_printf("%s/dry_%d_%d", gen_dir, loc, __gfz_map_ptr[loc]);
-              //rename(gen_file, fn);
-              //ck_free(fn);
-            //}
-          } else {
-            ++total_faults;
-          }
-
-          switch (fault) {
-            case FAULT_TMOUT:
-              ++total_tmouts;
-              break;
-            case FAULT_CRASH:
-              ++total_crashes;
-              break;
-          }
-
-          //if (gen_file)
-          //  remove(gen_file);
-
-          /* If applying mutations to this location slows the fuzzer for
-             more than 30 seconds continuously, ban it straight away.
-
-             (probably it can be done better)*/
-
-          if ( avg_exec < 100 ) {
-            if (!slow_since) {
-              slow_since = get_cur_time();
-            } else if ( get_cur_time() > ((GFZ_BAN_TMOUT_SEC * 1000) + slow_since) ) {
-              timeout_ban = 1;
-              break;
+            if (unlikely(!(total_execs % GFZ_COV_REFRESH_RATE))) {
+              __gfz_covered = 0;
+              int bb = 0;
+              for (bb = 0; bb < __gfz_total_bbs; ++bb)
+                __gfz_covered += __gfz_cov_map[bb];
             }
-          } else {
-            slow_since = 0;
-          }
 
-        } // end mutation loop
+            switch (fault) {
+              case FAULT_TMOUT:
+                ++total_tmouts;
+                __gfz_ban_ptr[loc]++;
+                break;
+              case FAULT_CRASH:
+                ++total_crashes;
+                __gfz_ban_ptr[loc]++;
+                break;
+            }
 
-        /* Ban location because of too many faults
-           or because of timeout. */
+          } // end mutation loop
 
-        if ( timeout_ban ||
-             ((total_faults / (float)loc_iter) > GFZ_BAN_RATIO) ) {
+          __gfz_map_ptr[loc] = GFZ_KEEP_ORIGINAL;
 
+        } // end location loop
+
+        __gfz_branch_ptr[branch]--;
+
+      } // end branch loop
+
+      for ( loc = 0; loc < __gfz_map_locs; ++loc ) {
+        if ( __gfz_ban_ptr[loc] / (__gfz_branch_locs * GFZ_BNC_DRY_EXECS) > GFZ_BAN_RATIO ) {
           __gfz_ban_ptr[loc] = 1;
-          __gfz_num_ban++;
-
+          __gfz_ban_locs++;
+        } else {
+          __gfz_ban_ptr[loc] = 0;
         }
-
-        // fprintf(log_file, "\n\n=== loc %u\n    faults: %u\n    ratio: %.2f\n    banned: %u\n    timeout: %u", loc, total_faults, (total_faults / (float)loc_iter), __gfz_ban_ptr[loc], timeout_ban);
-
-        /* Restore location to GFZ_KEEP_ORIGINAL
-           before continuing with the next location */
-
-        __gfz_map_ptr[loc] = GFZ_KEEP_ORIGINAL;
-
-        slow_since  = 0;
-        timeout_ban = 0;
-
-      } // end location loop
+      }
 
       /* Dump ban map */
 
       FILE *map_file = fopen("./gfz_ban_map", "wb");
-      fwrite(__gfz_ban_ptr, __gfz_num_locs * sizeof(u8), 1, map_file);
+      fwrite(__gfz_ban_ptr, __gfz_map_locs * sizeof(u8), 1, map_file);
 
     } // if ( ban_read_error || !ban_file )
 
@@ -8468,7 +8485,9 @@ gfuzz:
   */
 
   i = 0;
-  u32 rnd_loc = 0;
+  u32 branch = 0;
+  u32 branch_execs = 0;
+  u32 loc = 0;
   stage_name = "havoc";
 
   while ( (numiter == NULL) || (i < maxi) ) {
@@ -8481,23 +8500,35 @@ gfuzz:
     // terrible exploitation. In general super slow even with <1000 locs,
     // unguided, true havoc.
     //    
-    // ck_read(dev_urandom_fd, __gfz_map_ptr, __gfz_num_locs * 2, "/dev/urandom");
+    // ck_read(dev_urandom_fd, __gfz_map_ptr, __gfz_map_locs * 2, "/dev/urandom");
 
     // Faster, but if we get a tmout we'll be fucked until we choose
     // the same location with different mutations or a reset.
     // Not suggested. (just wanted to try it)
     // 
-    // __gfz_map_ptr[UR(__gfz_num_locs)] = UR(4) > 2 ? 1 : UR(65536);
+    // __gfz_map_ptr[UR(__gfz_map_locs)] = UR(4) > 2 ? 1 : UR(65536);
 
     // We activate a random location with random mutations.
-    // If something is successfully generated, we keep it.
-    // Otherwise, we reset it.
+    // If something is successfully generated, we keep the mutations.
+    // Otherwise, we reset the location.
+    //
     // Good exploitation at the expense of exploration, but
     // actually it's a nice trade-off: sooner or later even the
     // "successful" mutations will be overwritten and change.
 
-    rnd_loc = UR(__gfz_num_locs);
-    __gfz_map_ptr[rnd_loc] = UR(65536);
+    if (branch_execs > 1000) {
+      if (UR(2)) {
+        __gfz_branch_ptr[branch] = 1;
+      }
+
+      branch = UR(__gfz_branch_locs);
+      __gfz_branch_ptr[branch] = 2;
+
+      branch_execs = 0;
+    }
+
+    loc = UR(__gfz_map_locs);
+    __gfz_map_ptr[loc] = UR(65536);
 
     if (!skip_deterministic) {
 
@@ -8505,7 +8536,7 @@ gfuzz:
 
       int ban_idx = 0;
 
-      for (ban_idx = 0; ban_idx < __gfz_num_locs; ++ban_idx) {
+      for (ban_idx = 0; ban_idx < __gfz_map_locs; ++ban_idx) {
         if (__gfz_ban_ptr[ban_idx]) {
           __gfz_map_ptr[ban_idx] = GFZ_KEEP_ORIGINAL;
         }
@@ -8515,14 +8546,29 @@ gfuzz:
 
     fault = run_target(use_argv, exec_tmout);
 
+    /* Update basic block coverage */
+
+    if (unlikely(!(total_execs % GFZ_COV_REFRESH_RATE))) {
+      __gfz_covered = 0;
+      int bb = 0;
+      for (bb = 0; bb < __gfz_total_bbs; ++bb)
+        __gfz_covered += __gfz_cov_map[bb];
+    }
+
     if ( gen_file && fault == FAULT_NONE && !stat(gen_file, &st) && st.st_size != 0 ) {
-      // Save output in gen_dir
+      
+      /* Save output in gen_dir */
+      
       u8 *fn = alloc_printf("%s/%d", gen_dir, i);
       rename(gen_file, fn);
       ck_free(fn);
+    
     } else {
-      // Reset location
-      __gfz_map_ptr[rnd_loc] = 1;
+      
+      /* Reset location */
+
+      __gfz_map_ptr[loc] = GFZ_KEEP_ORIGINAL;
+
     }
 
     switch (fault) {
@@ -8537,6 +8583,7 @@ gfuzz:
     if (gen_file)
       remove(gen_file);
 
+    ++branch_execs;
     ++i;
 
   }

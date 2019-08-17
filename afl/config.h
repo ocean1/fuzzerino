@@ -353,18 +353,30 @@
 
 /* Environment variable used to pass SHM ID to the called program. */
 
-#define GFZ_SHM_ENV_VAR         "__GFZ_SHM_ID"
-#define GFZ_SHM_PTR_ENV_VAR     "__GFZ_SHM_PTR_ID"
+#define GFZ_MAP_SHM_ENV_VAR     "__GFZ_MAP_SHM_ID"
+#define GFZ_BNC_SHM_ENV_VAR     "__GFZ_BNC_SHM_ID"
+#define GFZ_PTR_SHM_ENV_VAR     "__GFZ_PTR_SHM_ID"
+#define GFZ_COV_SHM_ENV_VAR     "__GFZ_COV_SHM_ID"
 
 /* Size for map containing mutations (4MB) */
 
 #define GFZ_MAP_SIZE_POW2       22
 #define GFZ_MAP_SIZE            (1 << GFZ_MAP_SIZE_POW2)
 
+/* Size for map containing mutations (16k) */
+
+#define GFZ_BNC_MAP_SIZE_POW2   14
+#define GFZ_BNC_MAP_SIZE        (1 << GFZ_BNC_MAP_SIZE_POW2)
+
 /* Size for helper buffer for ptr instrumentation (128 bytes) */
 
 #define GFZ_PTR_BUF_SIZE_POW2   7
 #define GFZ_PTR_BUF_SIZE        (1 << GFZ_PTR_BUF_SIZE_POW2)
+
+/* Size for generator coverage map (64k) */
+
+#define GFZ_COV_MAP_SIZE_POW2   16
+#define GFZ_COV_MAP_SIZE        (1 << GFZ_COV_MAP_SIZE_POW2)
 
 /* Size for pool containing values to be used in mutations, 4KB seems good */
 
@@ -380,10 +392,15 @@
 #define GFZ_OUTPUT_LIMIT_POW2   30
 #define GFZ_OUTPUT_LIMIT        (1 << GFZ_OUTPUT_LIMIT_POW2)
 
-/* Dry run stuff */
+/* Dry run stuff - TODO: tune these values */
 
-#define GFZ_BAN_RATIO           0.3   /* TODO tune this value */
-#define GFZ_BAN_TMOUT_SEC       30    /* TODO tune this value */
+#define GFZ_BNC_DRY_EXECS       100
+#define GFZ_BAN_RATIO           0.3
+#define GFZ_BAN_TMOUT_SEC       30
+
+/* Random stuff */
+
+#define GFZ_COV_REFRESH_RATE    10000
 
 /* Don't touch this! */
 

@@ -63,28 +63,6 @@ u8 *__afl_area_ptr = __afl_area_initial;
 
 __thread u32 __afl_prev_loc;
 
-/* keep 4MB of map, it's quite a lot of space, and our test targets
-   will happily work with this, we can later optimize by storing inst_inst
-   and merging global vars in a LTO pass (or brutally patched with lief) */
-
-u16 *__gfz_map_ptr;
-
-/* Buffer for ptr instrumentation */
-
-u8 *__gfz_ptr_buf;
-
-/* "Rand" area gets filled by the thread itself every time we change fuzz
- * strategy or when all values have been used, for example filled with low/high
- * values, or random values */
-
-u8 *__gfz_rand_area = NULL;
-u32 __gfz_rand_idx;
-
-/* Number of instrumented locations in the target binary. */
-
-extern u32 __gfz_num_locs_defsym;
-u32 __gfz_num_locs;
-
 /* Running in persistent mode? */
 
 static u8 is_persistent;
@@ -97,9 +75,48 @@ void free(void *ptr)
 {
 }
 
+/* Extern variables which will be linked against by gfz-ld wrapper
+   through a command line flag called "--defsym".
+
+   They are filled with data taken from GFZ_IDFILE at the end of the
+   compiling process, to avoid LTO. */
+
+extern u32 __gfz_map_locs_defsym;    /* Number of instrumented locations in the target binary. */
+extern u32 __gfz_branch_locs_defsym; /* Number of instrumented branches in the target binary. */
+extern u32 __gfz_total_bbs_defsym;   /* Number of (whitelisted) basic blocks in the target binary. */
+
+/* gFuzz structure to send to the fuzzer. */
+
+struct gfz_data __gfz_data;
+
+/* keep 4MB of map, it's quite a lot of space, and our test targets
+   will happily work with this, we can later optimize by storing inst_inst
+   and merging global vars in a LTO pass (or brutally patched with lief) */
+
+u16* __gfz_map_ptr;
+
+/* Branch instrumentation bitmap SHM */
+
+u8* __gfz_branch_ptr;
+
+/* Buffer for ptr dictionary instrumentation */
+
+u8* __gfz_ptr_buf;
+
+/* Map for generator coverage */
+
+u8* __gfz_cov_map;
+
 /* Random file descriptor for populating __gfz_rand_area. */
 
-FILE *rfd;
+FILE* rfd;
+
+/* "Rand" area gets filled by the thread itself every time we change fuzz
+ * strategy or when all values have been used, for example filled with low/high
+ * values, or random values */
+
+u8* __gfz_rand_area = NULL;
+u32 __gfz_rand_idx;
 
 /* SHM setup. */
 
@@ -129,63 +146,79 @@ static void __afl_map_shm(void) {
   }
 }
 
-/* Attach __gfz_map_ptr and __gfz_ptr_buf to shm, in order to
-   be able to control them 'from the outside' (i.e. the fuzzer) */
+/* Attach the four SHMs in order to be able to control
+   them 'from the outside' (i.e. the fuzzer) */
 
 static void __gfz_map_shm(void) {
 
   /* Attach __gfz_map_ptr */
 
-  u8 *id_str = getenv(GFZ_SHM_ENV_VAR);
-
-  // If we're running under AFL, attach to the appropriate region, replacing the
-  // early-stage __afl_area_initial region that is needed to allow some really
-  // hacky .init code to work correctly in projects such as OpenSSL.
+  u8 *id_str = getenv(GFZ_MAP_SHM_ENV_VAR);
 
   if (id_str) {
-
     u32 shm_id = atoi(id_str);
-
     __gfz_map_ptr = shmat(shm_id, NULL, 0);
 
     // Whooooops.
-
     if (__gfz_map_ptr == (void *)-1) {
       _exit(1);
     }
-
   } else {
-
     __gfz_map_ptr = calloc(GFZ_MAP_SIZE, 1);
-  
+  }
+
+  /* Attach __gfz_branch_ptr */
+
+  id_str = getenv(GFZ_BNC_SHM_ENV_VAR);
+
+  if (id_str) {
+    u32 shm_id = atoi(id_str);
+    __gfz_branch_ptr = shmat(shm_id, NULL, 0);
+
+    // Whooooops.
+    if (__gfz_branch_ptr == (void *)-1) {
+      _exit(1);
+    }
+  } else {
+    __gfz_branch_ptr = calloc(GFZ_BNC_MAP_SIZE, 1);
   }
 
   /* Attach __gfz_ptr_buf */
 
-  id_str = getenv(GFZ_SHM_PTR_ENV_VAR);
+  id_str = getenv(GFZ_PTR_SHM_ENV_VAR);
 
   if (id_str) {
-
     u32 shm_id = atoi(id_str);
-
     __gfz_ptr_buf = shmat(shm_id, NULL, 0);
 
     // Whooooops.
-
     if (__gfz_ptr_buf == (void *)-1) {
+      _exit(1);
+    }
+  } else {
+    __gfz_ptr_buf = malloc(GFZ_PTR_BUF_SIZE);
+    
+    int i = 0;
+    for (i = 0; i < GFZ_PTR_BUF_SIZE; ++i) {
+      __gfz_ptr_buf[i] = 'A';
+    }
+  }
+
+  /* Attach __gfz_cov_map */
+
+  id_str = getenv(GFZ_COV_SHM_ENV_VAR);
+
+  if (id_str) {
+    u32 shm_id = atoi(id_str);
+    __gfz_cov_map = shmat(shm_id, NULL, 0);
+
+    // Whooooops.
+    if (__gfz_cov_map == (void *)-1) {
       _exit(1);
     }
 
   } else {
-
-    __gfz_ptr_buf = malloc(GFZ_PTR_BUF_SIZE);
-
-    int i = 0;
-
-    for (i = 0; i < GFZ_PTR_BUF_SIZE; ++i) {
-      __gfz_ptr_buf[i] = 'A';
-    }
-  
+    __gfz_cov_map = calloc(GFZ_COV_MAP_SIZE, 1);
   }
 
 }
@@ -244,21 +277,24 @@ static void __gfz_start_forkserver(void) {
 
       Code used for instrumentation testing.
 
-      It fills the map area with a custom map read from a file
-      called "gfz.map" in the current folder.
+      It fills the maps area with custom map files, if present.
+      The custom maps are searched in files in the current folder called
+
+          "gfz_map" for the locations map
+          "gfz_bnc" for the branches map
 
     */
 
-    FILE *map_file = fopen("./gfz.map", "rb");
+    FILE *gfz_map_file = fopen("./gfz_map", "rb");
 
-    if (map_file) {
+    if (gfz_map_file) {
     
-      ssize_t n_bytes = fread(__gfz_map_ptr, GFZ_MAP_SIZE, 1, map_file);
+      ssize_t n_bytes = fread(__gfz_map_ptr, GFZ_MAP_SIZE, 1, gfz_map_file);
     
       if (n_bytes <= 0)
-        printf("[-] Error reading map. (%ld)\n", n_bytes);
+        printf("[-] Error reading gfz_map. (%ld)\n", n_bytes);
       else
-        printf("[+] Map read.");
+        printf("[+] gfz_map read.");
 
       /* When a custom map is present, make the whole process
          memory writable, just as if we were fuzzing. */
@@ -275,12 +311,44 @@ static void __gfz_start_forkserver(void) {
       for (i = 0; i < (GFZ_MAP_SIZE / 2); ++i) {
         __gfz_map_ptr[i] = 1;
       }
-
+      
       /* Don't change rwx of the process memory in this case
          so that the instrumentation is fairly transparent
          and the program can still be used normally when
          NOT fuzzing, or testing with a custom map. */
 
+    }
+
+    FILE *gfz_bnc_file = fopen("gfz_bnc", "rb");
+
+    if (gfz_bnc_file) {
+
+      ssize_t n_bytes = fread(__gfz_branch_ptr, GFZ_BNC_MAP_SIZE, 1, gfz_bnc_file);
+    
+      if (n_bytes <= 0)
+        printf("[-] Error reading gfz_bnc. (%ld)\n", n_bytes);
+      else
+        printf("[+] gfz_bnc read.");
+
+      /* When a custom map is present, make the whole process
+         memory writable, just as if we were fuzzing. */
+
+      if (!gfz_map_file)
+        __gfz_make_writable();
+
+    } else {
+
+      int i = 0;
+
+      for (i = 0; i < GFZ_BNC_MAP_SIZE; ++i) {
+        __gfz_branch_ptr[i] = 1;
+      }
+
+      /* Don't change rwx of the process memory in this case
+         so that the instrumentation is fairly transparent
+         and the program can still be used normally when
+         NOT fuzzing, or testing with a custom map. */
+    
     }
 
     /* End code for instrumentation testing */
@@ -289,12 +357,14 @@ static void __gfz_start_forkserver(void) {
 
   __gfz_make_writable();
 
-  /* Send __gfz_num_locs to the fuzzer. */
+  /* Send __gfz_data to the fuzzer. */
 
-  __gfz_num_locs = (u32) &__gfz_num_locs_defsym; // ugly hack
+  __gfz_data.gfz_map_locs = (u32) &__gfz_map_locs_defsym;
+  __gfz_data.gfz_branch_locs = (u32) &__gfz_branch_locs_defsym;
+  __gfz_data.gfz_total_bbs = (u32) &__gfz_total_bbs_defsym;
 
-  if (write(FORKSRV_FD + 1, &__gfz_num_locs, sizeof(__gfz_num_locs)) != sizeof(__gfz_num_locs))
-    FATAL("Unable to write __gfz_num_locs to the fuzzer! (did you activate gFuzz mode?)");
+  if (write(FORKSRV_FD + 1, &__gfz_data, sizeof(struct gfz_data)) != sizeof(struct gfz_data))
+    FATAL("Unable to write __gfz_data to the fuzzer! (did you activate gFuzz mode?)");
 
   /* Forkserver loop. */
 

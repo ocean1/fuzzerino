@@ -60,14 +60,16 @@ int main(int argc, char** argv) {
          "instrumentation."
 
          "The purpose of this wrapper is to read the number of instrumented locations"
-         "from %s, add a flag that defines a symbol containing"
+         "and basic blocks from %s, add a flag that defines a symbol containing"
          "that value in the linked binary, and calls the real linker.", GFZ_IDFILE);
 
     exit(1);
 
   }
 
-  u32 __gfz_num_locs;
+  u32 __gfz_map_locs;
+  u32 __gfz_branch_locs;
+  u32 __gfz_total_bbs;
 
   cc_params = ck_alloc((argc + 128) * sizeof(u8*));
   cc_params[0] = "ld";
@@ -82,17 +84,37 @@ int main(int argc, char** argv) {
   int idfd = open(GFZ_IDFILE, O_CREAT | O_RDWR,
                   S_IRUSR | S_IWUSR | S_IRGRP);
 
-  if (read(idfd, &__gfz_num_locs, sizeof(__gfz_num_locs)) != sizeof(__gfz_num_locs))
+  if (read(idfd, &__gfz_map_locs, sizeof(__gfz_map_locs)) != sizeof(__gfz_map_locs))
     FATAL("[-] Cannot read number of locations!");
+
+  if (read(idfd, &__gfz_branch_locs, sizeof(__gfz_branch_locs)) != sizeof(__gfz_branch_locs))
+    FATAL("[-] Cannot read number of basic blocks!");
+
+  if (read(idfd, &__gfz_total_bbs, sizeof(__gfz_total_bbs)) != sizeof(__gfz_total_bbs))
+    FATAL("[-] Cannot read number of basic blocks!");
 
   close(idfd);
 
   /* Define symbol */
 
   cc_params[cc_par_cnt++] = "--defsym";
-  cc_params[cc_par_cnt++] = alloc_printf("__gfz_num_locs_defsym=%u", __gfz_num_locs);
+  cc_params[cc_par_cnt++] = alloc_printf("__gfz_map_locs_defsym=%u", __gfz_map_locs);
 
-  OKF("Read %u instrumented locations from %s.", __gfz_num_locs, GFZ_IDFILE);
+  OKF("Read %u instrumented locations from %s.", __gfz_map_locs, GFZ_IDFILE);
+
+  /* Define symbol */
+
+  cc_params[cc_par_cnt++] = "--defsym";
+  cc_params[cc_par_cnt++] = alloc_printf("__gfz_branch_locs_defsym=%u", __gfz_branch_locs);
+
+  OKF("Read %u instrumented branches from %s.", __gfz_branch_locs, GFZ_IDFILE);
+
+  /* Define symbol */
+
+  cc_params[cc_par_cnt++] = "--defsym";
+  cc_params[cc_par_cnt++] = alloc_printf("__gfz_total_bbs_defsym=%u", __gfz_total_bbs);
+
+  OKF("Read %u basic blocks from %s.", __gfz_total_bbs, GFZ_IDFILE);
 
   /* Execute real linker */
 

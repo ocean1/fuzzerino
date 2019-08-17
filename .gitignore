@@ -83,6 +83,9 @@ xray-log.*
 
 map_key.txt
 afl-fuzz.log
+
+gfz_map
+gfz_bnc
 gfz_ban_map
 
 irons/out

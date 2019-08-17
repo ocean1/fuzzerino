@@ -78,7 +78,21 @@ public:
   // }
 
 private:
-  uint32_t inst_id = 0;
+  /* Instrumented location ID and basic block ID.
+     
+     These are important and will be embedded in the final instrumented binary
+     by the linker, in order to send them to the fuzzer.
+
+     - map_locs is useful to know how many locations have been instrumented.
+     - branch_locs is useful to know how many branches have been instrumented.
+     - total_bbs is useful to know the total number of basic blocks and measure
+       the percentage of generator coverage. */
+  uint32_t map_locs = 0;
+  uint32_t branch_locs = 0;
+  uint32_t total_bbs = 0;
+
+  /* Total number of instructions and number of instruction selected for instrumentation.
+     Only for informative purposes. */
   uint32_t tot = 0;
   uint32_t sel = 0;
   
@@ -86,15 +100,17 @@ private:
 
   DataLayout *DL;
 
-  GlobalVariable *GFZMapPtr, *GFZRandPtr, *GFZRandIdx, *GFZPtrBuf;
+  GlobalVariable *GFZMapPtr, *GFZBranchPtr, *GFZPtrBuf, *GFZCovMap,
+                 *GFZRandPtr, *GFZRandIdx;
 
   Value* emitInstrumentation(LLVMContext &C, IRBuilder<> &IRB,
                              Value *Original, Value *MutationFlags,
                              bool isGEP = false);
   void instrumentOperands(Instruction *I,
                           Type::TypeID TyID = Type::TypeID::IntegerTyID);
-  Instruction* instrumentResult(Instruction *I,
-                                Type::TypeID TyID = Type::TypeID::IntegerTyID);
+  void instrumentBranch(Instruction *I);
+  void instrumentResult(Instruction *I,
+                        Type::TypeID TyID = Type::TypeID::IntegerTyID);
 };
 
 } // namespace
@@ -489,12 +505,6 @@ void AFLCoverage::instrumentOperands(Instruction *I, Type::TypeID TyID) {
 
   IntegerType *Int16Ty = IntegerType::getInt16Ty(C);
   IntegerType *Int32Ty = IntegerType::getInt32Ty(C);
-
-  // for each op, if type is Int (will need to add also for floats, and
-  // other types....) take OI as Value, push fuzzed val, substitute it
-  // val = insertFuzzVal(I, OI);
-  // updateOp(OI, val);
-  // Value *inval = dyn_cast<Value*>(OI);
   
   User::op_iterator OI, OE;
 
@@ -551,8 +561,8 @@ void AFLCoverage::instrumentOperands(Instruction *I, Type::TypeID TyID) {
 
     IRBuilder<> IRB(I);
 
-    // Use inst_id to reference the fuzzable location in __gfz_map_area
-    ConstantInt *InstID = ConstantInt::get(Int32Ty, inst_id);
+    // Use map_locs to reference the fuzzable location in __gfz_map_area
+    ConstantInt *InstID = ConstantInt::get(Int32Ty, map_locs);
 
     LoadInst *MapPtr = IRB.CreateLoad(GFZMapPtr);
     Value *MapPtrIdx = IRB.CreateGEP(MapPtr, InstID);
@@ -575,7 +585,7 @@ void AFLCoverage::instrumentOperands(Instruction *I, Type::TypeID TyID) {
     IRB.SetInsertPoint(CheckStatus);
     FuzzedVal = emitInstrumentation(C, IRB, Op, MutationFlags, isGEP);
 
-    if (FuzzedVal != NULL) {
+    if (FuzzedVal != NULL) { // FuzzedVal is NULL only for ptr instrumentation
       // Common block - executed anyway
       IRB.SetInsertPoint(I);
       PHINode *PHI = IRB.CreatePHI(OT, 2);
@@ -591,7 +601,7 @@ void AFLCoverage::instrumentOperands(Instruction *I, Type::TypeID TyID) {
       updateOperand(I, op_idx, dyn_cast<Instruction>(FuzzedVal));
     }
 
-    inst_id++;
+    map_locs++;
 
     /*
     // TODO: Custom mutations for each type of instruction?
@@ -614,7 +624,7 @@ void AFLCoverage::instrumentOperands(Instruction *I, Type::TypeID TyID) {
 
     /* BEGIN debugging stuff */
     
-    fprintf(map_key_fd, "\n%d:\t%s", inst_id-1, I->getOpcodeName());
+    fprintf(map_key_fd, "\n%d:\t%s", map_locs-1, I->getOpcodeName());
 
     //this sometimes crashes for nullptr dereference...
     //if ( isa<CallInst>(I) )
@@ -632,7 +642,83 @@ void AFLCoverage::instrumentOperands(Instruction *I, Type::TypeID TyID) {
   } // end op loop
 } // end instrumentOperands
 
-Instruction* AFLCoverage::instrumentResult(Instruction *I, Type::TypeID TyID) {
+void AFLCoverage::instrumentBranch(Instruction *I) {
+
+  Function *F = I->getFunction();
+  Module *M = F->getParent();
+  LLVMContext &C = M->getContext();
+
+  IntegerType *Int8Ty = IntegerType::getInt8Ty(C);
+  IntegerType *Int32Ty = IntegerType::getInt32Ty(C);
+
+  if ( !isa<BranchInst>(I) )
+    return;
+
+  BranchInst *BI = dyn_cast<BranchInst>(I);
+
+  if (!BI->isConditional())
+    return;
+
+  Value *Cond = BI->getCondition();
+  Type *CT = Cond->getType();
+
+  IRBuilder<> IRB(BI);
+
+  // Use branch_locs to reference the location in the map
+  ConstantInt *InstID = ConstantInt::get(Int32Ty, branch_locs);
+
+  LoadInst *MapPtr = IRB.CreateLoad(GFZBranchPtr);
+  Value *MapPtrIdx = IRB.CreateGEP(MapPtr, InstID);
+  
+  // MutationFlags tell us which mutations should be applied
+  // to this location. Each bit is tied to a different mutation.
+  //
+  // See documentation for details.
+  Value *MutationFlags = IRB.CreateLoad(MapPtrIdx);
+
+  // if ( MutationFlags != 1 )
+  Value *InstEnabled = IRB.CreateICmpNE(MutationFlags, ConstantInt::get(Int8Ty, 1));
+
+  TerminatorInst *CheckStatus = SplitBlockAndInsertIfThen(InstEnabled, BI, false,
+          MDBuilder(C).createBranchWeights(1, (1<<20)-1));
+
+  // "then" block - executed if location is active
+  IRB.SetInsertPoint(CheckStatus);
+  
+  Value *NotCond = IRB.CreateNot(Cond);
+
+  // Common block - executed anyway
+  IRB.SetInsertPoint(BI);
+  PHINode *PHI = IRB.CreatePHI(CT, 2);
+  
+  BasicBlock *LoadBlock = MapPtr->getParent();
+  PHI->addIncoming(Cond, LoadBlock);
+  
+  BasicBlock *ThenBlock = dyn_cast<Instruction>(NotCond)->getParent();
+  PHI->addIncoming(NotCond, ThenBlock);
+
+  BI->setCondition(PHI);
+
+  branch_locs++;
+
+  /* BEGIN debugging stuff */
+  
+  fprintf(map_key_fd, "\n%d:\t%s", branch_locs-1, I->getOpcodeName());
+
+  //this sometimes crashes for nullptr dereference...
+  //if ( isa<CallInst>(I) )
+  //  fprintf(map_key_fd, " (%s)", dyn_cast<CallInst>(I)->getCalledFunction()->getName().str().c_str());
+
+  std::string str;
+  raw_string_ostream rso(str);
+  CT->print(rso);
+  fprintf(map_key_fd, ", type %s", rso.str().c_str());
+
+  /* END debugging stuff */
+
+} // end instrumentBranch
+
+void AFLCoverage::instrumentResult(Instruction *I, Type::TypeID TyID) {
 
   Function *F = I->getFunction();
   Module *M = F->getParent();
@@ -644,29 +730,29 @@ Instruction* AFLCoverage::instrumentResult(Instruction *I, Type::TypeID TyID) {
   Type *IT = I->getType();
   
   if ( IT->getTypeID() != TyID )
-    return NULL;
+    return;
 
   Instruction *NI = I->getNextNode();
 
   if (!NI)
-    return NULL;
+    return;
 
   // Don't instrument results of instructions that are not used anywhere...
   if ( I->getNumUses() == 0 )
-    return NULL;
+    return;
 
   // If the pointer is not 'eligible' for instrumentation,
   // skip emitting the IR for loading from gfz map, etc...
   if ( IT->isPointerTy() && !checkPointer(I) )
-    return NULL;
+    return;
 
   IRBuilder<> IRB(NI);
 
   UnreachableInst *FakeVal = IRB.CreateUnreachable();
   I->replaceAllUsesWith(FakeVal);
 
-  // Use inst_id to reference the fuzzable location in __gfz_map_area
-  ConstantInt *InstID = ConstantInt::get(Int32Ty, inst_id);
+  // Use map_locs to reference the location in the map
+  ConstantInt *InstID = ConstantInt::get(Int32Ty, map_locs);
 
   LoadInst *MapPtr = IRB.CreateLoad(GFZMapPtr);
   Value *MapPtrIdx = IRB.CreateGEP(MapPtr, InstID);
@@ -702,11 +788,11 @@ Instruction* AFLCoverage::instrumentResult(Instruction *I, Type::TypeID TyID) {
   FakeVal->replaceAllUsesWith(PHI);
   FakeVal->eraseFromParent();
 
-  inst_id++;
+  map_locs++;
 
   /* BEGIN debugging stuff */
   
-  fprintf(map_key_fd, "\n%d:\t%s", inst_id-1, I->getOpcodeName());
+  fprintf(map_key_fd, "\n%d:\t%s", map_locs-1, I->getOpcodeName());
 
   //this sometimes crashes for nullptr dereference...
   //if ( isa<CallInst>(I) )
@@ -719,8 +805,10 @@ Instruction* AFLCoverage::instrumentResult(Instruction *I, Type::TypeID TyID) {
 
   /* END debugging stuff */
 
-  return NI;
+  return;
 } // end instrumentResult
+
+
 
 bool AFLCoverage::runOnModule(Module &M) {
 
@@ -740,17 +828,23 @@ bool AFLCoverage::runOnModule(Module &M) {
   GFZMapPtr = new GlobalVariable(M, PointerType::get(Int16Ty, 0), false,
                                  GlobalValue::ExternalLinkage, 0, "__gfz_map_ptr");
 
+  GFZBranchPtr = new GlobalVariable(M, PointerType::get(Int8Ty, 0), false,
+                                    GlobalValue::ExternalLinkage, 0, "__gfz_branch_ptr");
+
+  GFZPtrBuf = new GlobalVariable(M, PointerType::get(Int8Ty, 0), false,
+                                 GlobalValue::ExternalLinkage, 0, "__gfz_ptr_buf");
+
+  GFZCovMap = new GlobalVariable(M, PointerType::get(Int8Ty, 0), false,
+                                 GlobalValue::ExternalLinkage, 0, "__gfz_cov_map");
+
   GFZRandPtr = new GlobalVariable(M, PointerType::get(Int8Ty, 0), false,
                                   GlobalValue::ExternalLinkage, 0, "__gfz_rand_area");
 
   GFZRandIdx = new GlobalVariable(M, Int32Ty, false,
                                   GlobalValue::ExternalLinkage, 0, "__gfz_rand_idx");
 
-  GFZPtrBuf = new GlobalVariable(M, PointerType::get(Int8Ty, 0), false,
-                                 GlobalValue::ExternalLinkage, 0, "__gfz_ptr_buf");
-
   StringSet<> WhitelistSet;
-  SmallVector<Instruction*, 64> toInstrumentOperands, toInstrumentResult;
+  SmallVector<Instruction*, 64> toInstrumentBranches, toInstrumentOperands, toInstrumentResult;
 
   // Show a banner
 
@@ -797,12 +891,12 @@ bool AFLCoverage::runOnModule(Module &M) {
 
   // Instrument all the things!
 
-  int inst_fun = 0;
+  int inst_fun = 0;  /* Total number of instrumented functions. Only for informative purposes. */
   
-  int mod_tot = 0;
-  int mod_sel = 0;
-  int fun_tot = 0;
-  int fun_sel = 0;
+  int mod_tot = 0;   /* Total number of instructions in the module */
+  int mod_sel = 0;   /* Number of instructions in the module that are selected for instrumentation */
+  int fun_tot = 0;   /* Total number of instructions in the function */
+  int fun_sel = 0;   /* Number of instructions in the function that are selected for instrumentation */
 
   // ugly hack, don't want to implement an LTO pass,
   // keep track of current ID in a locked file
@@ -810,8 +904,14 @@ bool AFLCoverage::runOnModule(Module &M) {
   fcntl(idfd, F_SETLKW, &lock);
   lseek(idfd, 0, SEEK_SET);
 
-  if (read(idfd, &inst_id, sizeof(inst_id)) != sizeof(inst_id))
-    inst_id = 0;
+  if (read(idfd, &map_locs, sizeof(map_locs)) != sizeof(map_locs))
+    map_locs = 0;
+
+  if (read(idfd, &branch_locs, sizeof(branch_locs)) != sizeof(branch_locs))
+    branch_locs = 0;
+
+  if (read(idfd, &total_bbs, sizeof(total_bbs)) != sizeof(total_bbs))
+    total_bbs = 0;
 
   if (read(idfd, &tot, sizeof(tot)) != sizeof(tot))
     tot = 0;
@@ -821,12 +921,14 @@ bool AFLCoverage::runOnModule(Module &M) {
 
   SAYF("\n=== Module %s\n", M.getName().str().c_str());
 
+  bool used_in_branch = false;
+
   for (auto &F : M) { // function loop
     
     fun_tot = 0;
     fun_sel = 0;
 
-    if (whitelist && (WhitelistSet.find(F.getName()) == WhitelistSet.end()))
+    if (WhitelistSet.find(F.getName()) == WhitelistSet.end())
       continue;
 
     if (F.isIntrinsic())
@@ -841,7 +943,24 @@ bool AFLCoverage::runOnModule(Module &M) {
 
         fun_tot++;
 
-        // 'select': only instrument result
+        if ( isa<BranchInst>(I) ) {
+          toInstrumentBranches.push_back(&I);
+          fun_sel++;
+          continue;
+        }
+
+        // is it used in a branch instruction?
+        used_in_branch = false; 
+        for ( auto U : I.users() ) {
+          if ( isa<BranchInst>(U) ) {
+            used_in_branch = true;
+            break;
+          }
+        }
+        if (used_in_branch)
+          continue;
+
+        // only instrument result
         if ( isa<SelectInst>(I) || isa<CmpInst>(I) ) {
           toInstrumentResult.push_back(&I);
           fun_sel++;
@@ -849,7 +968,7 @@ bool AFLCoverage::runOnModule(Module &M) {
         }
 
         // instrument blacklist
-        if ( isa<BranchInst>(I) || isa<SwitchInst>(I) ||
+        if ( isa<IntrinsicInst>(I) || isa<SwitchInst>(I) ||
              isa<IndirectBrInst>(I) || isa<CatchSwitchInst>(I) ||
              isa<CatchReturnInst>(I) || isa<CleanupReturnInst>(I) ||
              isa<UnreachableInst>(I) || isa<ShuffleVectorInst>(I) ||
@@ -857,7 +976,8 @@ bool AFLCoverage::runOnModule(Module &M) {
              isa<CastInst>(I) || isa<PHINode>(I) ||
              isa<VAArgInst>(I) || isa<LandingPadInst>(I) ||
              isa<CatchPadInst>(I) || isa<CleanupPadInst>(I) ||
-             isa<IntrinsicInst>(I) ) {
+             isa<BranchInst>(I) || isa<SelectInst>(I) ||
+             isa<CmpInst>(I) ) {
           continue;
         }
 
@@ -880,6 +1000,20 @@ bool AFLCoverage::runOnModule(Module &M) {
         toInstrumentResult.push_back(&I);
 
       } // end instruction loop
+
+      /* Emit basic block coverage instrumentation
+
+         __gfz_cov_map[total_bbs] = 1; */
+
+      BasicBlock::iterator IP = BB.getFirstInsertionPt();
+      IRBuilder<> IRB(&(*IP));
+
+      LoadInst *CovMap = IRB.CreateLoad(GFZCovMap);
+      Value *CovMapIdx = IRB.CreateGEP(CovMap, ConstantInt::get(Int32Ty, total_bbs));
+      IRB.CreateStore(ConstantInt::get(Int8Ty, 1), CovMapIdx);
+
+      total_bbs++;
+
     } // end basic block loop
 
     if (fun_sel) {
@@ -906,10 +1040,18 @@ bool AFLCoverage::runOnModule(Module &M) {
   tot += mod_tot;
   sel += mod_sel;
 
-  OKF("Total: selected %u/%u instructions.", sel, tot);
+  OKF("Total: selected %u/%u instructions.\n"
+      "           %u basic blocks.", sel, tot, total_bbs);
 
   // Pass the selected instructions to the 
   // corresponding instrumenting functions
+
+  fprintf(map_key_fd, "\n\n--- branch_locs");
+
+  for (auto I: toInstrumentBranches)
+    instrumentBranch(I);
+
+  fprintf(map_key_fd, "\n\n--- map_locs");
 
   std::vector<Type::TypeID> TyIDs = { Type::TypeID::IntegerTyID,
                                       Type::TypeID::HalfTyID,
@@ -930,14 +1072,20 @@ bool AFLCoverage::runOnModule(Module &M) {
   
   }
 
-  OKF("Total: instrumented %u locations.", inst_id);
+  OKF("Total: instrumented %u locations and %u branches.", map_locs, branch_locs);
 
   // Write info that needs to be maintained between modules to GFZ_IDFILE
 
   lseek(idfd, 0, SEEK_SET);
   
-  if (write(idfd, &inst_id, sizeof(inst_id)) != sizeof(inst_id))
-    FATAL("Got a problem while writing current instruction id on %s", GFZ_IDFILE);
+  if (write(idfd, &map_locs, sizeof(map_locs)) != sizeof(map_locs))
+    FATAL("Got a problem while writing map_locs on %s", GFZ_IDFILE);
+
+  if (write(idfd, &branch_locs, sizeof(branch_locs)) != sizeof(branch_locs))
+    FATAL("Got a problem while writing branch_locs on %s", GFZ_IDFILE);
+
+  if (write(idfd, &total_bbs, sizeof(total_bbs)) != sizeof(total_bbs))
+    FATAL("Got a problem while writing total_bbs on %s", GFZ_IDFILE);
 
   if (write(idfd, &tot, sizeof(tot)) != sizeof(tot))
     FATAL("Got a problem while writing total instructions on %s", GFZ_IDFILE);
