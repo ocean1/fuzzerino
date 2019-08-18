@@ -1,6 +1,6 @@
 PACKAGE    = gif2apng
-CC         = GFZ_WHITE_LIST=1 ../../afl/bin/gfz-clang-fast
-CXX        = GFZ_WHITE_LIST=1 ../../afl/bin/gfz-clang-fast
+CC         = ../../afl/bin/gfz-clang-fast
+CXX        = ../../afl/bin/gfz-clang-fast
 SRC_DIRS   = . 7z zopfli
 CFLAGS     = -Wall -pedantic -g
 #CFLAGS     += -fsanitize=address

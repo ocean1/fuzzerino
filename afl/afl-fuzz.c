@@ -113,6 +113,7 @@ EXP_ST u8 *in_dir,                    /* Input directory with test cases  */
           *ban_file,                  /* Banned locs map file (gFuzz mode)*/
           *gen_file,                  /* Generated file (gFuzz mode)      */
           *gen_dir,                   /* Generated directory (gFuzz mode) */
+          *target_cmin,               /* afl-cmin target binary           */
           *out_dir,                   /* Working & output directory       */
           *sync_dir,                  /* Synchronization directory        */
           *sync_id,                   /* Fuzzer ID                        */
@@ -221,7 +222,9 @@ EXP_ST u64 total_crashes,             /* Total number of crashes          */
            bytes_trim_in,             /* Bytes coming into the trimmer    */
            bytes_trim_out,            /* Bytes coming outa the trimmer    */
            blocks_eff_total,          /* Blocks subject to effector maps  */
-           blocks_eff_select;         /* Blocks selected as fuzzable      */
+           blocks_eff_select,         /* Blocks selected as fuzzable      */
+           total_gen,                 /* Total number of generated seeds  */
+           unique_gen;                /* Unique seeds for afl-cmin        */
 
 static u32 subseq_tmouts;             /* Number of timeouts in a row      */
 
@@ -4341,7 +4344,15 @@ static void show_stats(void) {
   sprintf(tmp, "%s", DI(total_tmouts));
   SAYF(bSTG " " bSTOP "  total tmouts : " cRST "%-22s " bSTG bV "\n", tmp);
 
-  SAYF(bV bSTOP "%-78s" bSTG bV "\n", "");
+  // SAYF(bV bSTOP "%-78s" bSTG bV "\n", "");
+
+  SAYF(bV bSTOP "   generated : " cRST "%-21s " bSTG " " bSTOP, DI(total_gen));
+
+  if (target_cmin) {
+    SAYF("  unique seeds : %s%-22s " bSTG bV "\n", cRST, DI(unique_gen));    
+  } else {
+    SAYF("%-40s" bSTG bV "\n", "");
+  }    
 
   /* Aaaalmost there... hold on! */
 
@@ -7915,6 +7926,48 @@ char *dirname (char *path)
   return path;
 }
 
+/* More hacks! */
+
+void afl_cmin() {
+
+  u8 *min_dir = alloc_printf("%s_min", gen_dir);
+
+  /* Execute afl-cmin */
+
+  u8 *cmd = alloc_printf("env -i AFL_PATH=%s %s/afl-cmin -i %s -o %s -- %s >> /dev/null 2>> /dev/null",
+                         getenv("AFL_PATH"), getenv("AFL_PATH"), gen_dir, min_dir, target_cmin);
+  system(cmd);
+
+  /* Delete generated dir */
+
+  u8 *rm_rf_gen_dir = alloc_printf("rm -rf %s", gen_dir);
+  system(rm_rf_gen_dir);
+
+  /* Rename min dir to generated dir */
+
+  rename(min_dir, gen_dir);
+  
+  ck_free(min_dir);
+  ck_free(cmd);
+  ck_free(rm_rf_gen_dir);
+
+  /* Count number of unique seeds */
+
+  struct dirent *dp;
+  DIR *dfd = opendir(gen_dir);
+
+  u64 count = 0;
+  
+  while (( dp = readdir(dfd) ))
+    if ( dp->d_type != DT_DIR )
+      ++count;
+
+  closedir(dfd);
+
+  unique_gen = count;
+
+}
+
 #ifndef AFL_LIB
 
 /* Main entry point */
@@ -7941,7 +7994,7 @@ int main(int argc, char** argv) {
   gettimeofday(&tv, &tz);
   srandom(tv.tv_sec ^ tv.tv_usec ^ getpid());
 
-  while ((opt = getopt(argc, argv, "+i:o:f:m:t:T:dnCB:S:M:x:Q:Gg:b:")) > 0)
+  while ((opt = getopt(argc, argv, "+i:o:f:m:t:T:dnCB:S:M:x:Q:Gg:b:c:")) > 0)
 
     switch (opt) {
 
@@ -8128,6 +8181,12 @@ int main(int argc, char** argv) {
 
         if (ban_file) FATAL("Multiple -b options not supported");
         ban_file = optarg;
+        break;
+
+      case 'c': /* afl-cmin target binary */
+
+        if (target_cmin) FATAL("Multiple -c options not supported");
+        target_cmin = optarg;
         break;
 
       default:
@@ -8325,7 +8384,8 @@ stop_fuzzing:
   }
 
   fclose(plot_file);
-  if (!gfuzz_mode){
+  
+  if (!gfuzz_mode) {
     destroy_queue();
     destroy_extras();
   }
@@ -8345,8 +8405,33 @@ gfuzz:
   numiter = getenv("GFZ_NUM_ITER");
   maxi = (numiter == NULL) ? 500 : atoi(numiter);
   u32 i = 0;
+  u32 generated = 0;
   u8 fault;
   struct stat st;
+
+  if (target_cmin) {
+
+    /* 
+       If AFL_PATH is not set, try setting it to ../../afl/bin
+       since most generator scripts are ran from
+       <repository_root>/generators/<generator_name>
+    */
+
+    if(!getenv("AFL_PATH"))
+      setenv("AFL_PATH", "../../afl/bin", 1);
+
+    /* Check that afl-cmin and afl-showmap are found in AFL_PATH. */
+
+    u8 *cmin = alloc_printf("%s/afl-cmin", getenv("AFL_PATH"));
+    u8 *showmap = alloc_printf("%s/afl-showmap", getenv("AFL_PATH"));
+
+    if (access(cmin, X_OK) || access(showmap, X_OK))
+      FATAL("Unable to find 'afl-cmin' or 'afl-showmap'. Please set AFL_PATH.");
+
+    ck_free(cmin);
+    ck_free(showmap);
+
+  }
 
   if (gen_file) {
     /* Make generated dirs in the same file system where
@@ -8424,7 +8509,7 @@ gfuzz:
 
           sprintf(tmp, "dry %u/%u", branch, loc);
           
-          for ( mut = 0; mut < GFZ_BNC_DRY_EXECS; ++mut ) {
+          for ( mut = 0; mut < GFZ_DRY_BRANCH_EXECS; ++mut ) {
 
             show_stats();
 
@@ -8439,6 +8524,29 @@ gfuzz:
                 __gfz_covered += __gfz_cov_map[bb];
             }
 
+            if ( fault == FAULT_NONE ) {
+              /* Do not save files generated during dry run.
+                 The only purpose of the dry run is to have a better
+                 havoc phase afterwards. */
+
+              if ( gen_file && !stat(gen_file, &st) && st.st_size != 0 ) {
+                // Save output in gen_dir
+                u8 *fn = alloc_printf("%s/dry_%u_%u_%u", gen_dir, branch, loc, __gfz_map_ptr[loc]);
+                rename(gen_file, fn);
+                ck_free(fn);
+                ++generated;
+                ++total_gen;
+              }
+            }
+
+            if (unlikely(target_cmin && (generated > GFZ_MINIMIZE_EVERY))) {
+              sprintf(tmp, "minimizing");
+              show_stats();
+              afl_cmin();
+              show_stats();
+              generated = 0;
+            }
+
             switch (fault) {
               case FAULT_TMOUT:
                 ++total_tmouts;
@@ -8449,6 +8557,9 @@ gfuzz:
                 __gfz_ban_ptr[loc]++;
                 break;
             }
+
+            if (gen_file)
+              remove(gen_file);
 
           } // end mutation loop
 
@@ -8461,7 +8572,7 @@ gfuzz:
       } // end branch loop
 
       for ( loc = 0; loc < __gfz_map_locs; ++loc ) {
-        if ( __gfz_ban_ptr[loc] / (__gfz_branch_locs * GFZ_BNC_DRY_EXECS) > GFZ_BAN_RATIO ) {
+        if ( __gfz_ban_ptr[loc] / (__gfz_branch_locs * GFZ_DRY_BRANCH_EXECS) > GFZ_BAN_RATIO ) {
           __gfz_ban_ptr[loc] = 1;
           __gfz_ban_locs++;
         } else {
@@ -8516,7 +8627,7 @@ gfuzz:
     // actually it's a nice trade-off: sooner or later even the
     // "successful" mutations will be overwritten and change.
 
-    if (branch_execs > 1000) {
+    if (branch_execs > GFZ_HAVOC_BRANCH_EXECS) {
       if (UR(2)) {
         __gfz_branch_ptr[branch] = 1;
       }
@@ -8562,13 +8673,23 @@ gfuzz:
       u8 *fn = alloc_printf("%s/%d", gen_dir, i);
       rename(gen_file, fn);
       ck_free(fn);
-    
+      ++generated;
+      ++total_gen;
+
     } else {
       
       /* Reset location */
 
       __gfz_map_ptr[loc] = GFZ_KEEP_ORIGINAL;
 
+    }
+
+    if (unlikely(target_cmin && (generated > GFZ_MINIMIZE_EVERY))) {
+      stage_name = "minimizing";
+      show_stats();
+      afl_cmin();
+      stage_name = "havoc";
+      generated = 0;
     }
 
     switch (fault) {

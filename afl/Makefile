@@ -100,6 +100,7 @@ all_done: test_build
 	@echo "[+] All done! Be sure to review README - it's pretty short and useful."
 	@if [ "`uname`" = "Darwin" ]; then printf "\nWARNING: Fuzzing on MacOS X is slow because of the unusually high overhead of\nfork() on this OS. Consider using Linux or *BSD. You can also use VirtualBox\n(virtualbox.org) to put AFL inside a Linux or *BSD VM.\n\n"; fi
 	@! tty <&1 >/dev/null || printf "\033[0;30mNOTE: If you can read this, your terminal probably uses white background.\nThis will make the UI hard to read. See docs/status_screen.txt for advice.\033[0m\n" 2>/dev/null
+		cp afl-cmin $(OUTDIR)
 
 .NOTPARALLEL: clean
 
