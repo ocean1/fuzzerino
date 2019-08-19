@@ -401,7 +401,7 @@
 /* Random stuff */
 
 #define GFZ_COV_REFRESH_RATE    10000
-#define GFZ_MINIMIZE_EVERY      500
+#define GFZ_MINIMIZE_EVERY      1000
 #define GFZ_HAVOC_BRANCH_EXECS  1000
 
 /* Don't touch this! */
