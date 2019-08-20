@@ -395,7 +395,7 @@
 /* Dry run stuff - TODO: tune these values */
 
 #define GFZ_BAN_RATIO           0.3
-#define GFZ_BAN_TMOUT_SEC       30
+#define GFZ_DRY_TMOUT_SEC       30
 #define GFZ_DRY_BRANCH_EXECS    100
 
 /* Random stuff */

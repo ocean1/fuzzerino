@@ -8497,6 +8497,8 @@ gfuzz:
       u8 tmp[21];
       stage_name = tmp;
 
+      u64 slow_since = 0;
+
       u32 branch = 0;
       u32 loc = 0;
       u32 mut = 0;
@@ -8560,6 +8562,20 @@ gfuzz:
 
             if (gen_file)
               remove(gen_file);
+
+            /* The generation is consistently slow... */
+
+            if ( avg_exec < 100 ) {
+              if (!slow_since) {
+                slow_since = get_cur_time();
+              } else if ( get_cur_time() > (slow_since + (GFZ_DRY_TMOUT_SEC * 1000)) ) {
+                // Go on to next location
+                slow_since = 0;
+                break;
+              }
+            } else {
+              slow_since = 0;
+            }
 
           } // end mutation loop
 
