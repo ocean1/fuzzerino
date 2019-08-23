@@ -67,7 +67,8 @@ int main(int argc, char** argv) {
 
   }
 
-  u32 __gfz_map_locs;
+  u32 __gfz_num_locs;
+  u32 __gfz_ptr_locs;
   u32 __gfz_branch_locs;
   u32 __gfz_total_bbs;
 
@@ -84,11 +85,14 @@ int main(int argc, char** argv) {
   int idfd = open(GFZ_IDFILE, O_CREAT | O_RDWR,
                   S_IRUSR | S_IWUSR | S_IRGRP);
 
-  if (read(idfd, &__gfz_map_locs, sizeof(__gfz_map_locs)) != sizeof(__gfz_map_locs))
-    FATAL("[-] Cannot read number of locations!");
+  if (read(idfd, &__gfz_num_locs, sizeof(__gfz_num_locs)) != sizeof(__gfz_num_locs))
+    FATAL("[-] Cannot read number of numeric locations!");
+
+  if (read(idfd, &__gfz_ptr_locs, sizeof(__gfz_ptr_locs)) != sizeof(__gfz_ptr_locs))
+    FATAL("[-] Cannot read number of pointer locations!");
 
   if (read(idfd, &__gfz_branch_locs, sizeof(__gfz_branch_locs)) != sizeof(__gfz_branch_locs))
-    FATAL("[-] Cannot read number of basic blocks!");
+    FATAL("[-] Cannot read number of branch locations!");
 
   if (read(idfd, &__gfz_total_bbs, sizeof(__gfz_total_bbs)) != sizeof(__gfz_total_bbs))
     FATAL("[-] Cannot read number of basic blocks!");
@@ -98,16 +102,23 @@ int main(int argc, char** argv) {
   /* Define symbol */
 
   cc_params[cc_par_cnt++] = "--defsym";
-  cc_params[cc_par_cnt++] = alloc_printf("__gfz_map_locs_defsym=%u", __gfz_map_locs);
+  cc_params[cc_par_cnt++] = alloc_printf("__gfz_num_locs_defsym=%u", __gfz_num_locs);
 
-  OKF("Read %u instrumented locations from %s.", __gfz_map_locs, GFZ_IDFILE);
+  OKF("Read %u numeric locations from %s.", __gfz_num_locs, GFZ_IDFILE);
+
+  /* Define symbol */
+
+  cc_params[cc_par_cnt++] = "--defsym";
+  cc_params[cc_par_cnt++] = alloc_printf("__gfz_ptr_locs_defsym=%u", __gfz_ptr_locs);
+
+  OKF("Read %u pointer locations from %s.", __gfz_ptr_locs, GFZ_IDFILE);
 
   /* Define symbol */
 
   cc_params[cc_par_cnt++] = "--defsym";
   cc_params[cc_par_cnt++] = alloc_printf("__gfz_branch_locs_defsym=%u", __gfz_branch_locs);
 
-  OKF("Read %u instrumented branches from %s.", __gfz_branch_locs, GFZ_IDFILE);
+  OKF("Read %u branch locations from %s.", __gfz_branch_locs, GFZ_IDFILE);
 
   /* Define symbol */
 

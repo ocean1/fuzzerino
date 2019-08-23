@@ -353,17 +353,23 @@
 
 /* Environment variable used to pass SHM ID to the called program. */
 
-#define GFZ_MAP_SHM_ENV_VAR     "__GFZ_MAP_SHM_ID"
-#define GFZ_BNC_SHM_ENV_VAR     "__GFZ_BNC_SHM_ID"
+#define GFZ_NUM_SHM_ENV_VAR     "__GFZ_NUM_SHM_ID"
 #define GFZ_PTR_SHM_ENV_VAR     "__GFZ_PTR_SHM_ID"
+#define GFZ_BNC_SHM_ENV_VAR     "__GFZ_BNC_SHM_ID"
+#define GFZ_BUF_SHM_ENV_VAR     "__GFZ_BUF_SHM_ID"
 #define GFZ_COV_SHM_ENV_VAR     "__GFZ_COV_SHM_ID"
 
-/* Size for map containing mutations (4MB) */
+/* Size for map containing numeric locations (2MB) */
 
-#define GFZ_MAP_SIZE_POW2       22
-#define GFZ_MAP_SIZE            (1 << GFZ_MAP_SIZE_POW2)
+#define GFZ_NUM_MAP_SIZE_POW2   21
+#define GFZ_NUM_MAP_SIZE        (1 << GFZ_NUM_MAP_SIZE_POW2)
 
-/* Size for map containing mutations (16k) */
+/* Size for map containing pointer locations (2MB) */
+
+#define GFZ_PTR_MAP_SIZE_POW2   21
+#define GFZ_PTR_MAP_SIZE        (1 << GFZ_PTR_MAP_SIZE_POW2)
+
+/* Size for map containing branch locations (16k) */
 
 #define GFZ_BNC_MAP_SIZE_POW2   14
 #define GFZ_BNC_MAP_SIZE        (1 << GFZ_BNC_MAP_SIZE_POW2)
@@ -392,19 +398,13 @@
 #define GFZ_OUTPUT_LIMIT_POW2   30
 #define GFZ_OUTPUT_LIMIT        (1 << GFZ_OUTPUT_LIMIT_POW2)
 
-/* Dry run stuff - TODO: tune these values */
-
-#define GFZ_BAN_RATIO           0.3
-#define GFZ_DRY_TMOUT_SEC       30
-#define GFZ_DRY_BRANCH_EXECS    100
-
 /* Random stuff */
 
-#define GFZ_COV_REFRESH_RATE    10000
-#define GFZ_MINIMIZE_EVERY      1000
+#define GFZ_UPDATE_SEC          5
+#define GFZ_MAX_DICT_ENTRIES    100
 #define GFZ_HAVOC_BRANCH_EXECS  1000
 
-/* Don't touch this! */
+/* Mutations */
 
 #define GFZ_N_MUTATIONS         13
 
@@ -445,5 +445,56 @@
 #define GFZ_STRIDE_LEN_5        8192   // 0010 0000 0000 0000
 #define GFZ_STRIDE_LEN_6        16384  // 0100 0000 0000 0000
 #define GFZ_STRIDE_LEN_7        32768  // 1000 0000 0000 0000
+
+/* Dry run stuff - TODO: tune these values */
+
+#define GFZ_BAN_RATIO           0.3
+#define GFZ_DRY_TMOUT_SEC       30
+
+/* Deterministic mutation combinations to use in dry run */
+
+#define GFZ_NUM_DRY_NUMERIC     24
+
+#define GFZ_DRY_NUMERIC \
+  GFZ_PLUS_ONE | GFZ_KEEP_ORIGINAL,                         \
+  GFZ_MINUS_ONE | GFZ_KEEP_ORIGINAL,                        \
+  GFZ_INTERESTING_1 | GFZ_KEEP_ORIGINAL,                    \
+  GFZ_INTERESTING_2 | GFZ_KEEP_ORIGINAL,                    \
+  GFZ_INTERESTING_3 | GFZ_KEEP_ORIGINAL,                    \
+  GFZ_INTERESTING_4 | GFZ_KEEP_ORIGINAL,                    \
+  GFZ_INTERESTING_5 | GFZ_KEEP_ORIGINAL,                    \
+  GFZ_INTERESTING_6 | GFZ_KEEP_ORIGINAL,                    \
+  GFZ_INTERESTING_7 | GFZ_KEEP_ORIGINAL,                    \
+  GFZ_INTERESTING_8 | GFZ_KEEP_ORIGINAL,                    \
+  GFZ_PLUS_MAX | GFZ_KEEP_ORIGINAL,                         \
+  GFZ_PLUS_RAND | GFZ_KEEP_ORIGINAL,                        \
+  GFZ_PLUS_ONE,                                             \
+  GFZ_MINUS_ONE,                                            \
+  GFZ_INTERESTING_1,                                        \
+  GFZ_INTERESTING_2,                                        \
+  GFZ_INTERESTING_3,                                        \
+  GFZ_INTERESTING_4,                                        \
+  GFZ_INTERESTING_5,                                        \
+  GFZ_INTERESTING_6,                                        \
+  GFZ_INTERESTING_7,                                        \
+  GFZ_INTERESTING_8,                                        \
+  GFZ_PLUS_MAX,                                             \
+  GFZ_PLUS_RAND
+
+#define GFZ_NUM_DRY_POINTERS    12
+
+#define GFZ_DRY_POINTERS \
+  GFZ_BITFLIP,                                              \
+  GFZ_BITFLIP | GFZ_LEN_1,                                  \
+  GFZ_BITFLIP | GFZ_LEN_2,                                  \
+  GFZ_BITFLIP | GFZ_LEN_1 | GFZ_LEN_2,                      \
+  GFZ_BITFLIP | GFZ_LEN_3,                                  \
+  GFZ_BITFLIP | GFZ_LEN_1 | GFZ_LEN_3,                      \
+  GFZ_BITFLIP | GFZ_LEN_2 | GFZ_LEN_3,                      \
+  GFZ_BITFLIP | GFZ_LEN_1 | GFZ_LEN_2 | GFZ_LEN_3,          \
+  GFZ_BYTEFLIP,                                             \
+  GFZ_BYTEFLIP | GFZ_LEN_1,                                 \
+  GFZ_BYTEFLIP | GFZ_LEN_2,                                 \
+  GFZ_BYTEFLIP | GFZ_LEN_1 | GFZ_LEN_2
 
 #endif /* ! _HAVE_CONFIG_H */

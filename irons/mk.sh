@@ -32,7 +32,7 @@ fi
 # Emit LLVM IR of test program with instrumentation
 rm -f ./map_key.txt
 rm -f /dev/shm/gfzidfile
-GFZ_WHITE_LIST=1 ../afl/bin/gfz-clang-fast -I. -S -emit-llvm "$CFILE"
+../afl/bin/gfz-clang-fast -I. -S -emit-llvm "$CFILE"
 
 # Verify LLVM IR of test program with instrumentation
 opt -verify "$LLFILE" -o /dev/null
@@ -40,7 +40,7 @@ opt -verify "$LLFILE" -o /dev/null
 # Build test program with instrumentation
 rm -f ./map_key.txt
 rm -f /dev/shm/gfzidfile
-GFZ_WHITE_LIST=1 ../afl/bin/gfz-clang-fast -I. "$CFILE"
+../afl/bin/gfz-clang-fast -I. "$CFILE"
 
 if [ ! -z "$run" ]; then
   if [ "$run" == "r" ]; then

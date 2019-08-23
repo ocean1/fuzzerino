@@ -1,3 +1,17 @@
+/* The generation is consistently slow... */
+
+if ( avg_exec < 100 ) {
+  if (!slow_since) {
+    slow_since = get_cur_time();
+  } else if ( get_cur_time() > (slow_since + (GFZ_DRY_TMOUT_SEC * 1000)) ) {
+    // Go on to next location
+    slow_since = 0;
+    break;
+  }
+} else {
+  slow_since = 0;
+}
+
 /*
   Pointer instrumentation: work with Int64(s), just
   ptrtoint the operand before performing math, and then

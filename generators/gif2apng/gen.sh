@@ -1,1 +1,2 @@
-../../afl/bin/afl-fuzz -i in -o out -m10000 -t5000 -G -g /dev/shm/fuzztest -c ../../parsers/libpng/contrib/libtests/readpng -b gfz_ban_map -- ./gif2apng giftest
+rm -rf gfz_plot_data
+../../afl/bin/afl-fuzz -i in -o out -m10000 -t5000 -x png.dict -G -g /dev/shm/fuzztest -p ../../parsers/libpng/contrib/libtests/readpng -- ./gif2apng giftest
