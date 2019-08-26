@@ -92,4 +92,9 @@ struct gfz_data {
   u32 gfz_total_bbs;
 };
 
+struct gen_cmdline {
+  u32 argc;
+  u8 **argv;
+};
+
 #endif /* ! _HAVE_TYPES_H */

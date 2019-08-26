@@ -36,13 +36,13 @@ Only works if afl's output directory contains subfolders for *named* instances.
 
 usage:
 
-`./afl-ptmin.sh <number of cores> <input dir> <output dir> <path to fuzzed app>`
+`./afl_ptmin.sh <number of cores> <input dir> <output dir> <path to fuzzed app>`
 
 example:
 
-`screen -dmS tmin ./afl-ptmin.sh 8 in out ./readpng`
+`screen -dmS tmin ./afl_ptmin.sh 8 in out ./readpng`
 
-### Generate and merge graphs
+### Generate and merge graphs (AFL)
 
 usage:
 
@@ -51,3 +51,15 @@ usage:
 example:
 
 `./gen_graphs.sh out`
+
+### Generate graphs (GFZ)
+
+usage:
+
+`./gfz_plot.sh <gfz plot data> [-u]`
+
+example:
+
+`./gfz_plot.sh gfz_plot_data`
+
+`-u` is for plotting only unique seeds generated and coverage, otherwise full plot is generated, but basically in the full plot you can only see total execs, total generated, total crashes.

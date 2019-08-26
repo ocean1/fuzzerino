@@ -400,9 +400,11 @@
 
 /* Random stuff */
 
-#define GFZ_UPDATE_SEC          5
+#define GFZ_UPDATE_SEC          15
 #define GFZ_MAX_DICT_ENTRIES    100
 #define GFZ_HAVOC_BRANCH_EXECS  1000
+#define GFZ_MAX_CMIN_TARGETS    10
+#define GFZ_MAX_GEN_CMDLINES    10
 
 /* Mutations */
 
@@ -449,7 +451,7 @@
 /* Dry run stuff - TODO: tune these values */
 
 #define GFZ_BAN_RATIO           0.3
-#define GFZ_DRY_TMOUT_SEC       30
+#define GFZ_DRY_TMOUT_SEC       20
 
 /* Deterministic mutation combinations to use in dry run */
 

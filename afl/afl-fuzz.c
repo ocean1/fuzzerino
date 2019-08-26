@@ -116,15 +116,21 @@ u32  __gfz_num_ban_locs = 0;          /* Number of numeric banned locs    */
 u16* __gfz_ptr_ban_map;               /* Pointer locations ban map        */
 u32  __gfz_ptr_ban_locs = 0;          /* Number of pointer banned locs    */
 
-EXP_ST u8 *extra_cmdlines,            /* Generator cmdlines (gFuzz)       */
-          *gen_file,                  /* Generated file (gFuzz mode)      */
-          *gen_dir,                   /* Generated directory (gFuzz mode) */
-          *targets_cmin;              /* afl-cmin target binary/ies       */
+EXP_ST u8 *gen_file,                  /* Generated file                   */
+          *gen_dir,                   /* Generated directory              */
+          *cmin_targets               /* afl-cmin target binary/ies       */
+              [GFZ_MAX_CMIN_TARGETS];
 
-EXP_ST u8  gfuzz_mode;                /* Running in gfuzz mode?           */
+EXP_ST u8  gfuzz_mode,                /* Running in gfuzz mode?           */
+           gfz_is_havoc = 0,          /* Is gfuzz in havoc phase?         */
+           num_gen_cmdlines = 0,      /* Number of generator cmdlines     */
+           num_cmin_targets = 0;      /* Number of cmin target binaries   */
 
 EXP_ST u64 gen_total,                 /* Total number of generated seeds  */
            gen_unique;                /* Number unique seeds for afl-cmin */
+
+struct gen_cmdline gen_cmdlines       /* Generator cmdlines               */
+                       [GFZ_MAX_GEN_CMDLINES];
 
 static s32 gfz_num_shm_id;            /* ID of num SHM region (gFuzz mode)*/
 static s32 gfz_ptr_shm_id;            /* ID of ptr SHM region (gFuzz mode)*/
@@ -4076,14 +4082,14 @@ static void check_term_size(void);
 
 /* More hacks! */
 
-void afl_cmin() {
+void afl_cmin(u8 *cmin_target) {
 
   u8 *min_dir = alloc_printf("%s_min", gen_dir);
 
   /* Execute afl-cmin */
 
   u8 *cmd = alloc_printf("env -i AFL_PATH=%s %s/afl-cmin -i %s -o %s -- %s >> /dev/null 2>> /dev/null",
-                         getenv("AFL_PATH"), getenv("AFL_PATH"), gen_dir, min_dir, targets_cmin);
+                         getenv("AFL_PATH"), getenv("AFL_PATH"), gen_dir, min_dir, cmin_target);
   system(cmd);
 
   /* Delete generated dir */
@@ -4120,8 +4126,8 @@ void __gfz_update() {
 
   /* Minimize */
 
-  if (targets_cmin)
-    afl_cmin();
+  if (num_cmin_targets)
+    afl_cmin(cmin_targets[0]);
 
   /* Update bb coverage */
 
@@ -4133,12 +4139,12 @@ void __gfz_update() {
   /* Write gfz plot data
 
      Fields in the file:
-     unix_time, generated, unique, execs, crashes, tmouts, execs_per_sec */
+     unix_time, generated, unique, coverage, execs, crashes, tmouts, execs_sec, havoc */
 
   fprintf(__gfz_plot_file, 
-          "%llu, %llu, %llu, %llu, %llu, %llu, %0.02f\n",
-          get_cur_time() / 1000, gen_total, gen_unique, total_execs,
-          total_crashes, total_tmouts, avg_exec); /* ignore errors */
+          "%llu, %llu, %llu, %u, %llu, %llu, %llu, %0.02f, %u\n",
+          get_cur_time() / 1000, gen_total, gen_unique, __gfz_covered,
+          total_execs, total_crashes, total_tmouts, avg_exec, gfz_is_havoc);
 
   fflush(__gfz_plot_file);
 
@@ -4463,7 +4469,7 @@ static void show_stats(void) {
 
   SAYF(bV bSTOP "   generated : " cRST "%-21s " bSTG " " bSTOP, DI(gen_total));
 
-  if (targets_cmin) {
+  if (num_cmin_targets) {
     SAYF("  unique seeds : %s%-22s " bSTG bV "\n", cRST, DI(gen_unique));    
   } else {
     SAYF("%-40s" bSTG bV "\n", "");
@@ -7991,6 +7997,109 @@ static void save_cmdline(u32 argc, char** argv) {
 
 }
 
+/* read line from 'fp' allocate *buffer NCHAR in size
+ * realloc as necessary. Returns a pointer to *buffer
+ * on success, NULL otherwise.
+ */
+char *readline (FILE *fp, u8 **buffer) 
+{
+    int ch;
+    size_t buflen = 0, nchar = 64;
+
+    *buffer = malloc(nchar);    /* allocate buffer nchar in length */
+    if (!*buffer) {
+      fprintf(stderr, "readline() error: virtual memory exhausted.\n");
+      return NULL;
+    }
+
+    while ((ch = fgetc(fp)) != '\n' && ch != EOF) 
+    {
+      (*buffer)[buflen++] = ch;
+
+      if (buflen + 1 >= nchar) {  /* realloc */
+        u8 *tmp = realloc(*buffer, nchar * 2);
+        if (!tmp) {
+          fprintf(stderr, "error: realloc failed, "
+                          "returning partial buffer.\n");
+          (*buffer)[buflen] = 0;
+          return *buffer;
+        }
+        *buffer = tmp;
+        nchar *= 2;
+      }
+    }
+    (*buffer)[buflen] = 0;           /* nul-terminate */
+
+    if (buflen == 0 && ch == EOF) {  /* return NULL if nothing read */
+      free(*buffer);
+      *buffer = NULL;
+    }
+
+    return *buffer;
+}
+
+void read_cmin_targets(char *file) {
+
+    FILE *fp = fopen(file, "r");
+    if (!fp) PFATAL("error: file open failed '%s'.\n", file);
+
+    while ( readline(fp, &cmin_targets[num_cmin_targets]) )
+      ++num_cmin_targets;
+    
+    fclose(fp);
+
+}
+
+void read_gen_cmdlines(char *file) {
+
+  u32 arg = 0;
+  u32 nargs = 4;
+  u8 *tmp, *pch;
+
+  FILE *fp = fopen(file, "r");
+  if (!fp) PFATAL("error: file open failed '%s'.\n", file);
+
+  while ( readline(fp, &tmp) ) {
+
+    arg = 0;
+    nargs = 4;
+    gen_cmdlines[num_gen_cmdlines].argv = (u8**) malloc(nargs * sizeof(u8*));
+    
+    pch = strtok(tmp, " ");
+    
+    while ( pch != NULL ) {
+
+      if (arg >= nargs) {  /* realloc */
+        u8 **re = realloc(gen_cmdlines[num_gen_cmdlines].argv, nargs * 2 * sizeof(u8*));
+        if (!re) {
+          fprintf(stderr, "error: realloc failed.\n");
+          free(tmp);
+          fclose(fp);
+          return;
+        }
+        gen_cmdlines[num_gen_cmdlines].argv = re;
+        nargs *= 2;
+      }
+
+      gen_cmdlines[num_gen_cmdlines].argv[arg] = malloc(strlen(pch));
+      strcpy(gen_cmdlines[num_gen_cmdlines].argv[arg], pch);
+
+      ++arg;
+
+      pch = strtok(NULL, " ");
+
+    }
+
+    gen_cmdlines[num_gen_cmdlines].argc = arg;
+    ++num_gen_cmdlines;
+    free(tmp);
+
+  }
+  
+  fclose(fp);
+
+}
+
 /* dirname - return directory part of PATH. */
 
 char *dirname (char *path)
@@ -8365,14 +8474,14 @@ int main(int argc, char** argv) {
 
       case 'p': /* afl-cmin target binary(ies) */
 
-        if (targets_cmin) FATAL("Multiple -p options not supported");
-        targets_cmin = optarg;
+        if (num_cmin_targets) FATAL("Multiple -p options not supported");
+        read_cmin_targets(optarg);
         break;
 
-      case 'c': /* extra generator cmdline(s) */
+      case 'c': /* generator cmdline(s) */
 
-        if (extra_cmdlines) FATAL("Multiple -c options not supported");
-        extra_cmdlines = optarg;
+        if (num_gen_cmdlines) FATAL("Multiple -c options not supported");
+        read_gen_cmdlines(optarg);
         break;
 
       default:
@@ -8381,7 +8490,7 @@ int main(int argc, char** argv) {
 
     }
 
-  if (optind == argc || !in_dir || !out_dir) usage(argv[0]);
+  if (!in_dir || !out_dir) usage(argv[0]);
 
   setup_signal_handlers();
   check_asan_opts();
@@ -8422,7 +8531,7 @@ int main(int argc, char** argv) {
 
   save_cmdline(argc, argv);
 
-  fix_up_banner(argv[optind]);
+  fix_up_banner(gen_cmdlines[0].argv[0]);
 
   check_if_tty();
 
@@ -8455,14 +8564,14 @@ int main(int argc, char** argv) {
 
   if (!out_file) setup_stdio_file();
 
-  check_binary(argv[optind]);
+  check_binary(gen_cmdlines[0].argv[0]);
 
   start_time = get_cur_time();
 
   if (qemu_mode)
     use_argv = get_qemu_argv(argv[0], argv + optind, argc - optind);
   else
-    use_argv = argv + optind;
+    use_argv = (char**) gen_cmdlines[0].argv;
 
   perform_dry_run(use_argv);
 
@@ -8609,10 +8718,10 @@ gfuzz:
   __gfz_plot_file = fopen("./gfz_plot_data", "w");
   if (!__gfz_plot_file) PFATAL("fopen() failed");
 
-  fprintf(__gfz_plot_file, "# unix_time, generated, unique, execs, "
-                           "crashes, tmouts, execs_per_sec\n");
+  fprintf(__gfz_plot_file, "# unix_time, generated, unique, coverage, "
+                           "execs, crashes, tmouts, execs_sec, havoc\n");
 
-  if (targets_cmin) {
+  if (num_cmin_targets) {
 
     /* 
        If AFL_PATH is not set, try setting it to ../../afl/bin
@@ -8917,6 +9026,7 @@ gfz_havoc:
   u32 loc = 0;
   u32 is_ptr_loc = 0;
   stage_name = "havoc";
+  gfz_is_havoc = 1;
 
   while ( (numiter == NULL) || (i < maxi) ) {
 
