@@ -125,9 +125,12 @@ EXP_ST u8  gfuzz_mode,                /* Running in gfuzz mode?           */
            gfz_is_havoc = 0,          /* Is gfuzz in havoc phase?         */
            num_gen_cmdlines = 0,      /* Number of generator cmdlines     */
            num_cmin_targets = 0;      /* Number of cmin target binaries   */
+           //cur_cmdline = 0;           /* Current cmdline                  */
 
 EXP_ST u64 gen_total,                 /* Total number of generated seeds  */
-           gen_unique;                /* Number unique seeds for afl-cmin */
+           gen_after_cmin,            /* Generated seeds after afl-cmin   */
+           gen_unique,                /* Number unique seeds (afl-cmin)   */
+           time_spent_minimizing;     /* Total time spent in afl-cmin     */
 
 struct gen_cmdline gen_cmdlines       /* Generator cmdlines               */
                        [GFZ_MAX_GEN_CMDLINES];
@@ -4082,28 +4085,61 @@ static void check_term_size(void);
 
 /* More hacks! */
 
-void afl_cmin(u8 *cmin_target) {
+void afl_cmin() {
 
-  u8 *min_dir = alloc_printf("%s_min", gen_dir);
+  int i = 0;
+  u8 *cmd;
+  u8 *min_dirs[GFZ_MAX_CMIN_TARGETS];
 
-  /* Execute afl-cmin */
+  for (i = 0; i < num_cmin_targets; ++i) {
 
-  u8 *cmd = alloc_printf("env -i AFL_PATH=%s %s/afl-cmin -i %s -o %s -- %s >> /dev/null 2>> /dev/null",
-                         getenv("AFL_PATH"), getenv("AFL_PATH"), gen_dir, min_dir, cmin_target);
-  system(cmd);
+    min_dirs[i] = alloc_printf("%s_min_%d", gen_dir, i);
+
+    /* Execute afl-cmin */
+
+    cmd = alloc_printf("env -i AFL_PATH=%s %s/afl-cmin -i %s -o %s -- %s >> /dev/null 2>> /dev/null",
+                       getenv("AFL_PATH"), getenv("AFL_PATH"), gen_dir, min_dirs[i], cmin_targets[i]);
+    system(cmd);
+    ck_free(cmd);
+
+  }
 
   /* Delete generated dir */
 
-  u8 *rm_rf_gen_dir = alloc_printf("rm -rf %s", gen_dir);
-  system(rm_rf_gen_dir);
-
-  /* Rename min dir to generated dir */
-
-  rename(min_dir, gen_dir);
-  
-  ck_free(min_dir);
+  cmd = alloc_printf("rm -rf %s", gen_dir);
+  system(cmd);
   ck_free(cmd);
-  ck_free(rm_rf_gen_dir);
+
+  /* Rename first min dir to generated dir */
+
+  rename(min_dirs[0], gen_dir);
+  
+  if (num_cmin_targets > 1) {
+
+    /* Merge minimized folders */
+
+    for (i = 1; i < num_cmin_targets; ++i) {
+
+      cmd = alloc_printf("rsync -a %s/ %s/", min_dirs[i], gen_dir);
+      system(cmd);
+      ck_free(cmd);
+
+    }
+
+  }
+
+  /* Cleanup */
+
+  ck_free(min_dirs[0]);
+
+  for (i = 1; i < num_cmin_targets; ++i) {
+
+    cmd = alloc_printf("rm -rf %s", min_dirs[i]);
+    system(cmd);
+    ck_free(cmd);
+    ck_free(min_dirs[i]);
+
+  }
 
   /* Count number of unique seeds */
 
@@ -4119,15 +4155,21 @@ void afl_cmin(u8 *cmin_target) {
   closedir(dfd);
 
   gen_unique = count;
+  gen_after_cmin = 0;
 
 }
 
 void __gfz_update() {
 
+  double local_avg_exec = avg_exec;
+
   /* Minimize */
 
-  if (num_cmin_targets)
-    afl_cmin(cmin_targets[0]);
+  if (num_cmin_targets) {
+    u64 time_before_cmin = get_cur_time();
+    afl_cmin();
+    time_spent_minimizing += get_cur_time() - time_before_cmin;
+  }
 
   /* Update bb coverage */
 
@@ -4144,7 +4186,7 @@ void __gfz_update() {
   fprintf(__gfz_plot_file, 
           "%llu, %llu, %llu, %u, %llu, %llu, %llu, %0.02f, %u\n",
           get_cur_time() / 1000, gen_total, gen_unique, __gfz_covered,
-          total_execs, total_crashes, total_tmouts, avg_exec, gfz_is_havoc);
+          total_execs, total_crashes, total_tmouts, local_avg_exec, gfz_is_havoc);
 
   fflush(__gfz_plot_file);
 
@@ -4156,7 +4198,6 @@ void __gfz_update() {
 static void show_stats(void) {
 
   static u64 last_stats_ms, last_plot_ms, last_gfz_ms, last_ms, last_execs;
-  //static double avg_exec;
   double t_byte_ratio, stab_ratio;
 
   u64 cur_ms;
@@ -4179,7 +4220,7 @@ static void show_stats(void) {
 
   if (!last_execs) {
 
-    avg_exec = ((double)total_execs) * 1000 / (cur_ms - start_time);
+    avg_exec = ((double)total_execs) * 1000 / (cur_ms - time_spent_minimizing - start_time);
 
   } else {
 
@@ -4194,6 +4235,15 @@ static void show_stats(void) {
 
     avg_exec = avg_exec * (1.0 - 1.0 / AVG_SMOOTHING) +
                cur_avg * (1.0 / AVG_SMOOTHING);
+
+  }
+
+  /* Every now and then, minimize, update bb coverage and write plot data. */
+
+  if ( (cur_ms - last_gfz_ms > GFZ_UPDATE_SEC * 1000) || (gen_after_cmin > GFZ_UPDATE_GEN) ) {
+
+    __gfz_update();
+    last_gfz_ms = cur_ms;
 
   }
 
@@ -4232,15 +4282,6 @@ static void show_stats(void) {
 
     last_plot_ms = cur_ms;
     maybe_update_plot_file(t_byte_ratio, avg_exec);
-
-  }
-
-  /* Every now and then, minimize, update bb coverage and write plot data. */
-
-  if (cur_ms - last_gfz_ms > GFZ_UPDATE_SEC * 1000) {
-
-    last_gfz_ms = cur_ms;
-    __gfz_update();
 
   }
 
@@ -8709,10 +8750,12 @@ gfuzz:
   
   u32 i = 0;
   u8 fault;
+  u64 slow_since = 0;
 
   struct stat st;
 
   gen_total = 0;
+  gen_after_cmin = 0;
   gen_unique = 0;
 
   __gfz_plot_file = fopen("./gfz_plot_data", "w");
@@ -8830,8 +8873,6 @@ gfuzz:
     u16 dry_numeric[] = { GFZ_DRY_NUMERIC };
     u16 dry_pointers[] = { GFZ_DRY_POINTERS };
 
-    u64 slow_since = 0;
-
     u32 branch = 0;
     u32 loc = 0;
 
@@ -8862,6 +8903,7 @@ gfuzz:
               rename(gen_file, fn);
               ck_free(fn);
               ++gen_total;
+              ++gen_after_cmin;
             }
 
             switch (fault) {
@@ -8881,8 +8923,8 @@ gfuzz:
             if ( avg_exec < 100 ) {
               if (!slow_since) {
                 slow_since = get_cur_time();
-              } else if ( get_cur_time() > (slow_since + (GFZ_DRY_TMOUT_SEC * 1000)) ) {
-                // Go on to next location
+              } else if ( get_cur_time() > (slow_since + (GFZ_TMOUT_SEC * 1000)) ) {
+                __gfz_num_ban_map[loc] = 0xffff;
                 slow_since = 0;
                 break;
               }
@@ -8892,6 +8934,7 @@ gfuzz:
 
             if (stop_soon) {
               __gfz_update();
+              show_stats();
               goto stop_fuzzing;
             }
 
@@ -8935,6 +8978,7 @@ gfuzz:
                 rename(gen_file, fn);
                 ck_free(fn);
                 ++gen_total;
+                ++gen_after_cmin;
               }
             }
 
@@ -8955,8 +8999,8 @@ gfuzz:
             if ( avg_exec < 100 ) {
               if (!slow_since) {
                 slow_since = get_cur_time();
-              } else if ( get_cur_time() > (slow_since + (GFZ_DRY_TMOUT_SEC * 1000)) ) {
-                // Go on to next location
+              } else if ( get_cur_time() > (slow_since + (GFZ_TMOUT_SEC * 1000)) ) {
+                __gfz_ptr_ban_map[loc] = 0xffff;
                 slow_since = 0;
                 break;
               }
@@ -8966,6 +9010,7 @@ gfuzz:
 
             if (stop_soon) {
               __gfz_update();
+              show_stats();
               goto stop_fuzzing;
             }
 
@@ -9056,33 +9101,30 @@ gfz_havoc:
 
     if (branch_execs > GFZ_HAVOC_BRANCH_EXECS) {
       
-      // 50% chance to disable current branch mutation
-
-      if (UR(2)) {
-        __gfz_branch_map[branch] = 1;
-      }
-
-      // Enable new random branch mutation
+      // Flip random branch location
 
       branch = UR(__gfz_branch_locs);
-      __gfz_branch_map[branch] = 2;
+      
+      if (__gfz_branch_map[branch] == 1)
+        __gfz_branch_map[branch] = 2;
+      
+      else if (__gfz_branch_map[branch] == 2)
+        __gfz_branch_map[branch] = 1;
 
       branch_execs = 0;
 
     }
 
-    // Randomly choose between numeric and pointer location
+    // Randomly choose between numeric and pointer location,
     // and enable random mutations for a random location
 
     if (UR(2)) {
-
       is_ptr_loc = 0;
 
       loc = UR(__gfz_num_locs);
       __gfz_num_map[loc] = UR(65536);
 
     } else {
-
       is_ptr_loc = 1;
 
       loc = UR(__gfz_ptr_locs);
@@ -9090,21 +9132,38 @@ gfz_havoc:
 
     }
 
+    /* 1/1000 chance of selecting next cmdline
+
+    TODO: can't change the behavior of the program easily
+          when we have the forkserver... the options are:
+
+          1) spawn a different forkserver for each cmdline (no)
+          2) send cmdlines to the forkserver and change argv
+             from there!
+
+          for now, we'll just run different generation campaigns
+          for each cmdline!
+
+    if (!UR(1000)) {
+      cur_cmdline = (cur_cmdline + 1) % num_gen_cmdlines;
+      use_argv = (char**) gen_cmdlines[cur_cmdline].argv;
+    } */
+
     if (!skip_deterministic) {
 
       // Restore banned locations to GFZ_KEEP_ORIGINAL
 
-      int ban_idx = 0;
+      int idx = 0;
 
-      for (ban_idx = 0; ban_idx < __gfz_num_locs; ++ban_idx) {
-        if (__gfz_num_ban_map[ban_idx]) {
-          __gfz_num_map[ban_idx] = GFZ_KEEP_ORIGINAL;
+      for (idx = 0; idx < __gfz_num_locs; ++idx) {
+        if (__gfz_num_ban_map[idx]) {
+          __gfz_num_map[idx] = GFZ_KEEP_ORIGINAL;
         }
       }
 
-      for (ban_idx = 0; ban_idx < __gfz_ptr_locs; ++ban_idx) {
-        if (__gfz_ptr_ban_map[ban_idx]) {
-          __gfz_ptr_map[ban_idx] = GFZ_KEEP_ORIGINAL;
+      for (idx = 0; idx < __gfz_ptr_locs; ++idx) {
+        if (__gfz_ptr_ban_map[idx]) {
+          __gfz_ptr_map[idx] = GFZ_KEEP_ORIGINAL;
         }
       }
 
@@ -9118,6 +9177,7 @@ gfz_havoc:
       rename(gen_file, fn);
       ck_free(fn);
       ++gen_total;
+      ++gen_after_cmin;
     } else {
       // Reset location      
       if (is_ptr_loc)
@@ -9138,10 +9198,33 @@ gfz_havoc:
     if (gen_file)
       remove(gen_file);
 
-    // TODO: take action if havoc is stuck
+    if ( avg_exec < 100 ) {
+      if (!slow_since) {
+        slow_since = get_cur_time();
+      } else if ( get_cur_time() > (slow_since + (GFZ_TMOUT_SEC * 1000)) ) {
+        // Reset all mutations
+
+        int idx = 0;
+
+        for (idx = 0; idx < __gfz_num_locs; ++idx)
+          __gfz_num_map[idx] = GFZ_KEEP_ORIGINAL;
+
+        for (idx = 0; idx < __gfz_ptr_locs; ++idx)
+          __gfz_ptr_map[idx] = GFZ_KEEP_ORIGINAL;
+
+        for (idx = 0; idx < __gfz_branch_locs; ++idx)
+          __gfz_branch_map[idx] = GFZ_KEEP_ORIGINAL;
+
+        slow_since = 0;
+        break;
+      }
+    } else {
+      slow_since = 0;
+    }
 
     if (stop_soon) {
       __gfz_update();
+      show_stats();
       goto stop_fuzzing;
     }
 
@@ -9151,7 +9234,6 @@ gfz_havoc:
   } // end while
 
   show_stats();
-
   goto stop_fuzzing;
 
 }

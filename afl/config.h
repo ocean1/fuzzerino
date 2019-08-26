@@ -400,11 +400,13 @@
 
 /* Random stuff */
 
-#define GFZ_UPDATE_SEC          15
-#define GFZ_MAX_DICT_ENTRIES    100
-#define GFZ_HAVOC_BRANCH_EXECS  1000
-#define GFZ_MAX_CMIN_TARGETS    10
-#define GFZ_MAX_GEN_CMDLINES    10
+#define GFZ_UPDATE_GEN          10000  /* Max number of generated files before __gfz_update                         */
+#define GFZ_UPDATE_SEC          15     /* Time interval between calls to __gfz_update                               */
+#define GFZ_TMOUT_SEC           20     /* Time after which location is skipped (dry run) or mutations reset (havoc) */
+#define GFZ_MAX_DICT_ENTRIES    100    /* Maximum dictionary entries                                                */
+#define GFZ_HAVOC_BRANCH_EXECS  1000   /* Number of executions between every branch location flip (havoc)           */
+#define GFZ_MAX_CMIN_TARGETS    10     /* Maximum afl-cmin targets                                                  */
+#define GFZ_MAX_GEN_CMDLINES    10     /* Maximum generator cmdlines (TODO)                                         */
 
 /* Mutations */
 
@@ -451,7 +453,6 @@
 /* Dry run stuff - TODO: tune these values */
 
 #define GFZ_BAN_RATIO           0.3
-#define GFZ_DRY_TMOUT_SEC       20
 
 /* Deterministic mutation combinations to use in dry run */
 
