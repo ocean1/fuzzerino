@@ -1,6 +1,6 @@
 .PHONY: FORCE all clean generators
 
-all: afl gfz dogen
+all: afl gfz dogen generators
 
 afl:
 	CC=clang-6.0 make -C afl
@@ -12,7 +12,9 @@ dogen:
 	cd tests && ./dotests.sh
 
 generators:
-	cd tests && ./compileall.sh
+	make -C generators/gif2apng
+	make -C generators/miniz
+	make -C generators/stb/tests
 
 emit:
 	cd tests && ./emitall.sh
@@ -20,6 +22,9 @@ emit:
 clean:
 	make -C afl clean
 	make -C tests clean
+	make -C generators/gif2apng clean
+	make -C generators/miniz clean
+	make -C generators/stb/tests clean
 
 cleanll: clean
 	make -C tests cleanll

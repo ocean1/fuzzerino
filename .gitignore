@@ -81,7 +81,7 @@ xray-log.*
 
 *.o
 
-afl-fuzz.log
+gfz.log
 
 gfz_num
 gfz_ptr

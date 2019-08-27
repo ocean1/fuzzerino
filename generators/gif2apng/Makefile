@@ -18,7 +18,10 @@ OBJECTS := $(OBJECTS:.c=.o)
 OBJECTS := $(OBJECTS:.cc=.o)
 OBJECTS := $(OBJECTS:.cpp=.o)
 
-all : $(PACKAGE)
+all : cleangfz $(PACKAGE)
+
+cleangfz:
+	rm -rf /dev/shm/gfzidfile
 
 $(PACKAGE) : objdirs $(OBJECTS)
 	$(CXX) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJECTS) $(LIBS)
@@ -39,5 +42,6 @@ obj/%.o : %.cc
 
 clean :
 	rm -rf $(PACKAGE) obj
-	rm -rf /dev/shm/gfzidfile
-	rm -rf /dev/shm/generated
+	rm -rf out
+	rm -rf gfz.log
+	rm -rf gfz_plot_data

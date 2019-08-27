@@ -23,16 +23,14 @@ cleanids:
 gtest:
 	# Emit LLVM IR of test program with instrumentation
 	@rm -f /dev/shm/gfzidfile
-	@rm -f ./map_key.txt
-	GFZ_WHITE_LIST=1 $(CC) $(CFLAGS) $(LDFLAGS) -S -emit-llvm g.c -o $@.ll
+	$(CC) $(CFLAGS) $(LDFLAGS) -S -emit-llvm g.c -o $@.ll
 	
 	# Verify LLVM IR of test program with instrumentation
 	opt -verify $@.ll -o /dev/null
 
 	# Build test program with instrumentation
 	@rm -f /dev/shm/gfzidfile
-	@rm -f ./map_key.txt
-	GFZ_WHITE_LIST=1 $(CC) $(CFLAGS) $(LDFLAGS) g.c -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) g.c -o $@
 	
 ptest:
 	@rm -f /dev/shm/gfzidfile

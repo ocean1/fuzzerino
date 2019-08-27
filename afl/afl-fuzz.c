@@ -4153,13 +4153,10 @@ void afl_cmin() {
 
   closedir(dfd);
 
-  gen_unique = count;
-
-  if (gen_unique > max_unique) {
-    max_unique = gen_unique;
+  if (count > gen_unique)
     last_seed_time = get_cur_time();
-  }
 
+  gen_unique = count;
   gen_after_cmin = 0;
 
 }
@@ -8113,7 +8110,7 @@ int main(int argc, char** argv) {
 
   doc_path = access(DOC_PATH, F_OK) ? "docs" : DOC_PATH;
 
-  log_file = fopen("./afl-fuzz.log", "a");
+  log_file = fopen("./gfz.log", "a");
 
   gettimeofday(&tv, &tz);
   srandom(tv.tv_sec ^ tv.tv_usec ^ getpid());

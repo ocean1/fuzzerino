@@ -99,8 +99,6 @@ private:
   uint32_t tot = 0;
   uint32_t sel = 0;
   
-  FILE *map_key_fd;
-
   DataLayout *DL;
 
   GlobalVariable *GFZNumMapPtr, *GFZPtrMapPtr, *GFZBranchMapPtr, *GFZPtrBufPtr,
@@ -800,11 +798,6 @@ void AFLCoverage::instrumentBranch(Instruction *I) {
 
 bool AFLCoverage::runOnModule(Module &M) {
 
-  // File used for debugging  
-  map_key_fd = fopen("./map_key.txt", "a");
-
-  fprintf(map_key_fd, "\n=== %s ===", M.getName().str().c_str());
-
   LLVMContext &C = M.getContext();
 
   IntegerType *Int8Ty = IntegerType::getInt8Ty(C);
@@ -859,10 +852,11 @@ bool AFLCoverage::runOnModule(Module &M) {
 
   // Whitelist functions: scan for functions explicitly marked as fuzzable
   
-  char *whitelist = getenv("GFZ_WHITE_LIST");
+  for (auto &F : M)
+    if (F.getSection() == ".fuzzables")
+      WhitelistSet.insert(F.getName());
 
-  for (auto &F : M) if (F.getSection() == ".fuzzables")
-    WhitelistSet.insert(F.getName());
+  char *whitelist = getenv("GFZ_WHITE_LIST");
 
   // Read executed functions from llvm xray yaml
   
@@ -986,8 +980,8 @@ bool AFLCoverage::runOnModule(Module &M) {
         // instrument result blacklist
         if ( isa<ReturnInst>(I) || isa<ResumeInst>(I) ||
              isa<InsertElementInst>(I) || isa<AtomicCmpXchgInst>(I) ||
-             isa<AtomicRMWInst>(I) || isa<LoadInst>(I) ||
-             isa<StoreInst>(I) || isa<GetElementPtrInst>(I) ) {
+             isa<AtomicRMWInst>(I) || isa<StoreInst>(I) ||
+             isa<GetElementPtrInst>(I) ) {
           continue;
         }
 
@@ -1034,23 +1028,23 @@ bool AFLCoverage::runOnModule(Module &M) {
   } // end function loop
 
   SAYF("\n");
-  OKF("Module %s: selected %u/%u instructions in %u function(s).", M.getName().str().c_str(), mod_sel, mod_tot, inst_fun);
 
   tot += mod_tot;
   sel += mod_sel;
 
-  OKF("Total: selected %u/%u instructions.\n"
-      "           %u basic blocks.", sel, tot, total_bbs);
+  if (mod_sel) {
+    OKF("Module %s: selected %u/%u instructions in %u function(s).", M.getName().str().c_str(), mod_sel, mod_tot, inst_fun);
+    OKF("Total: selected %u/%u instructions.\n"
+        "           %u basic blocks.", sel, tot, total_bbs);
+  } else {
+    OKF("Module %s: skipped.", M.getName().str().c_str());
+  }
 
   // Pass the selected instructions to the 
   // corresponding instrumenting functions
 
-  fprintf(map_key_fd, "\n\n--- branch locations");
-
   for (auto I: toInstrumentBranches)
     instrumentBranch(I);
-
-  fprintf(map_key_fd, "\n\n--- other locations (numeric and pointer)");
 
   for (auto I: toInstrumentResult)
     instrumentResult(I);
@@ -1058,8 +1052,9 @@ bool AFLCoverage::runOnModule(Module &M) {
   for (auto I: toInstrumentOperands)
     instrumentOperands(I);
   
-  OKF("Total: instrumented %u numeric locations, %u pointer locations and %u branches.",
-    num_locs, ptr_locs, branch_locs);
+  if (mod_sel)
+    OKF("Total: instrumented %u numeric locations, %u pointer locations and %u branches.",
+        num_locs, ptr_locs, branch_locs);
 
   // Write info that needs to be maintained between modules to GFZ_IDFILE
 
@@ -1085,13 +1080,6 @@ bool AFLCoverage::runOnModule(Module &M) {
 
   lock.l_type = F_UNLCK;
   fcntl(idfd, F_SETLKW, &lock);
-
-  if (!be_quiet && !inst_fun)
-    WARNF("No instrumentation targets found.");
-    // there's functions with 0 I/ 0 BB (external references?) check them out....
-
-  // Debugging
-  fclose(map_key_fd);
 
   return true;
 
