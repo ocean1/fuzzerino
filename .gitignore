@@ -81,14 +81,11 @@ xray-log.*
 
 *.o
 
-map_key.txt
 afl-fuzz.log
 
 gfz_num
 gfz_ptr
 gfz_bnc
-gfz_ban_map
-gfz_ptr_map
+gfz_num_ban
+gfz_ptr_ban
 gfz_plot_data
-
-irons/out

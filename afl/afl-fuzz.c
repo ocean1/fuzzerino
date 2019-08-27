@@ -129,7 +129,9 @@ EXP_ST u8  gfuzz_mode,                /* Running in gfuzz mode?           */
 
 EXP_ST u64 gen_total,                 /* Total number of generated seeds  */
            gen_after_cmin,            /* Generated seeds after afl-cmin   */
-           gen_unique,                /* Number unique seeds (afl-cmin)   */
+           gen_unique,                /* Number of unique seeds (afl-cmin)*/
+           max_unique,                /* Max unique seeds (afl-cmin)      */
+           last_seed_time,            /* ms time for most recent uniq seed*/
            time_spent_minimizing;     /* Total time spent in afl-cmin     */
 
 struct gen_cmdline gen_cmdlines       /* Generator cmdlines               */
@@ -4152,6 +4154,12 @@ void afl_cmin() {
   closedir(dfd);
 
   gen_unique = count;
+
+  if (gen_unique > max_unique) {
+    max_unique = gen_unique;
+    last_seed_time = get_cur_time();
+  }
+
   gen_after_cmin = 0;
 
 }
@@ -4326,7 +4334,7 @@ static void show_stats(void) {
 
   sprintf(tmp + banner_pad, "%s " cLCY VERSION cLGN
           " (%s)",  crash_mode ? cPIN "peruvian were-rabbit" : 
-          cYEL "american fuzzy lop", use_banner);
+          cYEL "galactic furry zoo", use_banner);
 
   SAYF("\n%s\n\n", tmp);
 
@@ -4344,82 +4352,17 @@ static void show_stats(void) {
 
   /* Lord, forgive me this. */
 
-  SAYF(SET_G1 bSTG bLT bH bSTOP cCYA " process timing " bSTG bH30 bH5 bH2 bHB
-       bH bSTOP cCYA " overall results " bSTG bH5 bRT "\n");
+  SAYF(SET_G1 bSTG bLT bH bSTOP cCYA " process timing " bSTG bH30 bH30 bH bRT "\n");
 
-  if (dumb_mode) {
+  SAYF(bV bSTOP "        run time : " cRST "%-59s" bSTG bV "\n", DTD(cur_ms, start_time));
 
-    strcpy(tmp, cRST);
+  if (!dumb_mode && (last_seed_time || resuming_fuzz || queue_cycle == 1 ||
+      in_bitmap || crash_mode))
+    SAYF(bV bSTOP "   last new seed : " cRST "%-59s" bSTG bV "\n", DTD(cur_ms, last_seed_time));
+  else
+    SAYF(bV bSTOP "   last new seed : " cRST "none yet " cLRD "%-49s" bSTG bV "\n", "");
 
-  } else {
-
-    u64 min_wo_finds = (cur_ms - last_path_time) / 1000 / 60;
-
-    /* First queue cycle: don't stop now! */
-    if (queue_cycle == 1 || min_wo_finds < 15) strcpy(tmp, cMGN); else
-
-    /* Subsequent cycles, but we're still making finds. */
-    if (cycles_wo_finds < 25 || min_wo_finds < 30) strcpy(tmp, cYEL); else
-
-    /* No finds for a long time and no test cases to try. */
-    if (cycles_wo_finds > 100 && !pending_not_fuzzed && min_wo_finds > 120)
-      strcpy(tmp, cLGN);
-
-    /* Default: cautiously OK to stop? */
-    else strcpy(tmp, cLBL);
-
-  }
-
-  SAYF(bV bSTOP "        run time : " cRST "%-34s " bSTG bV bSTOP
-       "  cycles done : %s%-5s  " bSTG bV "\n",
-       DTD(cur_ms, start_time), tmp, DI(queue_cycle - 1));
-
-  /* We want to warn people about not seeing new paths after a full cycle,
-     except when resuming fuzzing or running in non-instrumented mode. */
-
-  if (!dumb_mode && (last_path_time || resuming_fuzz || queue_cycle == 1 ||
-      in_bitmap || crash_mode)) {
-
-    SAYF(bV bSTOP "   last new path : " cRST "%-34s ",
-         DTD(cur_ms, last_path_time));
-
-  } else {
-
-    if (dumb_mode)
-
-      SAYF(bV bSTOP "   last new path : " cPIN "n/a" cRST 
-           " (non-instrumented mode)        ");
-
-     else
-
-      SAYF(bV bSTOP "   last new path : " cRST "none yet " cLRD
-           "(odd, check syntax!)      ");
-
-  }
-
-  SAYF(bSTG bV bSTOP "  total paths : " cRST "%-5s  " bSTG bV "\n",
-       DI(queued_paths));
-
-  /* Highlight crashes in red if found, denote going over the KEEP_UNIQUE_CRASH
-     limit with a '+' appended to the count. */
-
-  sprintf(tmp, "%s%s", DI(unique_crashes),
-          (unique_crashes >= KEEP_UNIQUE_CRASH) ? "+" : "");
-
-  SAYF(bV bSTOP " last uniq crash : " cRST "%-34s " bSTG bV bSTOP
-       " uniq crashes : %s%-6s " bSTG bV "\n",
-       DTD(cur_ms, last_crash_time), unique_crashes ? cLRD : cRST,
-       tmp);
-
-  sprintf(tmp, "%s%s", DI(unique_hangs),
-         (unique_hangs >= KEEP_UNIQUE_HANG) ? "+" : "");
-
-  SAYF(bV bSTOP "  last uniq hang : " cRST "%-34s " bSTG bV bSTOP 
-       "   uniq hangs : " cRST "%-6s " bSTG bV "\n",
-       DTD(cur_ms, last_hang_time), tmp);
-
-  SAYF(bVR bH bSTOP cCYA " gfuzz mode " bSTG bH2 bH2 bH20 bHB bH bSTOP cCYA
-       " map coverage " bSTG bH bHT bH20 bH2 bH bVL "\n");
+  SAYF(bVR bH bSTOP cCYA " stats " bSTG bH30 bH30 bH10 bVL "\n");
 
   /* This gets funny because we want to print several variable-length variables
      together, but then cram them into a fixed-width field - so we need to
@@ -4427,28 +4370,15 @@ static void show_stats(void) {
 
   sprintf(tmp, "%u (num), %u (ptr)", __gfz_num_locs, __gfz_ptr_locs);
 
-  SAYF(bV bSTOP "   locations : " cRST "%-21s " bSTG bV bSTOP, tmp);
-
-  sprintf(tmp, "%0.02f%% / %0.02f%%", ((double)queue_cur->bitmap_size) * 
-          100 / MAP_SIZE, t_byte_ratio);
-
-  SAYF("    map density : %s%-21s " bSTG bV "\n", t_byte_ratio > 70 ? cLRD : 
-       ((t_bytes < 200 && !dumb_mode) ? cPIN : cRST), tmp);
-
-  //sprintf(tmp, "%s (%0.02f%%)", DI(cur_skipped_paths),
-  //        ((double)cur_skipped_paths * 100) / queued_paths);
-
-  SAYF(bV bSTOP "    branches : " cRST "%-21s " bSTG bV, DI(__gfz_branch_locs));
-
-  sprintf(tmp, "%0.02f bits/tuple",
-          t_bytes ? (((double)t_bits) / t_bytes) : 0);
-
-  SAYF(bSTOP " count coverage : " cRST "%-21s " bSTG bV "\n", tmp);
+  SAYF(bV bSTOP "   locations : " cRST "%-23s", tmp);
+  SAYF("%-39s " bSTG bV "\n", "");
+  SAYF(bV bSTOP "    branches : " cRST "%-23s", DI(__gfz_branch_locs));
+  SAYF("%-39s " bSTG bV "\n", "");
 
   sprintf(tmp, "%s/%s (%0.02f%%)", DI(__gfz_covered), DI(__gfz_total_bbs),
           (double)__gfz_covered * 100 / __gfz_total_bbs);
 
-  SAYF(bV bSTOP " bb coverage : " cRST "%-22s" bSTG bLB bH20 bH20 bVL "\n", tmp);
+  SAYF(bV bSTOP " bb coverage : " cRST "%-63s" bSTG bV "\n", tmp);
 
   /* Yeah... it's still going on... halp? */
 
@@ -4458,52 +4388,16 @@ static void show_stats(void) {
   SAYF(bV bSTOP "  now trying : " cRST "%-21s " bSTG " " bSTOP 
        "   banned locs : " cRST "%-22s " bSTG bV "\n", stage_name, tmp);
 
-  if (!stage_max) {
-
-    sprintf(tmp, "%s/-", DI(stage_cur));
-
-  } else {
-
-    sprintf(tmp, "%s/%s (%0.02f%%)", DI(stage_cur), DI(stage_max),
-            ((double)stage_cur) * 100 / stage_max);
-
-  }
-
   sprintf(tmp, "%s", DI(total_crashes));
 
-  if (crash_mode) {
+  SAYF(bV bSTOP " total execs : " cRST "%-21s " bSTG " " bSTOP
+       " total crashes : %s%-22s " bSTG bV "\n", DI(total_execs), cRST, tmp);
 
-    SAYF(bV bSTOP " total execs : " cRST "%-21s " bSTG bV bSTOP
-         "   new crashes : %s%-22s " bSTG bV "\n", DI(total_execs),
-         unique_crashes ? cLRD : cRST, tmp);
-
-  } else {
-
-    SAYF(bV bSTOP " total execs : " cRST "%-21s " bSTG " " bSTOP
-         " total crashes : %s%-22s " bSTG bV "\n", DI(total_execs), cRST, tmp);
-
-  }
-
-  /* Show a warning about slow execution. */
-
-  if (avg_exec < 100) {
-
-    sprintf(tmp, "%s/sec (%s)", DF(avg_exec), avg_exec < 20 ?
-            "zzzz..." : "slow!");
-
-    SAYF(bV bSTOP "  exec speed : " cLRD "%-21s ", tmp);
-
-  } else {
-
-    sprintf(tmp, "%s/sec", DF(avg_exec));
-    SAYF(bV bSTOP "  exec speed : " cRST "%-21s ", tmp);
-
-  }
+  sprintf(tmp, "%s/sec", DF(avg_exec));
+  SAYF(bV bSTOP "  exec speed : " cRST "%-21s ", tmp);
 
   sprintf(tmp, "%s", DI(total_tmouts));
   SAYF(bSTG " " bSTOP "  total tmouts : " cRST "%-22s " bSTG bV "\n", tmp);
-
-  // SAYF(bV bSTOP "%-78s" bSTG bV "\n", "");
 
   SAYF(bV bSTOP "   generated : " cRST "%-21s " bSTG " " bSTOP, DI(gen_total));
 
@@ -4511,112 +4405,9 @@ static void show_stats(void) {
     SAYF("  unique seeds : %s%-22s " bSTG bV "\n", cRST, DI(gen_unique));    
   } else {
     SAYF("%-40s" bSTG bV "\n", "");
-  }    
-
-  /* Aaaalmost there... hold on! */
-
-  SAYF(bVR bH cCYA bSTOP " fuzzing strategy yields " bSTG bH10 bH2 bH10
-       bH5 bHB bH bSTOP cCYA " path geometry " bSTG bH5 bH2 bH bVL "\n");
-
-  if (skip_deterministic) {
-
-    strcpy(tmp, "n/a, n/a, n/a");
-
-  } else {
-
-    sprintf(tmp, "%s/%s, %s/%s, %s/%s",
-            DI(stage_finds[STAGE_FLIP1]), DI(stage_cycles[STAGE_FLIP1]),
-            DI(stage_finds[STAGE_FLIP2]), DI(stage_cycles[STAGE_FLIP2]),
-            DI(stage_finds[STAGE_FLIP4]), DI(stage_cycles[STAGE_FLIP4]));
-
   }
 
-  SAYF(bV bSTOP "   bit flips : " cRST "%-37s " bSTG bV bSTOP "    levels : "
-       cRST "%-10s " bSTG bV "\n", tmp, DI(max_depth));
-
-  if (!skip_deterministic)
-    sprintf(tmp, "%s/%s, %s/%s, %s/%s",
-            DI(stage_finds[STAGE_FLIP8]), DI(stage_cycles[STAGE_FLIP8]),
-            DI(stage_finds[STAGE_FLIP16]), DI(stage_cycles[STAGE_FLIP16]),
-            DI(stage_finds[STAGE_FLIP32]), DI(stage_cycles[STAGE_FLIP32]));
-
-  SAYF(bV bSTOP "  byte flips : " cRST "%-37s " bSTG bV bSTOP "   pending : "
-       cRST "%-10s " bSTG bV "\n", tmp, DI(pending_not_fuzzed));
-
-  if (!skip_deterministic)
-    sprintf(tmp, "%s/%s, %s/%s, %s/%s",
-            DI(stage_finds[STAGE_ARITH8]), DI(stage_cycles[STAGE_ARITH8]),
-            DI(stage_finds[STAGE_ARITH16]), DI(stage_cycles[STAGE_ARITH16]),
-            DI(stage_finds[STAGE_ARITH32]), DI(stage_cycles[STAGE_ARITH32]));
-
-  SAYF(bV bSTOP " arithmetics : " cRST "%-37s " bSTG bV bSTOP "  pend fav : "
-       cRST "%-10s " bSTG bV "\n", tmp, DI(pending_favored));
-
-  if (!skip_deterministic)
-    sprintf(tmp, "%s/%s, %s/%s, %s/%s",
-            DI(stage_finds[STAGE_INTEREST8]), DI(stage_cycles[STAGE_INTEREST8]),
-            DI(stage_finds[STAGE_INTEREST16]), DI(stage_cycles[STAGE_INTEREST16]),
-            DI(stage_finds[STAGE_INTEREST32]), DI(stage_cycles[STAGE_INTEREST32]));
-
-  SAYF(bV bSTOP "  known ints : " cRST "%-37s " bSTG bV bSTOP " own finds : "
-       cRST "%-10s " bSTG bV "\n", tmp, DI(queued_discovered));
-
-  if (!skip_deterministic)
-    sprintf(tmp, "%s/%s, %s/%s, %s/%s",
-            DI(stage_finds[STAGE_EXTRAS_UO]), DI(stage_cycles[STAGE_EXTRAS_UO]),
-            DI(stage_finds[STAGE_EXTRAS_UI]), DI(stage_cycles[STAGE_EXTRAS_UI]),
-            DI(stage_finds[STAGE_EXTRAS_AO]), DI(stage_cycles[STAGE_EXTRAS_AO]));
-
-  SAYF(bV bSTOP "  dictionary : " cRST "%-37s " bSTG bV bSTOP
-       "  imported : " cRST "%-10s " bSTG bV "\n", tmp,
-       sync_id ? DI(queued_imported) : (u8*)"n/a");
-
-  sprintf(tmp, "%s/%s, %s/%s",
-          DI(stage_finds[STAGE_HAVOC]), DI(stage_cycles[STAGE_HAVOC]),
-          DI(stage_finds[STAGE_SPLICE]), DI(stage_cycles[STAGE_SPLICE]));
-
-  SAYF(bV bSTOP "       havoc : " cRST "%-37s " bSTG bV bSTOP, tmp);
-
-  if (t_bytes) sprintf(tmp, "%0.02f%%", stab_ratio);
-    else strcpy(tmp, "n/a");
-
-  SAYF(" stability : %s%-10s " bSTG bV "\n", (stab_ratio < 85 && var_byte_count > 40) 
-       ? cLRD : ((queued_variable && (!persistent_mode || var_byte_count > 20))
-       ? cMGN : cRST), tmp);
-
-  if (!bytes_trim_out) {
-
-    sprintf(tmp, "n/a, ");
-
-  } else {
-
-    sprintf(tmp, "%0.02f%%/%s, ",
-            ((double)(bytes_trim_in - bytes_trim_out)) * 100 / bytes_trim_in,
-            DI(trim_execs));
-
-  }
-
-  if (!blocks_eff_total) {
-
-    u8 tmp2[128];
-
-    sprintf(tmp2, "n/a");
-    strcat(tmp, tmp2);
-
-  } else {
-
-    u8 tmp2[128];
-
-    sprintf(tmp2, "%0.02f%%",
-            ((double)(blocks_eff_total - blocks_eff_select)) * 100 /
-            blocks_eff_total);
-
-    strcat(tmp, tmp2);
-
-  }
-
-  SAYF(bV bSTOP "        trim : " cRST "%-37s " bSTG bVR bH20 bH2 bH2 bRB "\n"
-       bLB bH30 bH20 bH2 bH bRB bSTOP cRST RESET_G1, tmp);
+  SAYF(bLB bH30 bH30 bH10 bH5 bH2 bH bRB bSTOP cRST RESET_G1 "\n%-56s", "");
 
   /* Provide some CPU utilization stats. */
 
@@ -8751,6 +8542,7 @@ gfuzz:
   gen_total = 0;
   gen_after_cmin = 0;
   gen_unique = 0;
+  max_unique = 0;
 
   __gfz_plot_file = fopen("./gfz_plot_data", "w");
   if (!__gfz_plot_file) PFATAL("fopen() failed");
@@ -8789,10 +8581,16 @@ gfuzz:
        This could clog up RAM when using a ramdisk such as /dev/shm. */
     
     u8 *gen_path = dirname(strdup(gen_file));
-    
-    gen_dir = alloc_printf("%s/generated", gen_path);
-    if (mkdir(gen_dir, 0700)) WARNF("Unable to create '%s'", gen_dir);
-    
+    u8 *bname = strrchr(gen_cmdlines[0].argv[0], '/');
+
+    i = 0;
+    gen_dir = alloc_printf("%s/%s_%d", gen_path, bname, i);
+
+    while (mkdir(gen_dir, 0700)) {
+      ck_free(gen_dir);
+      gen_dir = alloc_printf("%s/%s_%d", gen_path, bname, ++i);
+    }
+
     free(gen_path);
 
     // Save *default* output in gen_dir

@@ -1,3 +1,18 @@
+/* BEGIN debugging stuff */
+
+fprintf(map_key_fd, "\n%s %d:\t%s", is_pointer ? "(ptr)" : "(num)", (is_pointer ? ptr_locs : num_locs) - 1, I->getOpcodeName());
+
+//this sometimes crashes for nullptr dereference...
+//if ( isa<CallInst>(I) )
+//  fprintf(map_key_fd, " (%s)", dyn_cast<CallInst>(I)->getCalledFunction()->getName().str().c_str());
+
+std::string str;
+raw_string_ostream rso(str);
+IT->print(rso);
+fprintf(map_key_fd, ", type %s", rso.str().c_str());
+
+/* END debugging stuff */
+
 /* The generation is consistently slow... */
 
 if ( avg_exec < 100 ) {

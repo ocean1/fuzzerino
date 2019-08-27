@@ -660,42 +660,6 @@ void AFLCoverage::instrumentOperands(Instruction *I) {
 
     is_pointer ? ptr_locs++ : num_locs++;
 
-    /*
-    // TODO: Custom mutations for each type of instruction?
-    if ( isa<ExtractElementInst>(I) ) {
-      // 2nd operand only (integer, index)
-    } else if ( isa<InsertElementInst>(I) ) {
-      // 2nd operand (whatever, 1st class value)
-      // 3rd operand (integer, index)
-    } else if ( isa<ExtractValueInst>(I) ) {
-      // index/indices (integer(s)) from 2nd onwards
-    } else if ( isa<InsertValueInst>(I) ) {
-      // value (whatever, 1st class value) (2nd)
-      // and index/indices (integer(s)) from 3rd onwards
-    } else if ( isa<AtomicCmpXchgInst>(I) ) {
-      // operands 2 and 3, whatever 1st class values
-    } else if ( isa<AtomicRMWInst>(I) ) {
-      // operand 3, whatever 1st class value
-    }
-    */
-
-    /* BEGIN debugging stuff */
-    
-    fprintf(map_key_fd, "\n%s %d:\t%s", is_pointer ? "(ptr)" : "(num)", (is_pointer ? ptr_locs : num_locs) - 1, I->getOpcodeName());
-
-    //this sometimes crashes for nullptr dereference...
-    //if ( isa<CallInst>(I) )
-    //  fprintf(map_key_fd, " (%s)", dyn_cast<CallInst>(I)->getCalledFunction()->getName().str().c_str());
-
-    fprintf(map_key_fd, ", operand %d", op_idx);
-
-    std::string str;
-    raw_string_ostream rso(str);
-    OT->print(rso);
-    fprintf(map_key_fd, ", type %s", rso.str().c_str());
-
-    /* END debugging stuff */
-
   } // end op loop
 } // end instrumentOperands
 
@@ -769,22 +733,6 @@ void AFLCoverage::instrumentResult(Instruction *I) {
 
   is_pointer ? ptr_locs++ : num_locs++;
 
-  /* BEGIN debugging stuff */
-  
-  fprintf(map_key_fd, "\n%s %d:\t%s", is_pointer ? "(ptr)" : "(num)", (is_pointer ? ptr_locs : num_locs) - 1, I->getOpcodeName());
-
-  //this sometimes crashes for nullptr dereference...
-  //if ( isa<CallInst>(I) )
-  //  fprintf(map_key_fd, " (%s)", dyn_cast<CallInst>(I)->getCalledFunction()->getName().str().c_str());
-
-  std::string str;
-  raw_string_ostream rso(str);
-  IT->print(rso);
-  fprintf(map_key_fd, ", type %s", rso.str().c_str());
-
-  /* END debugging stuff */
-
-  return;
 } // end instrumentResult
 
 void AFLCoverage::instrumentBranch(Instruction *I) {
@@ -845,21 +793,6 @@ void AFLCoverage::instrumentBranch(Instruction *I) {
   BI->setCondition(PHI);
 
   branch_locs++;
-
-  /* BEGIN debugging stuff */
-  
-  fprintf(map_key_fd, "\n%d:\t%s", branch_locs-1, I->getOpcodeName());
-
-  //this sometimes crashes for nullptr dereference...
-  //if ( isa<CallInst>(I) )
-  //  fprintf(map_key_fd, " (%s)", dyn_cast<CallInst>(I)->getCalledFunction()->getName().str().c_str());
-
-  std::string str;
-  raw_string_ostream rso(str);
-  CT->print(rso);
-  fprintf(map_key_fd, ", type %s", rso.str().c_str());
-
-  /* END debugging stuff */
 
 } // end instrumentBranch
 
