@@ -141,8 +141,6 @@ static s32 gfz_bnc_shm_id;            /* ID of bnc SHM region (gFuzz mode)*/
 static s32 gfz_ptr_shm_id;            /* ID of ptr SHM region (gFuzz mode)*/
 static s32 gfz_cov_shm_id;            /* ID of cov SHM region (gFuzz mode)*/
 
-static u32 maxi = 2000;               /* max # of iterations (gfz test)   */
-
 static FILE* __gfz_plot_file;         /* Gnuplot output file              */
 
 /* Usual stuff */
@@ -156,8 +154,7 @@ EXP_ST u8 *in_dir,                    /* Input directory with test cases  */
           *in_bitmap,                 /* Input bitmap                     */
           *doc_path,                  /* Path to documentation dir        */
           *target_path,               /* Path to target binary            */
-          *orig_cmdline,              /* Original command line            */
-          *numiter;                   /* Number of iterations (gfuzz test)*/
+          *orig_cmdline;              /* Original command line            */
 
 EXP_ST u32 exec_tmout = EXEC_TIMEOUT; /* Configurable exec timeout (ms)   */
 static u32 hang_tmout = EXEC_TIMEOUT; /* Timeout used for hang det (ms)   */
@@ -8745,9 +8742,6 @@ gfuzz:
 
   queue_cur = queue;
   
-  numiter = getenv("GFZ_NUM_ITER");
-  maxi = (numiter == NULL) ? 500 : atoi(numiter);
-  
   u32 i = 0;
   u8 fault;
   u64 slow_since = 0;
@@ -9066,14 +9060,17 @@ gfuzz:
 gfz_havoc:
 
   i = 0;
+
   u32 branch = 0;
   u32 branch_execs = 0;
+  
   u32 loc = 0;
   u32 is_ptr_loc = 0;
+  
   stage_name = "havoc";
   gfz_is_havoc = 1;
 
-  while ( (numiter == NULL) || (i < maxi) ) {
+  while ( 1 ) {
 
     show_stats();
 
@@ -9216,7 +9213,6 @@ gfz_havoc:
           __gfz_branch_map[idx] = GFZ_KEEP_ORIGINAL;
 
         slow_since = 0;
-        break;
       }
     } else {
       slow_since = 0;

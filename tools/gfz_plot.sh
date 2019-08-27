@@ -30,7 +30,7 @@ $script
 set output '$1_unique.png'
 plot '$1' using 1:3 with lines title 'unique' linecolor rgb '#0090ff' linewidth 3, \\
      '' using 1:4 with lines title 'coverage' linecolor rgb '#009900' linewidth 3, \\
-     '' using 1:9 with lines title 'havoc' linecolor rgb '#ff99ff' linewidth 3
+     '' using 1:(100*\$9) with lines title 'havoc' linecolor rgb '#ff99ff' linewidth 3
 _EOF_
 ) | gnuplot
 
@@ -46,7 +46,7 @@ plot '$1' using 1:2 with lines title 'generated' linecolor rgb '#000000' linewid
      '' using 1:6 with lines title 'crashes' linecolor rgb '#c000f0' linewidth 3, \\
      '' using 1:7 with lines title 'tmouts' linecolor rgb '#ff8000' linewidth 3, \\
      '' using 1:8 with lines title 'execs/sec' linecolor rgb '#5bdaff' linewidth 3, \\
-     '' using 1:9 with lines title 'havoc' linecolor rgb '#ff99ff' linewidth 3
+     '' using 1:(100*\$9) with lines title 'havoc' linecolor rgb '#ff99ff' linewidth 3
 _EOF_
 ) | gnuplot
 
