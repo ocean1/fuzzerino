@@ -7229,13 +7229,6 @@ EXP_ST void setup_dirs_fds(void) {
 #endif /* !__sun */
 
   }
-  /* Make generated dir */
-  if (gfuzz_mode) {
-    tmp = alloc_printf("%s/generated", out_dir);
-    if (mkdir(tmp, 0700)) WARNF("Unable to create '%s'", tmp);
-    ck_free(tmp);
-  }
-
   /* Queue directory for any starting & discovered paths. */
 
   tmp = alloc_printf("%s/queue", out_dir);
@@ -7889,10 +7882,10 @@ void read_gen_cmdlines(char *file) {
 
     arg = 0;
     nargs = 4;
-    gen_cmdlines[num_gen_cmdlines].argv = (u8**) malloc(nargs * sizeof(u8*));
+    gen_cmdlines[num_gen_cmdlines].argv = malloc(nargs * sizeof(u8*));
     
     pch = strtok(tmp, " ");
-    
+
     while ( pch != NULL ) {
 
       if (arg >= nargs) {  /* realloc */
@@ -7907,7 +7900,7 @@ void read_gen_cmdlines(char *file) {
         nargs *= 2;
       }
 
-      gen_cmdlines[num_gen_cmdlines].argv[arg] = malloc(strlen(pch));
+      gen_cmdlines[num_gen_cmdlines].argv[arg] = malloc(strlen(pch) + 1);
       strcpy(gen_cmdlines[num_gen_cmdlines].argv[arg], pch);
 
       ++arg;
@@ -8086,6 +8079,18 @@ u32 __gfz_load_dict(u8* fname) {
   fclose(f);
 
   return cur_entry;
+
+}
+
+void print_cmdline_at(u8 pos) {
+
+  if (pos >= GFZ_MAX_GEN_CMDLINES)
+    return;
+
+  u32 i = 0;
+
+  for (i = 0; i < gen_cmdlines[pos].argc; ++i)
+    printf("%s ", gen_cmdlines[pos].argv[i]);
 
 }
 
@@ -8361,7 +8366,7 @@ int main(int argc, char** argv) {
 
   check_if_tty();
 
-  get_core_count();
+  get_core_count();  
 
 #ifdef HAVE_AFFINITY
   bind_to_free_cpu();
@@ -8389,6 +8394,9 @@ int main(int argc, char** argv) {
   detect_file_args(argv + optind + 1);
 
   if (!out_file) setup_stdio_file();
+
+  OKF("Default generator cmdline: ");
+  printf("    "); print_cmdline_at(0); printf("\n");
 
   check_binary(gen_cmdlines[0].argv[0]);
 
