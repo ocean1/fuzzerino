@@ -102,28 +102,28 @@ int main(int argc, char** argv) {
   /* Define symbol */
 
   cc_params[cc_par_cnt++] = "--defsym";
-  cc_params[cc_par_cnt++] = alloc_printf("__gfz_num_locs_defsym=%u", __gfz_num_locs);
+  cc_params[cc_par_cnt++] = alloc_printf("__gfz_num_locs_defsym=%u", __gfz_num_locs ? __gfz_num_locs : 1);
 
   OKF("Read %u numeric locations from %s.", __gfz_num_locs, GFZ_IDFILE);
 
   /* Define symbol */
 
   cc_params[cc_par_cnt++] = "--defsym";
-  cc_params[cc_par_cnt++] = alloc_printf("__gfz_ptr_locs_defsym=%u", __gfz_ptr_locs);
+  cc_params[cc_par_cnt++] = alloc_printf("__gfz_ptr_locs_defsym=%u", __gfz_ptr_locs ? __gfz_ptr_locs : 1);
 
   OKF("Read %u pointer locations from %s.", __gfz_ptr_locs, GFZ_IDFILE);
 
   /* Define symbol */
 
   cc_params[cc_par_cnt++] = "--defsym";
-  cc_params[cc_par_cnt++] = alloc_printf("__gfz_branch_locs_defsym=%u", __gfz_branch_locs);
+  cc_params[cc_par_cnt++] = alloc_printf("__gfz_branch_locs_defsym=%u", __gfz_branch_locs ? __gfz_branch_locs : 1);
 
   OKF("Read %u branch locations from %s.", __gfz_branch_locs, GFZ_IDFILE);
 
   /* Define symbol */
 
   cc_params[cc_par_cnt++] = "--defsym";
-  cc_params[cc_par_cnt++] = alloc_printf("__gfz_total_bbs_defsym=%u", __gfz_total_bbs);
+  cc_params[cc_par_cnt++] = alloc_printf("__gfz_total_bbs_defsym=%u", __gfz_total_bbs ? __gfz_total_bbs : 1);
 
   OKF("Read %u basic blocks from %s.", __gfz_total_bbs, GFZ_IDFILE);
 
