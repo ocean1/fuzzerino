@@ -36,7 +36,7 @@ void image_write_test(void)
       img6x5_rgbf[i*3 + 2] = on ? 0.0f : 1.0f;
    }
 
-   stbi_write_png("/dev/shm/fuzztest", 6, 5, 3, img6x5_rgb, 6*3);
+   stbi_write_png("/dev/shm/stb", 6, 5, 3, img6x5_rgb, 6*3);
    /*stbi_write_bmp("output/wr6x5_regular.bmp", 6, 5, 3, img6x5_rgb);
    stbi_write_tga("output/wr6x5_regular.tga", 6, 5, 3, img6x5_rgb);
    stbi_write_jpg("output/wr6x5_regular.jpg", 6, 5, 3, img6x5_rgb, 95);

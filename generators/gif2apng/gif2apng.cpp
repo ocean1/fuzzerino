@@ -527,7 +527,7 @@ int main(int argc, char** argv)
 
   if (szOut[0] == 0)
   {
-    strcpy(szOut, "/dev/shm/fuzztest");
+    strcpy(szOut, "/dev/shm/gif2apng");
   }
 
   memset(&cube, 0, sizeof(cube));

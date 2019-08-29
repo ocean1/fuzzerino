@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
 
   // Output filename
   // char *pFilename = argv[3];
-  char *pFilename = "/dev/shm/fuzztest";
+  char *pFilename = "/dev/shm/miniz";
 
   int iX, iY;
   const double CxMin = -2.5;

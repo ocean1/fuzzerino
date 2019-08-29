@@ -8919,15 +8919,27 @@ gfz_havoc:
     // and enable random mutations for a random location
 
     if (UR(2)) {
+
       is_ptr_loc = 0;
 
       loc = UR(__gfz_num_locs);
+
+      if (!skip_deterministic)
+        while (__gfz_num_ban_map[loc])
+          loc = UR(__gfz_num_locs);
+
       __gfz_num_map[loc] = UR(65536);
 
     } else {
+
       is_ptr_loc = 1;
 
       loc = UR(__gfz_ptr_locs);
+
+      if (!skip_deterministic)
+        while (__gfz_ptr_ban_map[loc])
+          loc = UR(__gfz_ptr_locs);
+      
       __gfz_ptr_map[loc] = UR(65536);
 
     }
@@ -8948,26 +8960,6 @@ gfz_havoc:
       cur_cmdline = (cur_cmdline + 1) % num_gen_cmdlines;
       use_argv = (char**) gen_cmdlines[cur_cmdline].argv;
     } */
-
-    if (!skip_deterministic) {
-
-      // Restore banned locations to GFZ_KEEP_ORIGINAL
-
-      int idx = 0;
-
-      for (idx = 0; idx < __gfz_num_locs; ++idx) {
-        if (__gfz_num_ban_map[idx]) {
-          __gfz_num_map[idx] = GFZ_KEEP_ORIGINAL;
-        }
-      }
-
-      for (idx = 0; idx < __gfz_ptr_locs; ++idx) {
-        if (__gfz_ptr_ban_map[idx]) {
-          __gfz_ptr_map[idx] = GFZ_KEEP_ORIGINAL;
-        }
-      }
-
-    }
 
     fault = run_target(use_argv, exec_tmout);
 
