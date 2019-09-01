@@ -1,7 +1,7 @@
 fuzzerino
 -----------
 
-![alt text][resources/alpaca_small]
+![alt text](resources/alpaca_small.jpg)
 
 Kang inverse fuzzing (10.000 execs - 5 secs) then switches to normal fuzzer, with fuzzerino we can cover more space:
   - we apply coverage also to the generator since we might be exploring a new path (not present in Kang)
