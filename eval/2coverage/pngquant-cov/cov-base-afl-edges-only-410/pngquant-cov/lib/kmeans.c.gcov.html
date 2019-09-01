@@ -1,0 +1,174 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - cov-base-afl-edges-only-410.info - pngquant-cov/lib/kmeans.c</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">pngquant-cov/lib</a> - kmeans.c<span style="font-size: 80%;"> (source / <a href="kmeans.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">cov-base-afl-edges-only-410.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">28</td>
+            <td class="headerCovTableEntry">42</td>
+            <td class="headerCovTableEntryLo">66.7 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2019-09-01 22:22:05</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">3</td>
+            <td class="headerCovTableEntry">4</td>
+            <td class="headerCovTableEntryMed">75.0 %</td>
+          </tr>
+          <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*</a>
+<span class="lineNum">       2 </span>            : ** © 2011-2016 by Kornel Lesiński.
+<span class="lineNum">       3 </span>            : ** See COPYRIGHT file for license.
+<span class="lineNum">       4 </span>            : */
+<span class="lineNum">       5 </span>            : 
+<span class="lineNum">       6 </span>            : #include &quot;libimagequant.h&quot;
+<span class="lineNum">       7 </span>            : #include &quot;pam.h&quot;
+<span class="lineNum">       8 </span>            : #include &quot;kmeans.h&quot;
+<span class="lineNum">       9 </span>            : #include &quot;nearest.h&quot;
+<span class="lineNum">      10 </span>            : #include &lt;stdlib.h&gt;
+<span class="lineNum">      11 </span>            : #include &lt;string.h&gt;
+<span class="lineNum">      12 </span>            : 
+<span class="lineNum">      13 </span>            : #ifdef _OPENMP
+<span class="lineNum">      14 </span>            : #include &lt;omp.h&gt;
+<span class="lineNum">      15 </span>            : #else
+<span class="lineNum">      16 </span>            : #define omp_get_max_threads() 1
+<span class="lineNum">      17 </span>            : #define omp_get_thread_num() 0
+<span class="lineNum">      18 </span>            : #endif
+<span class="lineNum">      19 </span>            : 
+<span class="lineNum">      20 </span>            : /*
+<a name="21"><span class="lineNum">      21 </span>            :  * K-Means iteration: new palette color is computed from weighted average of colors that map to that palette entry.</a>
+<span class="lineNum">      22 </span>            :  */
+<span class="lineNum">      23 </span><span class="lineCov">         30 : LIQ_PRIVATE void kmeans_init(const colormap *map, const unsigned int max_threads, kmeans_state average_color[])</span>
+<span class="lineNum">      24 </span>            : {
+<span class="lineNum">      25 </span><span class="lineCov">         30 :     memset(average_color, 0, sizeof(average_color[0])*(KMEANS_CACHE_LINE_GAP+map-&gt;colors)*max_threads);</span>
+<a name="26"><span class="lineNum">      26 </span><span class="lineCov">         30 : }</span></a>
+<span class="lineNum">      27 </span>            : 
+<span class="lineNum">      28 </span><span class="lineCov">      30208 : LIQ_PRIVATE void kmeans_update_color(const f_pixel acolor, const float value, const colormap *map, unsigned int match, const unsigned int thread, kmeans_state average_color[])</span>
+<span class="lineNum">      29 </span>            : {
+<span class="lineNum">      30 </span><span class="lineCov">      30208 :     match += thread * (KMEANS_CACHE_LINE_GAP+map-&gt;colors);</span>
+<span class="lineNum">      31 </span><span class="lineCov">      30208 :     average_color[match].a += acolor.a * value;</span>
+<span class="lineNum">      32 </span><span class="lineCov">      30208 :     average_color[match].r += acolor.r * value;</span>
+<span class="lineNum">      33 </span><span class="lineCov">      30208 :     average_color[match].g += acolor.g * value;</span>
+<span class="lineNum">      34 </span><span class="lineCov">      30208 :     average_color[match].b += acolor.b * value;</span>
+<span class="lineNum">      35 </span><span class="lineCov">      30208 :     average_color[match].total += value;</span>
+<a name="36"><span class="lineNum">      36 </span><span class="lineCov">      30208 : }</span></a>
+<span class="lineNum">      37 </span>            : 
+<span class="lineNum">      38 </span><span class="lineCov">         30 : LIQ_PRIVATE void kmeans_finalize(colormap *map, const unsigned int max_threads, const kmeans_state average_color[])</span>
+<span class="lineNum">      39 </span>            : {
+<span class="lineNum">      40 </span><span class="lineCov">        151 :     for (unsigned int i=0; i &lt; map-&gt;colors; i++) {</span>
+<span class="lineNum">      41 </span>            :         double a=0, r=0, g=0, b=0, total=0;
+<span class="lineNum">      42 </span>            : 
+<span class="lineNum">      43 </span>            :         // Aggregate results from all threads
+<span class="lineNum">      44 </span><span class="lineCov">        121 :         for(unsigned int t=0; t &lt; max_threads; t++) {</span>
+<span class="lineNum">      45 </span><span class="lineCov">        121 :             const unsigned int offset = (KMEANS_CACHE_LINE_GAP+map-&gt;colors) * t + i;</span>
+<span class="lineNum">      46 </span>            : 
+<span class="lineNum">      47 </span><span class="lineCov">        121 :             a += average_color[offset].a;</span>
+<span class="lineNum">      48 </span><span class="lineCov">        121 :             r += average_color[offset].r;</span>
+<span class="lineNum">      49 </span><span class="lineCov">        121 :             g += average_color[offset].g;</span>
+<span class="lineNum">      50 </span><span class="lineCov">        121 :             b += average_color[offset].b;</span>
+<span class="lineNum">      51 </span><span class="lineCov">        121 :             total += average_color[offset].total;</span>
+<span class="lineNum">      52 </span>            :         }
+<span class="lineNum">      53 </span>            : 
+<span class="lineNum">      54 </span><span class="lineCov">        121 :         if (total &amp;&amp; !map-&gt;palette[i].fixed) {</span>
+<span class="lineNum">      55 </span><span class="lineCov">        121 :             map-&gt;palette[i].acolor = (f_pixel){</span>
+<span class="lineNum">      56 </span><span class="lineCov">        121 :                 .a = a / total,</span>
+<span class="lineNum">      57 </span><span class="lineCov">        121 :                 .r = r / total,</span>
+<span class="lineNum">      58 </span><span class="lineCov">        121 :                 .g = g / total,</span>
+<span class="lineNum">      59 </span><span class="lineCov">        121 :                 .b = b / total,</span>
+<span class="lineNum">      60 </span>            :             };
+<span class="lineNum">      61 </span><span class="lineCov">        121 :             map-&gt;palette[i].popularity = total;</span>
+<span class="lineNum">      62 </span>            :         }
+<span class="lineNum">      63 </span>            :     }
+<a name="64"><span class="lineNum">      64 </span><span class="lineCov">         30 : }</span></a>
+<span class="lineNum">      65 </span>            : 
+<span class="lineNum">      66 </span><span class="lineNoCov">          0 : LIQ_PRIVATE double kmeans_do_iteration(histogram *hist, colormap *const map, kmeans_callback callback)</span>
+<span class="lineNum">      67 </span><span class="lineNoCov">          0 : {</span>
+<span class="lineNum">      68 </span>            :     const unsigned int max_threads = omp_get_max_threads();
+<span class="lineNum">      69 </span><span class="lineNoCov">          0 :     LIQ_ARRAY(kmeans_state, average_color, (KMEANS_CACHE_LINE_GAP+map-&gt;colors) * max_threads);</span>
+<span class="lineNum">      70 </span>            :     kmeans_init(map, max_threads, average_color);
+<span class="lineNum">      71 </span>            :     struct nearest_map *const n = nearest_init(map);
+<span class="lineNum">      72 </span><span class="lineNoCov">          0 :     hist_item *const achv = hist-&gt;achv;</span>
+<span class="lineNum">      73 </span><span class="lineNoCov">          0 :     const int hist_size = hist-&gt;size;</span>
+<span class="lineNum">      74 </span>            : 
+<span class="lineNum">      75 </span>            :     double total_diff=0;
+<span class="lineNum">      76 </span>            : #if __GNUC__ &gt;= 9
+<span class="lineNum">      77 </span>            :     #pragma omp parallel for if (hist_size &gt; 2000) \
+<span class="lineNum">      78 </span>            :         schedule(static) default(none) shared(achv,average_color,callback,hist_size,map,n) reduction(+:total_diff)
+<span class="lineNum">      79 </span>            : #else
+<span class="lineNum">      80 </span>            :     #pragma omp parallel for if (hist_size &gt; 2000) \
+<span class="lineNum">      81 </span>            :         schedule(static) default(none) shared(average_color,callback) reduction(+:total_diff)
+<span class="lineNum">      82 </span>            : #endif
+<span class="lineNum">      83 </span><span class="lineNoCov">          0 :     for(int j=0; j &lt; hist_size; j++) {</span>
+<span class="lineNum">      84 </span>            :         float diff;
+<span class="lineNum">      85 </span><span class="lineNoCov">          0 :         unsigned int match = nearest_search(n, &amp;achv[j].acolor, achv[j].tmp.likely_colormap_index, &amp;diff);</span>
+<span class="lineNum">      86 </span><span class="lineNoCov">          0 :         achv[j].tmp.likely_colormap_index = match;</span>
+<span class="lineNum">      87 </span><span class="lineNoCov">          0 :         total_diff += diff * achv[j].perceptual_weight;</span>
+<span class="lineNum">      88 </span>            : 
+<span class="lineNum">      89 </span><span class="lineNoCov">          0 :         kmeans_update_color(achv[j].acolor, achv[j].perceptual_weight, map, match, omp_get_thread_num(), average_color);</span>
+<span class="lineNum">      90 </span>            : 
+<span class="lineNum">      91 </span><span class="lineNoCov">          0 :         if (callback) callback(&amp;achv[j], diff);</span>
+<span class="lineNum">      92 </span>            :     }
+<span class="lineNum">      93 </span>            : 
+<span class="lineNum">      94 </span><span class="lineNoCov">          0 :     nearest_free(n);</span>
+<span class="lineNum">      95 </span><span class="lineNoCov">          0 :     kmeans_finalize(map, max_threads, average_color);</span>
+<span class="lineNum">      96 </span>            : 
+<span class="lineNum">      97 </span><span class="lineNoCov">          0 :     return total_diff / hist-&gt;total_perceptual_weight;</span>
+<span class="lineNum">      98 </span>            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

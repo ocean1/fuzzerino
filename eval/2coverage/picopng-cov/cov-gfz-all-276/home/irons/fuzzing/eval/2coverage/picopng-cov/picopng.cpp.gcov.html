@@ -1,0 +1,669 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - cov-gfz-all-276.info - /home/irons/fuzzing/eval/2coverage/picopng-cov/picopng.cpp</title>
+  <link rel="stylesheet" type="text/css" href="../../../../../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../../../../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../../../../../index.html">top level</a> - <a href="index.html">home/irons/fuzzing/eval/2coverage/picopng-cov</a> - picopng.cpp<span style="font-size: 80%;"> (source / <a href="picopng.cpp.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">cov-gfz-all-276.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">323</td>
+            <td class="headerCovTableEntry">351</td>
+            <td class="headerCovTableEntryHi">92.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2019-09-01 22:22:01</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">36</td>
+            <td class="headerCovTableEntry">36</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr><td><img src="../../../../../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../../../../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : #include &lt;vector&gt;</a>
+<span class="lineNum">       2 </span>            : #include &lt;cstdio&gt;
+<span class="lineNum">       3 </span>            : 
+<span class="lineNum">       4 </span>            : /*
+<span class="lineNum">       5 </span>            : decodePNG: The picoPNG function, decodes a PNG file buffer in memory, into a raw pixel buffer.
+<span class="lineNum">       6 </span>            : out_image: output parameter, this will contain the raw pixels after decoding.
+<span class="lineNum">       7 </span>            :   By default the output is 32-bit RGBA color.
+<span class="lineNum">       8 </span>            :   The std::vector is automatically resized to the correct size.
+<span class="lineNum">       9 </span>            : image_width: output_parameter, this will contain the width of the image in pixels.
+<span class="lineNum">      10 </span>            : image_height: output_parameter, this will contain the height of the image in pixels.
+<span class="lineNum">      11 </span>            : in_png: pointer to the buffer of the PNG file in memory. To get it from a file on
+<span class="lineNum">      12 </span>            :   disk, load it and store it in a memory buffer yourself first.
+<span class="lineNum">      13 </span>            : in_size: size of the input PNG file in bytes.
+<span class="lineNum">      14 </span>            : convert_to_rgba32: optional parameter, true by default.
+<span class="lineNum">      15 </span>            :   Set to true to get the output in RGBA 32-bit (8 bit per channel) color format
+<span class="lineNum">      16 </span>            :   no matter what color type the original PNG image had. This gives predictable,
+<span class="lineNum">      17 </span>            :   useable data from any random input PNG.
+<span class="lineNum">      18 </span>            :   Set to false to do no color conversion at all. The result then has the same data
+<span class="lineNum">      19 </span>            :   type as the PNG image, which can range from 1 bit to 64 bits per pixel.
+<span class="lineNum">      20 </span>            :   Information about the color type or palette colors are not provided. You need
+<span class="lineNum">      21 </span>            :   to know this information yourself to be able to use the data so this only
+<span class="lineNum">      22 </span>            :   works for trusted PNG files. Use LodePNG instead of picoPNG if you need this information.
+<a name="23"><span class="lineNum">      23 </span>            : return: 0 if success, not 0 if some error occured.</a>
+<span class="lineNum">      24 </span>            : */
+<span class="lineNum">      25 </span><span class="lineCov">        276 : int decodePNG(std::vector&lt;unsigned char&gt;&amp; out_image, unsigned long&amp; image_width, unsigned long&amp; image_height, const unsigned char* in_png, size_t in_size, bool convert_to_rgba32 = true)</span>
+<span class="lineNum">      26 </span>            : {
+<span class="lineNum">      27 </span>            :   // picoPNG version 20101224
+<span class="lineNum">      28 </span>            :   // Copyright (c) 2005-2010 Lode Vandevenne
+<span class="lineNum">      29 </span>            :   //
+<span class="lineNum">      30 </span>            :   // This software is provided 'as-is', without any express or implied
+<span class="lineNum">      31 </span>            :   // warranty. In no event will the authors be held liable for any damages
+<span class="lineNum">      32 </span>            :   // arising from the use of this software.
+<span class="lineNum">      33 </span>            :   //
+<span class="lineNum">      34 </span>            :   // Permission is granted to anyone to use this software for any purpose,
+<span class="lineNum">      35 </span>            :   // including commercial applications, and to alter it and redistribute it
+<span class="lineNum">      36 </span>            :   // freely, subject to the following restrictions:
+<span class="lineNum">      37 </span>            :   //
+<span class="lineNum">      38 </span>            :   //     1. The origin of this software must not be misrepresented; you must not
+<span class="lineNum">      39 </span>            :   //     claim that you wrote the original software. If you use this software
+<span class="lineNum">      40 </span>            :   //     in a product, an acknowledgment in the product documentation would be
+<span class="lineNum">      41 </span>            :   //     appreciated but is not required.
+<span class="lineNum">      42 </span>            :   //     2. Altered source versions must be plainly marked as such, and must not be
+<span class="lineNum">      43 </span>            :   //     misrepresented as being the original software.
+<span class="lineNum">      44 </span>            :   //     3. This notice may not be removed or altered from any source distribution.
+<span class="lineNum">      45 </span>            :   
+<span class="lineNum">      46 </span>            :   // picoPNG is a PNG decoder in one C++ function of around 500 lines. Use picoPNG for
+<span class="lineNum">      47 </span>            :   // programs that need only 1 .cpp file. Since it's a single function, it's very limited,
+<span class="lineNum">      48 </span>            :   // it can convert a PNG to raw pixel data either converted to 32-bit RGBA color or
+<span class="lineNum">      49 </span>            :   // with no color conversion at all. For anything more complex, another tiny library
+<span class="lineNum">      50 </span>            :   // is available: LodePNG (lodepng.c(pp)), which is a single source and header file.
+<span class="lineNum">      51 </span>            :   // Apologies for the compact code style, it's to make this tiny.
+<span class="lineNum">      52 </span>            :   
+<span class="lineNum">      53 </span>            :   static const unsigned long LENBASE[29] =  {3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258};
+<span class="lineNum">      54 </span>            :   static const unsigned long LENEXTRA[29] = {0,0,0,0,0,0,0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4,  4,  5,  5,  5,  5,  0};
+<span class="lineNum">      55 </span>            :   static const unsigned long DISTBASE[30] =  {1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577};
+<span class="lineNum">      56 </span>            :   static const unsigned long DISTEXTRA[30] = {0,0,0,0,1,1,2, 2, 3, 3, 4, 4, 5, 5,  6,  6,  7,  7,  8,  8,   9,   9,  10,  10,  11,  11,  12,   12,   13,   13};
+<span class="lineNum">      57 </span>            :   static const unsigned long CLCL[19] = {16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15}; //code length code lengths
+<a name="58"><span class="lineNum">      58 </span>            :   struct Zlib //nested functions for zlib decompression</a>
+<a name="59"><span class="lineNum">      59 </span>            :   {</a>
+<span class="lineNum">      60 </span><span class="lineCov">     160370 :     static unsigned long readBitFromStream(size_t&amp; bitp, const unsigned char* bits) { unsigned long result = (bits[bitp &gt;&gt; 3] &gt;&gt; (bitp &amp; 0x7)) &amp; 1; bitp++; return result;}</span>
+<span class="lineNum">      61 </span><span class="lineCov">      18803 :     static unsigned long readBitsFromStream(size_t&amp; bitp, const unsigned char* bits, size_t nbits)</span>
+<span class="lineNum">      62 </span>            :     {
+<span class="lineNum">      63 </span><span class="lineCov">      18803 :       unsigned long result = 0;</span>
+<span class="lineNum">      64 </span><span class="lineCov">      18803 :       for(size_t i = 0; i &lt; nbits; i++) result += (readBitFromStream(bitp, bits)) &lt;&lt; i;</span>
+<a name="65"><span class="lineNum">      65 </span><span class="lineCov">      18803 :       return result;</span></a>
+<span class="lineNum">      66 </span>            :     }
+<a name="67"><span class="lineNum">      67 </span><span class="lineCov">       1284 :     struct HuffmanTree</span></a>
+<span class="lineNum">      68 </span>            :     {
+<span class="lineNum">      69 </span><span class="lineCov">        844 :       int makeFromLengths(const std::vector&lt;unsigned long&gt;&amp; bitlen, unsigned long maxbitlen)</span>
+<span class="lineNum">      70 </span>            :       { //make tree given the lengths
+<span class="lineNum">      71 </span><span class="lineCov">        844 :         unsigned long numcodes = (unsigned long)(bitlen.size()), treepos = 0, nodefilled = 0;</span>
+<span class="lineNum">      72 </span><span class="lineCov">       1688 :         std::vector&lt;unsigned long&gt; tree1d(numcodes), blcount(maxbitlen + 1, 0), nextcode(maxbitlen + 1, 0);</span>
+<span class="lineNum">      73 </span><span class="lineCov">        844 :         for(unsigned long bits = 0; bits &lt; numcodes; bits++) blcount[bitlen[bits]]++; //count number of instances of each code length</span>
+<span class="lineNum">      74 </span><span class="lineCov">        844 :         for(unsigned long bits = 1; bits &lt;= maxbitlen; bits++) nextcode[bits] = (nextcode[bits - 1] + blcount[bits - 1]) &lt;&lt; 1;</span>
+<span class="lineNum">      75 </span><span class="lineCov">        844 :         for(unsigned long n = 0; n &lt; numcodes; n++) if(bitlen[n] != 0) tree1d[n] = nextcode[bitlen[n]]++; //generate all the codes</span>
+<span class="lineNum">      76 </span><span class="lineCov">        844 :         tree2d.clear(); tree2d.resize(numcodes * 2, 32767); //32767 here means the tree2d isn't filled there yet</span>
+<span class="lineNum">      77 </span><span class="lineCov">     100807 :         for(unsigned long n = 0; n &lt; numcodes; n++) //the codes</span>
+<span class="lineNum">      78 </span><span class="lineCov">     283789 :         for(unsigned long i = 0; i &lt; bitlen[n]; i++) //the bits for this code</span>
+<span class="lineNum">      79 </span>            :         {
+<span class="lineNum">      80 </span><span class="lineCov">     183826 :           unsigned long bit = (tree1d[n] &gt;&gt; (bitlen[n] - i - 1)) &amp; 1;</span>
+<span class="lineNum">      81 </span><span class="lineCov">     183826 :           if(treepos &gt; numcodes - 2) return 55;</span>
+<span class="lineNum">      82 </span><span class="lineCov">     183820 :           if(tree2d[2 * treepos + bit] == 32767) //not yet filled in</span>
+<span class="lineNum">      83 </span>            :           {
+<span class="lineNum">      84 </span><span class="lineCov">      49712 :             if(i + 1 == bitlen[n]) { tree2d[2 * treepos + bit] = n; treepos = 0; } //last bit</span>
+<span class="lineNum">      85 </span><span class="lineCov">      24080 :             else { tree2d[2 * treepos + bit] = ++nodefilled + numcodes; treepos = nodefilled; } //addresses are encoded as values &gt; numcodes</span>
+<span class="lineNum">      86 </span>            :           }
+<span class="lineNum">      87 </span><span class="lineCov">     134108 :           else treepos = tree2d[2 * treepos + bit] - numcodes; //subtract numcodes from address to get address value</span>
+<span class="lineNum">      88 </span>            :         }
+<a name="89"><span class="lineNum">      89 </span><span class="lineCov">        838 :         return 0;</span></a>
+<span class="lineNum">      90 </span>            :       }
+<span class="lineNum">      91 </span><span class="lineCov">     124457 :       int decode(bool&amp; decoded, unsigned long&amp; result, size_t&amp; treepos, unsigned long bit) const</span>
+<span class="lineNum">      92 </span>            :       { //Decodes a symbol from the tree
+<span class="lineNum">      93 </span><span class="lineCov">     124457 :         unsigned long numcodes = (unsigned long)tree2d.size() / 2;</span>
+<span class="lineNum">      94 </span><span class="lineCov">     124457 :         if(treepos &gt;= numcodes) return 11; //error: you appeared outside the codetree</span>
+<span class="lineNum">      95 </span><span class="lineCov">     124453 :         result = tree2d[2 * treepos + bit];</span>
+<span class="lineNum">      96 </span><span class="lineCov">     124453 :         decoded = (result &lt; numcodes);</span>
+<span class="lineNum">      97 </span><span class="lineCov">     124453 :         treepos = decoded ? 0 : result - numcodes;</span>
+<span class="lineNum">      98 </span><span class="lineCov">     124453 :         return 0;</span>
+<span class="lineNum">      99 </span>            :       }
+<a name="100"><span class="lineNum">     100 </span>            :       std::vector&lt;unsigned long&gt; tree2d; //2D representation of a huffman tree: The one dimension is &quot;0&quot; or &quot;1&quot;, the other contains all nodes and leaves of the tree.</a>
+<span class="lineNum">     101 </span>            :     };
+<span class="lineNum">     102 </span><span class="lineCov">        428 :     struct Inflator</span>
+<a name="103"><span class="lineNum">     103 </span>            :     {</a>
+<span class="lineNum">     104 </span>            :       int error;
+<span class="lineNum">     105 </span><span class="lineCov">        204 :       void inflate(std::vector&lt;unsigned char&gt;&amp; out, const std::vector&lt;unsigned char&gt;&amp; in, size_t inpos = 0)</span>
+<span class="lineNum">     106 </span>            :       {
+<span class="lineNum">     107 </span><span class="lineCov">        204 :         size_t bp = 0, pos = 0; //bit pointer and byte pointer</span>
+<span class="lineNum">     108 </span><span class="lineCov">        204 :         error = 0;</span>
+<span class="lineNum">     109 </span><span class="lineCov">        204 :         unsigned long BFINAL = 0;</span>
+<span class="lineNum">     110 </span><span class="lineCov">       1294 :         while(!BFINAL &amp;&amp; !error)</span>
+<span class="lineNum">     111 </span>            :         {
+<span class="lineNum">     112 </span><span class="lineCov">        549 :           if(bp &gt;&gt; 3 &gt;= in.size()) { error = 52; return; } //error, bit pointer will jump past memory</span>
+<span class="lineNum">     113 </span><span class="lineCov">        547 :           BFINAL = readBitFromStream(bp, &amp;in[inpos]);</span>
+<span class="lineNum">     114 </span><span class="lineCov">        547 :           unsigned long BTYPE = readBitFromStream(bp, &amp;in[inpos]); BTYPE += 2 * readBitFromStream(bp, &amp;in[inpos]);</span>
+<span class="lineNum">     115 </span><span class="lineCov">        547 :           if(BTYPE == 3) { error = 20; return; } //error: invalid BTYPE</span>
+<span class="lineNum">     116 </span><span class="lineCov">        545 :           else if(BTYPE == 0) inflateNoCompression(out, &amp;in[inpos], bp, pos, in.size());</span>
+<span class="lineNum">     117 </span><span class="lineCov">        313 :           else inflateHuffmanBlock(out, &amp;in[inpos], bp, pos, in.size(), BTYPE);</span>
+<span class="lineNum">     118 </span>            :         }
+<a name="119"><span class="lineNum">     119 </span><span class="lineCov">        202 :         if(!error) out.resize(pos); //Only now we know the true size of out, resize it to that</span></a>
+<span class="lineNum">     120 </span>            :       }
+<span class="lineNum">     121 </span><span class="lineCov">         64 :       void generateFixedTrees(HuffmanTree&amp; tree, HuffmanTree&amp; treeD) //get the tree of a deflated block with fixed tree</span>
+<span class="lineNum">     122 </span>            :       {
+<span class="lineNum">     123 </span><span class="lineCov">        128 :         std::vector&lt;unsigned long&gt; bitlen(288, 8), bitlenD(32, 5);;</span>
+<span class="lineNum">     124 </span><span class="lineCov">         64 :         for(size_t i = 144; i &lt;= 255; i++) bitlen[i] = 9;</span>
+<span class="lineNum">     125 </span><span class="lineCov">         64 :         for(size_t i = 256; i &lt;= 279; i++) bitlen[i] = 7;</span>
+<span class="lineNum">     126 </span><span class="lineCov">         64 :         tree.makeFromLengths(bitlen, 15);</span>
+<span class="lineNum">     127 </span><span class="lineCov">         64 :         treeD.makeFromLengths(bitlenD, 15);</span>
+<a name="128"><span class="lineNum">     128 </span><span class="lineCov">         64 :       }</span></a>
+<span class="lineNum">     129 </span>            :       HuffmanTree codetree, codetreeD, codelengthcodetree; //the code tree for Huffman codes, dist codes, and code length codes
+<span class="lineNum">     130 </span><span class="lineCov">      87169 :       unsigned long huffmanDecodeSymbol(const unsigned char* in, size_t&amp; bp, const HuffmanTree&amp; codetree, size_t inlength)</span>
+<span class="lineNum">     131 </span>            :       { //decode a single symbol from given list of bits with given code tree. return value is the symbol
+<span class="lineNum">     132 </span>            :         bool decoded; unsigned long ct;
+<span class="lineNum">     133 </span><span class="lineCov">      87169 :         for(size_t treepos = 0;;)</span>
+<span class="lineNum">     134 </span>            :         {
+<span class="lineNum">     135 </span><span class="lineCov">     161751 :           if((bp &amp; 0x07) == 0 &amp;&amp; (bp &gt;&gt; 3) &gt; inlength) { error = 10; return 0; } //error: end reached without endcode</span>
+<span class="lineNum">     136 </span><span class="lineCov">     124457 :           error = codetree.decode(decoded, ct, treepos, readBitFromStream(bp, in)); if(error) return 0; //stop, an error happened</span>
+<span class="lineNum">     137 </span><span class="lineCov">     124453 :           if(decoded) return ct;</span>
+<a name="138"><span class="lineNum">     138 </span>            :         }</a>
+<span class="lineNum">     139 </span>            :       }
+<span class="lineNum">     140 </span><span class="lineCov">        249 :       void getTreeInflateDynamic(HuffmanTree&amp; tree, HuffmanTree&amp; treeD, const unsigned char* in, size_t&amp; bp, size_t inlength)</span>
+<span class="lineNum">     141 </span>            :       { //get the tree of a deflated block with dynamic tree, the tree itself is also Huffman compressed with a known tree
+<span class="lineNum">     142 </span><span class="lineCov">        482 :         std::vector&lt;unsigned long&gt; bitlen(288, 0), bitlenD(32, 0);</span>
+<span class="lineNum">     143 </span><span class="lineCov">        249 :         if(bp &gt;&gt; 3 &gt;= inlength - 2) { error = 49; return; } //the bit pointer is or will go past the memory</span>
+<span class="lineNum">     144 </span><span class="lineCov">        249 :         size_t HLIT =  readBitsFromStream(bp, in, 5) + 257; //number of literal/length codes + 257</span>
+<span class="lineNum">     145 </span><span class="lineCov">        249 :         size_t HDIST = readBitsFromStream(bp, in, 5) + 1; //number of dist codes + 1</span>
+<span class="lineNum">     146 </span><span class="lineCov">        249 :         size_t HCLEN = readBitsFromStream(bp, in, 4) + 4; //number of code length codes + 4</span>
+<span class="lineNum">     147 </span><span class="lineCov">        482 :         std::vector&lt;unsigned long&gt; codelengthcode(19); //lengths of tree to decode the lengths of the dynamic tree</span>
+<span class="lineNum">     148 </span><span class="lineCov">        249 :         for(size_t i = 0; i &lt; 19; i++) codelengthcode[CLCL[i]] = (i &lt; HCLEN) ? readBitsFromStream(bp, in, 3) : 0;</span>
+<span class="lineNum">     149 </span><span class="lineCov">        249 :         error = codelengthcodetree.makeFromLengths(codelengthcode, 7); if(error) return;</span>
+<span class="lineNum">     150 </span><span class="lineCov">        244 :         size_t i = 0, replength;</span>
+<span class="lineNum">     151 </span><span class="lineCov">      11704 :         while(i &lt; HLIT + HDIST)</span>
+<span class="lineNum">     152 </span>            :         {
+<span class="lineNum">     153 </span><span class="lineCov">       5740 :           unsigned long code = huffmanDecodeSymbol(in, bp, codelengthcodetree, inlength); if(error) return;</span>
+<span class="lineNum">     154 </span><span class="lineCov">       5737 :           if(code &lt;= 15)  { if(i &lt; HLIT) bitlen[i++] = code; else bitlenD[i++ - HLIT] = code; } //a length code</span>
+<span class="lineNum">     155 </span><span class="lineCov">       1692 :           else if(code == 16) //repeat previous</span>
+<span class="lineNum">     156 </span>            :           {
+<span class="lineNum">     157 </span><span class="lineCov">        146 :             if(bp &gt;&gt; 3 &gt;= inlength) { error = 50; return; } //error, bit pointer jumps past memory</span>
+<span class="lineNum">     158 </span><span class="lineCov">        146 :             replength = 3 + readBitsFromStream(bp, in, 2);</span>
+<span class="lineNum">     159 </span>            :             unsigned long value; //set value to the previous code
+<span class="lineNum">     160 </span><span class="lineCov">        146 :             if((i - 1) &lt; HLIT) value = bitlen[i - 1];</span>
+<span class="lineNum">     161 </span><span class="lineCov">         25 :             else value = bitlenD[i - HLIT - 1];</span>
+<span class="lineNum">     162 </span><span class="lineCov">        717 :             for(size_t n = 0; n &lt; replength; n++) //repeat this value in the next lengths</span>
+<span class="lineNum">     163 </span>            :             {
+<span class="lineNum">     164 </span><span class="lineCov">        571 :               if(i &gt;= HLIT + HDIST) { error = 13; return; } //error: i is larger than the amount of codes</span>
+<span class="lineNum">     165 </span><span class="lineCov">        571 :               if(i &lt; HLIT) bitlen[i++] = value; else bitlenD[i++ - HLIT] = value;</span>
+<span class="lineNum">     166 </span>            :             }
+<span class="lineNum">     167 </span>            :           }
+<span class="lineNum">     168 </span><span class="lineCov">       1546 :           else if(code == 17) //repeat &quot;0&quot; 3-10 times</span>
+<span class="lineNum">     169 </span>            :           {
+<span class="lineNum">     170 </span><span class="lineCov">        618 :             if(bp &gt;&gt; 3 &gt;= inlength) { error = 50; return; } //error, bit pointer jumps past memory</span>
+<span class="lineNum">     171 </span><span class="lineCov">        617 :             replength = 3 + readBitsFromStream(bp, in, 3);</span>
+<span class="lineNum">     172 </span><span class="lineCov">       3893 :             for(size_t n = 0; n &lt; replength; n++) //repeat this value in the next lengths</span>
+<span class="lineNum">     173 </span>            :             {
+<span class="lineNum">     174 </span><span class="lineCov">       3278 :               if(i &gt;= HLIT + HDIST) { error = 14; return; } //error: i is larger than the amount of codes</span>
+<span class="lineNum">     175 </span><span class="lineCov">       3276 :               if(i &lt; HLIT) bitlen[i++] = 0; else bitlenD[i++ - HLIT] = 0;</span>
+<span class="lineNum">     176 </span>            :             }
+<span class="lineNum">     177 </span>            :           }
+<span class="lineNum">     178 </span><span class="lineCov">        928 :           else if(code == 18) //repeat &quot;0&quot; 11-138 times</span>
+<span class="lineNum">     179 </span>            :           {
+<span class="lineNum">     180 </span><span class="lineCov">        928 :             if(bp &gt;&gt; 3 &gt;= inlength) { error = 50; return; } //error, bit pointer jumps past memory</span>
+<span class="lineNum">     181 </span><span class="lineCov">        927 :             replength = 11 + readBitsFromStream(bp, in, 7);</span>
+<span class="lineNum">     182 </span><span class="lineCov">      61912 :             for(size_t n = 0; n &lt; replength; n++) //repeat this value in the next lengths</span>
+<span class="lineNum">     183 </span>            :             {
+<span class="lineNum">     184 </span><span class="lineCov">      60988 :               if(i &gt;= HLIT + HDIST) { error = 15; return; } //error: i is larger than the amount of codes</span>
+<span class="lineNum">     185 </span><span class="lineCov">      60985 :               if(i &lt; HLIT) bitlen[i++] = 0; else bitlenD[i++ - HLIT] = 0;</span>
+<span class="lineNum">     186 </span>            :             }
+<span class="lineNum">     187 </span>            :           }
+<span class="lineNum">     188 </span><span class="lineNoCov">          0 :           else { error = 16; return; } //error: somehow an unexisting code appeared. This can never happen.</span>
+<span class="lineNum">     189 </span>            :         }
+<span class="lineNum">     190 </span><span class="lineCov">        234 :         if(bitlen[256] == 0) { error = 64; return; } //the length of the end code 256 must be larger than 0</span>
+<span class="lineNum">     191 </span><span class="lineCov">        234 :         error = tree.makeFromLengths(bitlen, 15); if(error) return; //now we've finally got HLIT and HDIST, so generate the code trees, and the function is done</span>
+<a name="192"><span class="lineNum">     192 </span><span class="lineCov">        233 :         error = treeD.makeFromLengths(bitlenD, 15); if(error) return;</span></a>
+<span class="lineNum">     193 </span>            :       }
+<span class="lineNum">     194 </span><span class="lineCov">        313 :       void inflateHuffmanBlock(std::vector&lt;unsigned char&gt;&amp; out, const unsigned char* in, size_t&amp; bp, size_t&amp; pos, size_t inlength, unsigned long btype) </span>
+<span class="lineNum">     195 </span>            :       {
+<span class="lineNum">     196 </span><span class="lineCov">        313 :         if(btype == 1) { generateFixedTrees(codetree, codetreeD); }</span>
+<span class="lineNum">     197 </span><span class="lineCov">        249 :         else if(btype == 2) { getTreeInflateDynamic(codetree, codetreeD, in, bp, inlength); if(error) return; }</span>
+<span class="lineNum">     198 </span>            :         for(;;)
+<span class="lineNum">     199 </span>            :         {
+<span class="lineNum">     200 </span><span class="lineCov">      75722 :           unsigned long code = huffmanDecodeSymbol(in, bp, codetree, inlength); if(error) return;</span>
+<span class="lineNum">     201 </span><span class="lineCov">      75423 :           if(code == 256) return; //end code</span>
+<span class="lineNum">     202 </span><span class="lineCov">      75138 :           else if(code &lt;= 255) //literal symbol</span>
+<span class="lineNum">     203 </span>            :           {
+<span class="lineNum">     204 </span><span class="lineCov">      69129 :             if(pos &gt;= out.size()) out.resize((pos + 1) * 2); //reserve more room</span>
+<span class="lineNum">     205 </span><span class="lineCov">      69129 :             out[pos++] = (unsigned char)(code);</span>
+<span class="lineNum">     206 </span>            :           }
+<span class="lineNum">     207 </span><span class="lineCov">       6009 :           else if(code &gt;= 257 &amp;&amp; code &lt;= 285) //length code</span>
+<span class="lineNum">     208 </span>            :           {
+<span class="lineNum">     209 </span><span class="lineCov">       6009 :             size_t length = LENBASE[code - 257], numextrabits = LENEXTRA[code - 257];</span>
+<span class="lineNum">     210 </span><span class="lineCov">       6009 :             if((bp &gt;&gt; 3) &gt;= inlength) { error = 51; return; } //error, bit pointer will jump past memory</span>
+<span class="lineNum">     211 </span><span class="lineCov">       6004 :             length += readBitsFromStream(bp, in, numextrabits);</span>
+<span class="lineNum">     212 </span><span class="lineCov">       6004 :             unsigned long codeD = huffmanDecodeSymbol(in, bp, codetreeD, inlength); if(error) return;</span>
+<span class="lineNum">     213 </span><span class="lineCov">       6002 :             if(codeD &gt; 29) { error = 18; return; } //error: invalid dist code (30-31 are never used)</span>
+<span class="lineNum">     214 </span><span class="lineCov">       6002 :             unsigned long dist = DISTBASE[codeD], numextrabitsD = DISTEXTRA[codeD];</span>
+<span class="lineNum">     215 </span><span class="lineCov">       6002 :             if((bp &gt;&gt; 3) &gt;= inlength) { error = 51; return; } //error, bit pointer will jump past memory</span>
+<span class="lineNum">     216 </span><span class="lineCov">       5999 :             dist += readBitsFromStream(bp, in, numextrabitsD);</span>
+<span class="lineNum">     217 </span><span class="lineCov">       5999 :             size_t start = pos, back = start - dist; //backwards</span>
+<span class="lineNum">     218 </span><span class="lineCov">       5999 :             if(pos + length &gt;= out.size()) out.resize((pos + length) * 2); //reserve more room</span>
+<span class="lineNum">     219 </span><span class="lineCov">       5999 :             for(size_t i = 0; i &lt; length; i++) { out[pos++] = out[back++]; if(back &gt;= start) back = start - dist; }</span>
+<span class="lineNum">     220 </span>            :           }
+<a name="221"><span class="lineNum">     221 </span><span class="lineCov">      75128 :         }</span></a>
+<span class="lineNum">     222 </span>            :       }
+<span class="lineNum">     223 </span><span class="lineCov">       1268 :       void inflateNoCompression(std::vector&lt;unsigned char&gt;&amp; out, const unsigned char* in, size_t&amp; bp, size_t&amp; pos, size_t inlength)</span>
+<span class="lineNum">     224 </span>            :       {
+<span class="lineNum">     225 </span><span class="lineCov">       1268 :         while((bp &amp; 0x7) != 0) bp++; //go to first boundary of byte</span>
+<span class="lineNum">     226 </span><span class="lineCov">        232 :         size_t p = bp / 8;</span>
+<span class="lineNum">     227 </span><span class="lineCov">        232 :         if(p &gt;= inlength - 4) { error = 52; return; } //error, bit pointer will jump past memory</span>
+<span class="lineNum">     228 </span><span class="lineCov">        231 :         unsigned long LEN = in[p] + 256 * in[p + 1], NLEN = in[p + 2] + 256 * in[p + 3]; p += 4;</span>
+<span class="lineNum">     229 </span><span class="lineCov">        231 :         if(LEN + NLEN != 65535) { error = 21; return; } //error: NLEN is not one's complement of LEN</span>
+<span class="lineNum">     230 </span><span class="lineCov">        230 :         if(pos + LEN &gt;= out.size()) out.resize(pos + LEN);</span>
+<span class="lineNum">     231 </span><span class="lineCov">        230 :         if(p + LEN &gt; inlength) { error = 23; return; } //error: reading outside of in buffer</span>
+<span class="lineNum">     232 </span><span class="lineCov">        230 :         for(unsigned long n = 0; n &lt; LEN; n++) out[pos++] = in[p++]; //read LEN bytes of literal data</span>
+<span class="lineNum">     233 </span><span class="lineCov">        230 :         bp = p * 8;</span>
+<a name="234"><span class="lineNum">     234 </span>            :       }</a>
+<span class="lineNum">     235 </span>            :     };
+<span class="lineNum">     236 </span><span class="lineCov">        214 :     int decompress(std::vector&lt;unsigned char&gt;&amp; out, const std::vector&lt;unsigned char&gt;&amp; in) //returns error value</span>
+<span class="lineNum">     237 </span>            :     {
+<span class="lineNum">     238 </span><span class="lineCov">        428 :       Inflator inflator;</span>
+<span class="lineNum">     239 </span><span class="lineCov">        214 :       if(in.size() &lt; 2) { return 53; } //error, size of zlib data too small</span>
+<span class="lineNum">     240 </span><span class="lineCov">        211 :       if((in[0] * 256 + in[1]) % 31 != 0) { return 24; } //error: 256 * in[0] + in[1] must be a multiple of 31, the FCHECK value is supposed to be made that way</span>
+<span class="lineNum">     241 </span><span class="lineCov">        207 :       unsigned long CM = in[0] &amp; 15, CINFO = (in[0] &gt;&gt; 4) &amp; 15, FDICT = (in[1] &gt;&gt; 5) &amp; 1;</span>
+<span class="lineNum">     242 </span><span class="lineCov">        207 :       if(CM != 8 || CINFO &gt; 7) { return 25; } //error: only compression method 8: inflate with sliding window of 32k is supported by the PNG spec</span>
+<span class="lineNum">     243 </span><span class="lineCov">        205 :       if(FDICT != 0) { return 26; } //error: the specification of PNG says about the zlib stream: &quot;The additional flags shall not specify a preset dictionary.&quot;</span>
+<span class="lineNum">     244 </span><span class="lineCov">        204 :       inflator.inflate(out, in, 2);</span>
+<span class="lineNum">     245 </span><span class="lineCov">        204 :       return inflator.error; //note: adler32 checksum was skipped and ignored</span>
+<a name="246"><span class="lineNum">     246 </span>            :     }</a>
+<span class="lineNum">     247 </span>            :   };
+<a name="248"><span class="lineNum">     248 </span><span class="lineCov">        552 :   struct PNG //nested functions for PNG decoding</span></a>
+<span class="lineNum">     249 </span>            :   {
+<span class="lineNum">     250 </span><span class="lineCov">        552 :     struct Info</span>
+<span class="lineNum">     251 </span>            :     {
+<span class="lineNum">     252 </span>            :       unsigned long width, height, colorType, bitDepth, compressionMethod, filterMethod, interlaceMethod, key_r, key_g, key_b;
+<span class="lineNum">     253 </span>            :       bool key_defined; //is a transparent color key given?
+<span class="lineNum">     254 </span>            :       std::vector&lt;unsigned char&gt; palette;
+<a name="255"><span class="lineNum">     255 </span>            :     } info;</a>
+<span class="lineNum">     256 </span>            :     int error;
+<span class="lineNum">     257 </span><span class="lineCov">        276 :     void decode(std::vector&lt;unsigned char&gt;&amp; out, const unsigned char* in, size_t size, bool convert_to_rgba32)</span>
+<span class="lineNum">     258 </span>            :     {
+<span class="lineNum">     259 </span><span class="lineCov">        276 :       error = 0;</span>
+<span class="lineNum">     260 </span><span class="lineCov">        416 :       if(size == 0 || in == 0) { error = 48; return; } //the given data is empty</span>
+<span class="lineNum">     261 </span><span class="lineCov">        276 :       readPngHeader(&amp;in[0], size); if(error) return;</span>
+<span class="lineNum">     262 </span><span class="lineCov">        244 :       size_t pos = 33; //first byte of the first chunk after the header</span>
+<span class="lineNum">     263 </span><span class="lineCov">        380 :       std::vector&lt;unsigned char&gt; idat; //the data from idat chunks</span>
+<span class="lineNum">     264 </span><span class="lineCov">        244 :       bool IEND = false, known_type = true;</span>
+<span class="lineNum">     265 </span><span class="lineCov">        244 :       info.key_defined = false;</span>
+<span class="lineNum">     266 </span><span class="lineCov">       4420 :       while(!IEND) //loop through the chunks, ignoring unknown chunks and stopping at IEND chunk. IDAT data is put at the start of the in buffer</span>
+<span class="lineNum">     267 </span>            :       {
+<span class="lineNum">     268 </span><span class="lineCov">       2118 :         if(pos + 8 &gt;= size) { error = 30; return; } //error: size of the in buffer too small to contain next chunk</span>
+<span class="lineNum">     269 </span><span class="lineCov">       2114 :         size_t chunkLength = read32bitInt(&amp;in[pos]); pos += 4;</span>
+<span class="lineNum">     270 </span><span class="lineCov">       2114 :         if(chunkLength &gt; 2147483647) { error = 63; return; }</span>
+<span class="lineNum">     271 </span><span class="lineCov">       2110 :         if(pos + chunkLength &gt;= size) { error = 35; return; } //error: size of the in buffer too small to contain next chunk</span>
+<span class="lineNum">     272 </span><span class="lineCov">       2101 :         if(in[pos + 0] == 'I' &amp;&amp; in[pos + 1] == 'D' &amp;&amp; in[pos + 2] == 'A' &amp;&amp; in[pos + 3] == 'T') //IDAT chunk, containing compressed image data</span>
+<span class="lineNum">     273 </span>            :         {
+<span class="lineNum">     274 </span><span class="lineCov">        228 :           idat.insert(idat.end(), &amp;in[pos + 4], &amp;in[pos + 4 + chunkLength]);</span>
+<span class="lineNum">     275 </span><span class="lineCov">        228 :           pos += (4 + chunkLength);</span>
+<span class="lineNum">     276 </span>            :         }
+<span class="lineNum">     277 </span><span class="lineCov">       1873 :         else if(in[pos + 0] == 'I' &amp;&amp; in[pos + 1] == 'E' &amp;&amp; in[pos + 2] == 'N' &amp;&amp; in[pos + 3] == 'D')  { pos += 4; IEND = true; }</span>
+<span class="lineNum">     278 </span><span class="lineCov">       1659 :         else if(in[pos + 0] == 'P' &amp;&amp; in[pos + 1] == 'L' &amp;&amp; in[pos + 2] == 'T' &amp;&amp; in[pos + 3] == 'E') //palette chunk (PLTE)</span>
+<span class="lineNum">     279 </span>            :         {
+<span class="lineNum">     280 </span><span class="lineCov">         92 :           pos += 4; //go after the 4 letters</span>
+<span class="lineNum">     281 </span><span class="lineCov">         92 :           info.palette.resize(4 * (chunkLength / 3));</span>
+<span class="lineNum">     282 </span><span class="lineCov">         92 :           if(info.palette.size() &gt; (4 * 256)) { error = 38; return; } //error: palette too big</span>
+<span class="lineNum">     283 </span><span class="lineCov">       8405 :           for(size_t i = 0; i &lt; info.palette.size(); i += 4)</span>
+<span class="lineNum">     284 </span>            :           {
+<span class="lineNum">     285 </span><span class="lineCov">       8313 :             for(size_t j = 0; j &lt; 3; j++) info.palette[i + j] = in[pos++]; //RGB</span>
+<span class="lineNum">     286 </span><span class="lineCov">       8313 :             info.palette[i + 3] = 255; //alpha</span>
+<span class="lineNum">     287 </span><span class="lineCov">         92 :           }</span>
+<span class="lineNum">     288 </span>            :         }
+<span class="lineNum">     289 </span><span class="lineCov">       1567 :         else if(in[pos + 0] == 't' &amp;&amp; in[pos + 1] == 'R' &amp;&amp; in[pos + 2] == 'N' &amp;&amp; in[pos + 3] == 'S') //palette transparency chunk (tRNS)</span>
+<span class="lineNum">     290 </span>            :         {
+<span class="lineNum">     291 </span><span class="lineCov">         91 :           pos += 4; //go after the 4 letters</span>
+<span class="lineNum">     292 </span><span class="lineCov">         91 :           if(info.colorType == 3)</span>
+<span class="lineNum">     293 </span>            :           {
+<span class="lineNum">     294 </span><span class="lineCov">         91 :             if(4 * chunkLength &gt; info.palette.size()) { error = 39; return; } //error: more alpha values given than there are palette entries</span>
+<span class="lineNum">     295 </span><span class="lineCov">         91 :             for(size_t i = 0; i &lt; chunkLength; i++) info.palette[4 * i + 3] = in[pos++];</span>
+<span class="lineNum">     296 </span>            :           }
+<span class="lineNum">     297 </span><span class="lineNoCov">          0 :           else if(info.colorType == 0)</span>
+<span class="lineNum">     298 </span>            :           {
+<span class="lineNum">     299 </span><span class="lineNoCov">          0 :             if(chunkLength != 2) { error = 40; return; } //error: this chunk must be 2 bytes for greyscale image</span>
+<span class="lineNum">     300 </span><span class="lineNoCov">          0 :             info.key_defined = 1; info.key_r = info.key_g = info.key_b = 256 * in[pos] + in[pos + 1]; pos += 2;</span>
+<span class="lineNum">     301 </span>            :           }
+<span class="lineNum">     302 </span><span class="lineNoCov">          0 :           else if(info.colorType == 2)</span>
+<span class="lineNum">     303 </span>            :           {
+<span class="lineNum">     304 </span><span class="lineNoCov">          0 :             if(chunkLength != 6) { error = 41; return; } //error: this chunk must be 6 bytes for RGB image</span>
+<span class="lineNum">     305 </span><span class="lineNoCov">          0 :             info.key_defined = 1;</span>
+<span class="lineNum">     306 </span><span class="lineNoCov">          0 :             info.key_r = 256 * in[pos] + in[pos + 1]; pos += 2;</span>
+<span class="lineNum">     307 </span><span class="lineNoCov">          0 :             info.key_g = 256 * in[pos] + in[pos + 1]; pos += 2;</span>
+<span class="lineNum">     308 </span><span class="lineNoCov">          0 :             info.key_b = 256 * in[pos] + in[pos + 1]; pos += 2;</span>
+<span class="lineNum">     309 </span>            :           }
+<span class="lineNum">     310 </span><span class="lineNoCov">          0 :           else { error = 42; return; } //error: tRNS chunk not allowed for other color models</span>
+<span class="lineNum">     311 </span>            :         }
+<span class="lineNum">     312 </span>            :         else //it's not an implemented chunk type, so ignore it: skip over the data
+<span class="lineNum">     313 </span>            :         {
+<span class="lineNum">     314 </span><span class="lineCov">       1476 :           if(!(in[pos + 0] &amp; 32)) { error = 69; return; } //error: unknown critical chunk (5th bit of first byte of chunk type is 0)</span>
+<span class="lineNum">     315 </span><span class="lineCov">       1463 :           pos += (chunkLength + 4); //skip 4 letters and uninterpreted data of unimplemented chunk</span>
+<span class="lineNum">     316 </span><span class="lineCov">       1463 :           known_type = false;</span>
+<span class="lineNum">     317 </span>            :         }
+<span class="lineNum">     318 </span><span class="lineCov">       2088 :         pos += 4; //step over CRC (which is ignored)</span>
+<span class="lineNum">     319 </span>            :       }
+<span class="lineNum">     320 </span><span class="lineCov">        214 :       unsigned long bpp = getBpp(info);</span>
+<span class="lineNum">     321 </span><span class="lineCov">        350 :       std::vector&lt;unsigned char&gt; scanlines(((info.width * (info.height * bpp + 7)) / 8) + info.height); //now the out buffer will be filled</span>
+<span class="lineNum">     322 </span>            :       Zlib zlib; //decompress with the Zlib decompressor
+<span class="lineNum">     323 </span><span class="lineCov">        214 :       error = zlib.decompress(scanlines, idat); if(error) return; //stop if the zlib decompressor returned an error</span>
+<span class="lineNum">     324 </span><span class="lineCov">        172 :       size_t bytewidth = (bpp + 7) / 8, outlength = (info.height * info.width * bpp + 7) / 8;</span>
+<span class="lineNum">     325 </span><span class="lineCov">        172 :       out.resize(outlength); //time to fill the out buffer</span>
+<span class="lineNum">     326 </span><span class="lineCov">        172 :       unsigned char* out_ = outlength ? &amp;out[0] : 0; //use a regular pointer to the std::vector for faster code if compiled without optimization</span>
+<span class="lineNum">     327 </span><span class="lineCov">        172 :       if(info.interlaceMethod == 0) //no interlace, just filter</span>
+<span class="lineNum">     328 </span>            :       {
+<span class="lineNum">     329 </span><span class="lineCov">        171 :         size_t linestart = 0, linelength = (info.width * bpp + 7) / 8; //length in bytes of a scanline, excluding the filtertype byte</span>
+<span class="lineNum">     330 </span><span class="lineCov">        171 :         if(bpp &gt;= 8) //byte per byte</span>
+<span class="lineNum">     331 </span><span class="lineCov">       6954 :         for(unsigned long y = 0; y &lt; info.height; y++)</span>
+<span class="lineNum">     332 </span>            :         {
+<span class="lineNum">     333 </span><span class="lineCov">       6820 :           unsigned long filterType = scanlines[linestart];</span>
+<span class="lineNum">     334 </span><span class="lineCov">       6820 :           const unsigned char* prevline = (y == 0) ? 0 : &amp;out_[(y - 1) * info.width * bytewidth];</span>
+<span class="lineNum">     335 </span><span class="lineCov">       6820 :           unFilterScanline(&amp;out_[linestart - y], &amp;scanlines[linestart + 1], prevline, bytewidth, filterType,  linelength); if(error) return;</span>
+<span class="lineNum">     336 </span><span class="lineCov">       6785 :           linestart += (1 + linelength); //go to start of next scanline</span>
+<span class="lineNum">     337 </span>            :         }
+<span class="lineNum">     338 </span>            :         else //less than 8 bits per pixel, so fill it up bit per bit
+<span class="lineNum">     339 </span>            :         {
+<span class="lineNum">     340 </span><span class="lineCov">          3 :           std::vector&lt;unsigned char&gt; templine((info.width * bpp + 7) &gt;&gt; 3); //only used if bpp &lt; 8</span>
+<span class="lineNum">     341 </span><span class="lineCov">         20 :           for(size_t y = 0, obp = 0; y &lt; info.height; y++)</span>
+<span class="lineNum">     342 </span>            :           {
+<span class="lineNum">     343 </span><span class="lineCov">         19 :             unsigned long filterType = scanlines[linestart];</span>
+<span class="lineNum">     344 </span><span class="lineCov">         19 :             const unsigned char* prevline = (y == 0) ? 0 : &amp;out_[(y - 1) * info.width * bytewidth];</span>
+<span class="lineNum">     345 </span><span class="lineCov">         20 :             unFilterScanline(&amp;templine[0], &amp;scanlines[linestart + 1], prevline, bytewidth, filterType, linelength); if(error) return;</span>
+<span class="lineNum">     346 </span><span class="lineCov">         18 :             for(size_t bp = 0; bp &lt; info.width * bpp;) setBitOfReversedStream(obp, out_, readBitFromReversedStream(bp, &amp;templine[0]));</span>
+<span class="lineNum">     347 </span><span class="lineCov">         18 :             linestart += (1 + linelength); //go to start of next scanline</span>
+<span class="lineNum">     348 </span>            :           }
+<span class="lineNum">     349 </span>            :         }
+<span class="lineNum">     350 </span>            :       }
+<span class="lineNum">     351 </span>            :       else //interlaceMethod is 1 (Adam7)
+<span class="lineNum">     352 </span>            :       {
+<span class="lineNum">     353 </span><span class="lineCov">          1 :         size_t passw[7] = { (info.width + 7) / 8, (info.width + 3) / 8, (info.width + 3) / 4, (info.width + 1) / 4, (info.width + 1) / 2, (info.width + 0) / 2, (info.width + 0) / 1 };</span>
+<span class="lineNum">     354 </span><span class="lineCov">          1 :         size_t passh[7] = { (info.height + 7) / 8, (info.height + 7) / 8, (info.height + 3) / 8, (info.height + 3) / 4, (info.height + 1) / 4, (info.height + 1) / 2, (info.height + 0) / 2 };</span>
+<span class="lineNum">     355 </span><span class="lineCov">          1 :         size_t passstart[7] = {0};</span>
+<span class="lineNum">     356 </span><span class="lineCov">          1 :         size_t pattern[28] = {0,4,0,2,0,1,0,0,0,4,0,2,0,1,8,8,4,4,2,2,1,8,8,8,4,4,2,2}; //values for the adam7 passes</span>
+<span class="lineNum">     357 </span><span class="lineCov">          1 :         for(int i = 0; i &lt; 6; i++) passstart[i + 1] = passstart[i] + passh[i] * ((passw[i] ? 1 : 0) + (passw[i] * bpp + 7) / 8);</span>
+<span class="lineNum">     358 </span><span class="lineCov">          2 :         std::vector&lt;unsigned char&gt; scanlineo((info.width * bpp + 7) / 8), scanlinen((info.width * bpp + 7) / 8); //&quot;old&quot; and &quot;new&quot; scanline</span>
+<span class="lineNum">     359 </span><span class="lineCov">          8 :         for(int i = 0; i &lt; 7; i++)</span>
+<span class="lineNum">     360 </span><span class="lineCov">          7 :           adam7Pass(&amp;out_[0], &amp;scanlinen[0], &amp;scanlineo[0], &amp;scanlines[passstart[i]], info.width, pattern[i], pattern[i + 7], pattern[i + 14], pattern[i + 21], passw[i], passh[i], bpp);</span>
+<span class="lineNum">     361 </span>            :       }
+<span class="lineNum">     362 </span><span class="lineCov">        136 :       if(convert_to_rgba32 &amp;&amp; (info.colorType != 6 || info.bitDepth != 8)) //conversion needed</span>
+<span class="lineNum">     363 </span>            :       {
+<span class="lineNum">     364 </span><span class="lineCov">        270 :         std::vector&lt;unsigned char&gt; data = out;</span>
+<span class="lineNum">     365 </span><span class="lineCov">        135 :         error = convert(out, &amp;data[0], info, info.width, info.height);</span>
+<a name="366"><span class="lineNum">     366 </span>            :       }</a>
+<span class="lineNum">     367 </span>            :     }
+<span class="lineNum">     368 </span><span class="lineCov">        276 :     void readPngHeader(const unsigned char* in, size_t inlength) //read the information from the header and store it in the Info</span>
+<span class="lineNum">     369 </span>            :     {
+<span class="lineNum">     370 </span><span class="lineCov">        276 :       if(inlength &lt; 29) { error = 27; return; } //error: the data length is smaller than the length of the header</span>
+<span class="lineNum">     371 </span><span class="lineCov">        270 :       if(in[0] != 137 || in[1] != 80 || in[2] != 78 || in[3] != 71 || in[4] != 13 || in[5] != 10 || in[6] != 26 || in[7] != 10) { error = 28; return; } //no PNG signature</span>
+<span class="lineNum">     372 </span><span class="lineCov">        262 :       if(in[12] != 'I' || in[13] != 'H' || in[14] != 'D' || in[15] != 'R') { error = 29; return; } //error: it doesn't start with a IHDR chunk!</span>
+<span class="lineNum">     373 </span><span class="lineCov">        257 :       info.width = read32bitInt(&amp;in[16]); info.height = read32bitInt(&amp;in[20]);</span>
+<span class="lineNum">     374 </span><span class="lineCov">        257 :       info.bitDepth = in[24]; info.colorType = in[25];</span>
+<span class="lineNum">     375 </span><span class="lineCov">        257 :       info.compressionMethod = in[26]; if(in[26] != 0) { error = 32; return; } //error: only compression method 0 is allowed in the specification</span>
+<span class="lineNum">     376 </span><span class="lineCov">        252 :       info.filterMethod = in[27]; if(in[27] != 0) { error = 33; return; } //error: only filter method 0 is allowed in the specification</span>
+<span class="lineNum">     377 </span><span class="lineCov">        251 :       info.interlaceMethod = in[28]; if(in[28] &gt; 1) { error = 34; return; } //error: only interlace methods 0 and 1 exist in the specification</span>
+<a name="378"><span class="lineNum">     378 </span><span class="lineCov">        250 :       error = checkColorValidity(info.colorType, info.bitDepth);</span></a>
+<span class="lineNum">     379 </span>            :     }
+<span class="lineNum">     380 </span><span class="lineCov">       6847 :     void unFilterScanline(unsigned char* recon, const unsigned char* scanline, const unsigned char* precon, size_t bytewidth, unsigned long filterType, size_t length)</span>
+<span class="lineNum">     381 </span>            :     {
+<span class="lineNum">     382 </span><span class="lineCov">       6847 :       switch(filterType)</span>
+<span class="lineNum">     383 </span>            :       {
+<span class="lineNum">     384 </span><span class="lineCov">       6603 :         case 0: for(size_t i = 0; i &lt; length; i++) recon[i] = scanline[i]; break;</span>
+<span class="lineNum">     385 </span><span class="lineCov">         71 :         case 1:</span>
+<span class="lineNum">     386 </span><span class="lineCov">         71 :           for(size_t i =         0; i &lt; bytewidth; i++) recon[i] = scanline[i];</span>
+<span class="lineNum">     387 </span><span class="lineCov">         71 :           for(size_t i = bytewidth; i &lt;    length; i++) recon[i] = scanline[i] + recon[i - bytewidth];</span>
+<span class="lineNum">     388 </span><span class="lineCov">         71 :           break;</span>
+<span class="lineNum">     389 </span><span class="lineCov">         52 :         case 2:</span>
+<span class="lineNum">     390 </span><span class="lineCov">         52 :           if(precon) for(size_t i = 0; i &lt; length; i++) recon[i] = scanline[i] + precon[i];</span>
+<span class="lineNum">     391 </span><span class="lineCov">          2 :           else       for(size_t i = 0; i &lt; length; i++) recon[i] = scanline[i];</span>
+<span class="lineNum">     392 </span><span class="lineCov">         52 :           break;</span>
+<span class="lineNum">     393 </span><span class="lineCov">         37 :         case 3:</span>
+<span class="lineNum">     394 </span><span class="lineCov">         37 :           if(precon)</span>
+<span class="lineNum">     395 </span>            :           {
+<span class="lineNum">     396 </span><span class="lineCov">         35 :             for(size_t i =         0; i &lt; bytewidth; i++) recon[i] = scanline[i] + precon[i] / 2;</span>
+<span class="lineNum">     397 </span><span class="lineCov">         35 :             for(size_t i = bytewidth; i &lt;    length; i++) recon[i] = scanline[i] + ((recon[i - bytewidth] + precon[i]) / 2);</span>
+<span class="lineNum">     398 </span>            :           }
+<span class="lineNum">     399 </span>            :           else
+<span class="lineNum">     400 </span>            :           {
+<span class="lineNum">     401 </span><span class="lineCov">          2 :             for(size_t i =         0; i &lt; bytewidth; i++) recon[i] = scanline[i];</span>
+<span class="lineNum">     402 </span><span class="lineCov">          2 :             for(size_t i = bytewidth; i &lt;    length; i++) recon[i] = scanline[i] + recon[i - bytewidth] / 2;</span>
+<span class="lineNum">     403 </span>            :           }
+<span class="lineNum">     404 </span><span class="lineCov">         37 :           break;</span>
+<span class="lineNum">     405 </span><span class="lineCov">         45 :         case 4:</span>
+<span class="lineNum">     406 </span><span class="lineCov">         45 :           if(precon)</span>
+<span class="lineNum">     407 </span>            :           {
+<span class="lineNum">     408 </span><span class="lineCov">         39 :             for(size_t i =         0; i &lt; bytewidth; i++) recon[i] = scanline[i] + paethPredictor(0, precon[i], 0);</span>
+<span class="lineNum">     409 </span><span class="lineCov">         39 :             for(size_t i = bytewidth; i &lt;    length; i++) recon[i] = scanline[i] + paethPredictor(recon[i - bytewidth], precon[i], precon[i - bytewidth]);</span>
+<span class="lineNum">     410 </span>            :           }
+<span class="lineNum">     411 </span>            :           else
+<span class="lineNum">     412 </span>            :           {
+<span class="lineNum">     413 </span><span class="lineCov">          6 :             for(size_t i =         0; i &lt; bytewidth; i++) recon[i] = scanline[i];</span>
+<span class="lineNum">     414 </span><span class="lineCov">          6 :             for(size_t i = bytewidth; i &lt;    length; i++) recon[i] = scanline[i] + paethPredictor(recon[i - bytewidth], 0, 0);</span>
+<span class="lineNum">     415 </span>            :           }
+<span class="lineNum">     416 </span><span class="lineCov">         45 :           break;</span>
+<span class="lineNum">     417 </span><span class="lineCov">         39 :         default: error = 36; return; //error: unexisting filter type given</span>
+<a name="418"><span class="lineNum">     418 </span>            :       }</a>
+<span class="lineNum">     419 </span>            :     }
+<span class="lineNum">     420 </span><span class="lineCov">          7 :     void adam7Pass(unsigned char* out, unsigned char* linen, unsigned char* lineo, const unsigned char* in, unsigned long w, size_t passleft, size_t passtop, size_t spacex, size_t spacey, size_t passw, size_t passh, unsigned long bpp)</span>
+<span class="lineNum">     421 </span>            :     { //filter and reposition the pixels into the output when the image is Adam7 interlaced. This function can only do it after the full image is already decoded. The out buffer must have the correct allocated memory size already.
+<span class="lineNum">     422 </span><span class="lineCov">          7 :       if(passw == 0) return;</span>
+<span class="lineNum">     423 </span><span class="lineCov">          7 :       size_t bytewidth = (bpp + 7) / 8, linelength = 1 + ((bpp * passw + 7) / 8);</span>
+<span class="lineNum">     424 </span><span class="lineCov">          8 :       for(unsigned long y = 0; y &lt; passh; y++)</span>
+<span class="lineNum">     425 </span>            :       {
+<span class="lineNum">     426 </span><span class="lineCov">          8 :         unsigned char filterType = in[y * linelength], *prevline = (y == 0) ? 0 : lineo;</span>
+<span class="lineNum">     427 </span><span class="lineCov">          8 :         unFilterScanline(linen, &amp;in[y * linelength + 1], prevline, bytewidth, filterType, (w * bpp + 7) / 8); if(error) return;</span>
+<span class="lineNum">     428 </span><span class="lineCov">          7 :         if(bpp &gt;= 8) for(size_t i = 0; i &lt; passw; i++) for(size_t b = 0; b &lt; bytewidth; b++) //b = current byte of this pixel</span>
+<span class="lineNum">     429 </span><span class="lineCov">          6 :           out[bytewidth * w * (passtop + spacey * y) + bytewidth * (passleft + spacex * i) + b] = linen[bytewidth * i + b];</span>
+<span class="lineNum">     430 </span><span class="lineNoCov">          0 :         else for(size_t i = 0; i &lt; passw; i++)</span>
+<span class="lineNum">     431 </span>            :         {
+<span class="lineNum">     432 </span><span class="lineNoCov">          0 :           size_t obp = bpp * w * (passtop + spacey * y) + bpp * (passleft + spacex * i), bp = i * bpp;</span>
+<span class="lineNum">     433 </span><span class="lineNoCov">          0 :           for(size_t b = 0; b &lt; bpp; b++) setBitOfReversedStream(obp, out, readBitFromReversedStream(bp, &amp;linen[0]));</span>
+<span class="lineNum">     434 </span>            :         }
+<span class="lineNum">     435 </span><span class="lineCov">          1 :         unsigned char* temp = linen; linen = lineo; lineo = temp; //swap the two buffer pointers &quot;line old&quot; and &quot;line new&quot;</span>
+<a name="436"><span class="lineNum">     436 </span>            :       }</a>
+<a name="437"><span class="lineNum">     437 </span>            :     }</a>
+<span class="lineNum">     438 </span><span class="lineCov">       1088 :     static unsigned long readBitFromReversedStream(size_t&amp; bitp, const unsigned char* bits) { unsigned long result = (bits[bitp &gt;&gt; 3] &gt;&gt; (7 - (bitp &amp; 0x7))) &amp; 1; bitp++; return result;}</span>
+<span class="lineNum">     439 </span><span class="lineCov">        256 :     static unsigned long readBitsFromReversedStream(size_t&amp; bitp, const unsigned char* bits, unsigned long nbits)</span>
+<span class="lineNum">     440 </span>            :     {
+<span class="lineNum">     441 </span><span class="lineCov">        256 :       unsigned long result = 0;</span>
+<span class="lineNum">     442 </span><span class="lineCov">        256 :       for(size_t i = nbits - 1; i &lt; nbits; i--) result += ((readBitFromReversedStream(bitp, bits)) &lt;&lt; i);</span>
+<a name="443"><span class="lineNum">     443 </span><span class="lineCov">        256 :       return result;</span></a>
+<a name="444"><span class="lineNum">     444 </span>            :     }</a>
+<a name="445"><span class="lineNum">     445 </span><span class="lineCov">        576 :     void setBitOfReversedStream(size_t&amp; bitp, unsigned char* bits, unsigned long bit) { bits[bitp &gt;&gt; 3] |=  (bit &lt;&lt; (7 - (bitp &amp; 0x7))); bitp++; }</span></a>
+<span class="lineNum">     446 </span><span class="lineCov">       2628 :     unsigned long read32bitInt(const unsigned char* buffer) { return (buffer[0] &lt;&lt; 24) | (buffer[1] &lt;&lt; 16) | (buffer[2] &lt;&lt; 8) | buffer[3]; }</span>
+<span class="lineNum">     447 </span><span class="lineCov">        250 :     int checkColorValidity(unsigned long colorType, unsigned long bd) //return type is a LodePNG error code</span>
+<span class="lineNum">     448 </span>            :     {
+<span class="lineNum">     449 </span><span class="lineCov">        250 :       if((colorType == 2 || colorType == 4 || colorType == 6)) { if(!(bd == 8 || bd == 16)) return 37; else return 0; }</span>
+<span class="lineNum">     450 </span><span class="lineCov">        114 :       else if(colorType == 0) { if(!(bd == 1 || bd == 2 || bd == 4 || bd == 8 || bd == 16)) return 37; else return 0; }</span>
+<span class="lineNum">     451 </span><span class="lineCov">         97 :       else if(colorType == 3) { if(!(bd == 1 || bd == 2 || bd == 4 || bd == 8            )) return 37; else return 0; }</span>
+<a name="452"><span class="lineNum">     452 </span><span class="lineCov">          3 :       else return 31; //unexisting color type</span></a>
+<span class="lineNum">     453 </span>            :     }
+<span class="lineNum">     454 </span><span class="lineCov">        214 :     unsigned long getBpp(const Info&amp; info)</span>
+<span class="lineNum">     455 </span>            :     {
+<span class="lineNum">     456 </span><span class="lineCov">        214 :       if(info.colorType == 2) return (3 * info.bitDepth);</span>
+<span class="lineNum">     457 </span><span class="lineCov">        105 :       else if(info.colorType &gt;= 4) return (info.colorType - 2) * info.bitDepth;</span>
+<a name="458"><span class="lineNum">     458 </span><span class="lineCov">         99 :       else return info.bitDepth;</span></a>
+<span class="lineNum">     459 </span>            :     }
+<span class="lineNum">     460 </span><span class="lineCov">        135 :     int convert(std::vector&lt;unsigned char&gt;&amp; out, const unsigned char* in, Info&amp; infoIn, unsigned long w, unsigned long h)</span>
+<span class="lineNum">     461 </span>            :     { //converts from any color type to 32-bit. return value = LodePNG error code
+<span class="lineNum">     462 </span><span class="lineCov">        135 :       size_t numpixels = w * h, bp = 0;</span>
+<span class="lineNum">     463 </span><span class="lineCov">        135 :       out.resize(numpixels * 4);</span>
+<span class="lineNum">     464 </span><span class="lineCov">        135 :       unsigned char* out_ = out.empty() ? 0 : &amp;out[0]; //faster if compiled without optimization</span>
+<span class="lineNum">     465 </span><span class="lineCov">        135 :       if(infoIn.bitDepth == 8 &amp;&amp; infoIn.colorType == 0) //greyscale</span>
+<span class="lineNum">     466 </span><span class="lineCov">     161043 :       for(size_t i = 0; i &lt; numpixels; i++)</span>
+<span class="lineNum">     467 </span>            :       {
+<span class="lineNum">     468 </span><span class="lineCov">     161040 :         out_[4 * i + 0] = out_[4 * i + 1] = out_[4 * i + 2] = in[i];</span>
+<span class="lineNum">     469 </span><span class="lineCov">     161040 :         out_[4 * i + 3] = (infoIn.key_defined &amp;&amp; in[i] == infoIn.key_r) ? 0 : 255;</span>
+<span class="lineNum">     470 </span><span class="lineCov">          3 :       }</span>
+<span class="lineNum">     471 </span><span class="lineCov">        132 :       else if(infoIn.bitDepth == 8 &amp;&amp; infoIn.colorType == 2) //RGB color</span>
+<span class="lineNum">     472 </span><span class="lineCov">    8078949 :       for(size_t i = 0; i &lt; numpixels; i++)</span>
+<span class="lineNum">     473 </span>            :       {
+<span class="lineNum">     474 </span><span class="lineCov">    8078872 :         for(size_t c = 0; c &lt; 3; c++) out_[4 * i + c] = in[3 * i + c];</span>
+<span class="lineNum">     475 </span><span class="lineCov">    8078872 :         out_[4 * i + 3] = (infoIn.key_defined == 1 &amp;&amp; in[3 * i + 0] == infoIn.key_r &amp;&amp; in[3 * i + 1] == infoIn.key_g &amp;&amp; in[3 * i + 2] == infoIn.key_b) ? 0 : 255;</span>
+<span class="lineNum">     476 </span><span class="lineCov">         77 :       }</span>
+<span class="lineNum">     477 </span><span class="lineCov">         55 :       else if(infoIn.bitDepth == 8 &amp;&amp; infoIn.colorType == 3) //indexed color (palette)</span>
+<span class="lineNum">     478 </span><span class="lineCov">       3656 :       for(size_t i = 0; i &lt; numpixels; i++)</span>
+<span class="lineNum">     479 </span>            :       {
+<span class="lineNum">     480 </span><span class="lineCov">       3626 :         if(4U * in[i] &gt;= infoIn.palette.size()) return 46;</span>
+<span class="lineNum">     481 </span><span class="lineCov">       3606 :         for(size_t c = 0; c &lt; 4; c++) out_[4 * i + c] = infoIn.palette[4 * in[i] + c]; //get rgb colors from the palette</span>
+<span class="lineNum">     482 </span><span class="lineCov">         30 :       }</span>
+<span class="lineNum">     483 </span><span class="lineCov">          5 :       else if(infoIn.bitDepth == 8 &amp;&amp; infoIn.colorType == 4) //greyscale with alpha</span>
+<span class="lineNum">     484 </span><span class="lineCov">      53762 :       for(size_t i = 0; i &lt; numpixels; i++)</span>
+<span class="lineNum">     485 </span>            :       {
+<span class="lineNum">     486 </span><span class="lineCov">      53760 :         out_[4 * i + 0] = out_[4 * i + 1] = out_[4 * i + 2] = in[2 * i + 0];</span>
+<span class="lineNum">     487 </span><span class="lineCov">      53760 :         out_[4 * i + 3] = in[2 * i + 1];</span>
+<span class="lineNum">     488 </span><span class="lineCov">          2 :       }</span>
+<span class="lineNum">     489 </span><span class="lineCov">          3 :       else if(infoIn.bitDepth == 8 &amp;&amp; infoIn.colorType == 6) for(size_t i = 0; i &lt; numpixels; i++) for(size_t c = 0; c &lt; 4; c++) out_[4 * i + c] = in[4 * i + c]; //RGB with alpha</span>
+<span class="lineNum">     490 </span><span class="lineCov">          3 :       else if(infoIn.bitDepth == 16 &amp;&amp; infoIn.colorType == 0) //greyscale</span>
+<span class="lineNum">     491 </span><span class="lineCov">          1 :       for(size_t i = 0; i &lt; numpixels; i++)</span>
+<span class="lineNum">     492 </span>            :       {
+<span class="lineNum">     493 </span><span class="lineNoCov">          0 :         out_[4 * i + 0] = out_[4 * i + 1] = out_[4 * i + 2] = in[2 * i];</span>
+<span class="lineNum">     494 </span><span class="lineNoCov">          0 :         out_[4 * i + 3] = (infoIn.key_defined &amp;&amp; 256U * in[i] + in[i + 1] == infoIn.key_r) ? 0 : 255;</span>
+<span class="lineNum">     495 </span><span class="lineCov">          1 :       }</span>
+<span class="lineNum">     496 </span><span class="lineCov">          2 :       else if(infoIn.bitDepth == 16 &amp;&amp; infoIn.colorType == 2) //RGB color</span>
+<span class="lineNum">     497 </span><span class="lineCov">          1 :       for(size_t i = 0; i &lt; numpixels; i++)</span>
+<span class="lineNum">     498 </span>            :       {
+<span class="lineNum">     499 </span><span class="lineNoCov">          0 :         for(size_t c = 0; c &lt; 3; c++) out_[4 * i + c] = in[6 * i + 2 * c];</span>
+<span class="lineNum">     500 </span><span class="lineNoCov">          0 :         out_[4 * i + 3] = (infoIn.key_defined &amp;&amp; 256U*in[6*i+0]+in[6*i+1] == infoIn.key_r &amp;&amp; 256U*in[6*i+2]+in[6*i+3] == infoIn.key_g &amp;&amp; 256U*in[6*i+4]+in[6*i+5] == infoIn.key_b) ? 0 : 255;</span>
+<span class="lineNum">     501 </span><span class="lineCov">          1 :       }</span>
+<span class="lineNum">     502 </span><span class="lineCov">          1 :       else if(infoIn.bitDepth == 16 &amp;&amp; infoIn.colorType == 4) //greyscale with alpha</span>
+<span class="lineNum">     503 </span><span class="lineNoCov">          0 :       for(size_t i = 0; i &lt; numpixels; i++)</span>
+<span class="lineNum">     504 </span>            :       {
+<span class="lineNum">     505 </span><span class="lineNoCov">          0 :         out_[4 * i + 0] = out_[4 * i + 1] = out_[4 * i + 2] = in[4 * i]; //most significant byte</span>
+<span class="lineNum">     506 </span><span class="lineNoCov">          0 :         out_[4 * i + 3] = in[4 * i + 2];</span>
+<span class="lineNum">     507 </span><span class="lineNoCov">          0 :       }</span>
+<span class="lineNum">     508 </span><span class="lineCov">          1 :       else if(infoIn.bitDepth == 16 &amp;&amp; infoIn.colorType == 6) for(size_t i = 0; i &lt; numpixels; i++) for(size_t c = 0; c &lt; 4; c++) out_[4 * i + c] = in[8 * i + 2 * c]; //RGB with alpha</span>
+<span class="lineNum">     509 </span><span class="lineCov">          1 :       else if(infoIn.bitDepth &lt; 8 &amp;&amp; infoIn.colorType == 0) //greyscale</span>
+<span class="lineNum">     510 </span><span class="lineCov">        257 :       for(size_t i = 0; i &lt; numpixels; i++)</span>
+<span class="lineNum">     511 </span>            :       {
+<span class="lineNum">     512 </span><span class="lineCov">        256 :         unsigned long value = (readBitsFromReversedStream(bp, in, infoIn.bitDepth) * 255) / ((1 &lt;&lt; infoIn.bitDepth) - 1); //scale value from 0 to 255</span>
+<span class="lineNum">     513 </span><span class="lineCov">        256 :         out_[4 * i + 0] = out_[4 * i + 1] = out_[4 * i + 2] = (unsigned char)(value);</span>
+<span class="lineNum">     514 </span><span class="lineCov">        256 :         out_[4 * i + 3] = (infoIn.key_defined &amp;&amp; value &amp;&amp; ((1U &lt;&lt; infoIn.bitDepth) - 1U) == infoIn.key_r &amp;&amp; ((1U &lt;&lt; infoIn.bitDepth) - 1U)) ? 0 : 255;</span>
+<span class="lineNum">     515 </span><span class="lineCov">          1 :       }</span>
+<span class="lineNum">     516 </span><span class="lineNoCov">          0 :       else if(infoIn.bitDepth &lt; 8 &amp;&amp; infoIn.colorType == 3) //palette</span>
+<span class="lineNum">     517 </span><span class="lineNoCov">          0 :       for(size_t i = 0; i &lt; numpixels; i++)</span>
+<span class="lineNum">     518 </span>            :       {
+<span class="lineNum">     519 </span><span class="lineNoCov">          0 :         unsigned long value = readBitsFromReversedStream(bp, in, infoIn.bitDepth);</span>
+<span class="lineNum">     520 </span><span class="lineNoCov">          0 :         if(4 * value &gt;= infoIn.palette.size()) return 47;</span>
+<span class="lineNum">     521 </span><span class="lineNoCov">          0 :         for(size_t c = 0; c &lt; 4; c++) out_[4 * i + c] = infoIn.palette[4 * value + c]; //get rgb colors from the palette</span>
+<span class="lineNum">     522 </span>            :       }
+<a name="523"><span class="lineNum">     523 </span><span class="lineCov">        115 :       return 0;</span></a>
+<span class="lineNum">     524 </span>            :     }
+<span class="lineNum">     525 </span><span class="lineCov">        644 :     unsigned char paethPredictor(short a, short b, short c) //Paeth predicter, used by PNG filter type 4</span>
+<span class="lineNum">     526 </span>            :     {
+<span class="lineNum">     527 </span><span class="lineCov">        644 :       short p = a + b - c, pa = p &gt; a ? (p - a) : (a - p), pb = p &gt; b ? (p - b) : (b - p), pc = p &gt; c ? (p - c) : (c - p);</span>
+<span class="lineNum">     528 </span><span class="lineCov">        644 :       return (unsigned char)((pa &lt;= pb &amp;&amp; pa &lt;= pc) ? a : pb &lt;= pc ? b : c);</span>
+<span class="lineNum">     529 </span>            :     }
+<span class="lineNum">     530 </span>            :   };
+<span class="lineNum">     531 </span><span class="lineCov">        552 :   PNG decoder; decoder.decode(out_image, in_png, in_size, convert_to_rgba32);</span>
+<span class="lineNum">     532 </span><span class="lineCov">        276 :   image_width = decoder.info.width; image_height = decoder.info.height;</span>
+<span class="lineNum">     533 </span><span class="lineCov">        552 :   return decoder.error;</span>
+<span class="lineNum">     534 </span>            : }
+<span class="lineNum">     535 </span>            : 
+<span class="lineNum">     536 </span>            : 
+<span class="lineNum">     537 </span>            : 
+<span class="lineNum">     538 </span>            : 
+<span class="lineNum">     539 </span>            : 
+<span class="lineNum">     540 </span>            : //an example using the PNG loading function:
+<span class="lineNum">     541 </span>            : 
+<span class="lineNum">     542 </span>            : #include &lt;iostream&gt;
+<a name="543"><span class="lineNum">     543 </span>            : #include &lt;fstream&gt;</a>
+<span class="lineNum">     544 </span>            : 
+<span class="lineNum">     545 </span><span class="lineCov">        276 : void loadFile(std::vector&lt;unsigned char&gt;&amp; buffer, const std::string&amp; filename) //designed for loading files from hard disk in an std::vector</span>
+<span class="lineNum">     546 </span>            : {
+<span class="lineNum">     547 </span><span class="lineCov">        552 :   std::ifstream file(filename.c_str(), std::ios::in|std::ios::binary|std::ios::ate);</span>
+<span class="lineNum">     548 </span>            : 
+<span class="lineNum">     549 </span>            :   //get filesize
+<span class="lineNum">     550 </span><span class="lineCov">        276 :   std::streamsize size = 0;</span>
+<span class="lineNum">     551 </span><span class="lineCov">        276 :   if(file.seekg(0, std::ios::end).good()) size = file.tellg();</span>
+<span class="lineNum">     552 </span><span class="lineCov">        276 :   if(file.seekg(0, std::ios::beg).good()) size -= file.tellg();</span>
+<span class="lineNum">     553 </span>            : 
+<span class="lineNum">     554 </span>            :   //read contents of the file into the vector
+<span class="lineNum">     555 </span><span class="lineCov">        276 :   if(size &gt; 0)</span>
+<span class="lineNum">     556 </span>            :   {
+<span class="lineNum">     557 </span><span class="lineCov">        276 :     buffer.resize((size_t)size);</span>
+<span class="lineNum">     558 </span><span class="lineCov">        276 :     file.read((char*)(&amp;buffer[0]), size);</span>
+<span class="lineNum">     559 </span>            :   }
+<span class="lineNum">     560 </span><span class="lineNoCov">          0 :   else buffer.clear();</span>
+<a name="561"><span class="lineNum">     561 </span><span class="lineCov">        276 : }</span></a>
+<span class="lineNum">     562 </span>            : 
+<span class="lineNum">     563 </span><span class="lineCov">        276 : int main(int argc, char *argv[])</span>
+<span class="lineNum">     564 </span>            : {
+<span class="lineNum">     565 </span><span class="lineCov">        276 :   const char* filename = argc &gt; 1 ? argv[1] : &quot;test.png&quot;;</span>
+<span class="lineNum">     566 </span>            :   
+<span class="lineNum">     567 </span>            :   //load and decode
+<span class="lineNum">     568 </span><span class="lineCov">        552 :   std::vector&lt;unsigned char&gt; buffer, image;</span>
+<span class="lineNum">     569 </span><span class="lineCov">        276 :   loadFile(buffer, filename);</span>
+<span class="lineNum">     570 </span>            :   unsigned long w, h;
+<span class="lineNum">     571 </span><span class="lineCov">        276 :   int error = decodePNG(image, w, h, buffer.empty() ? 0 : &amp;buffer[0], (unsigned long)buffer.size());</span>
+<span class="lineNum">     572 </span>            :   
+<span class="lineNum">     573 </span>            :   //if there's an error, display it
+<span class="lineNum">     574 </span><span class="lineCov">        276 :   if(error != 0) std::cout &lt;&lt; &quot;error: &quot; &lt;&lt; error &lt;&lt; std::endl;</span>
+<span class="lineNum">     575 </span>            :   
+<span class="lineNum">     576 </span>            :   //the pixels are now in the vector &quot;image&quot;, use it as texture, draw it, ...
+<a name="577"><span class="lineNum">     577 </span>            :   </a>
+<span class="lineNum">     578 </span><span class="lineCov">        276 :   if(image.size() &gt; 4) std::cout &lt;&lt; &quot;width: &quot; &lt;&lt; w &lt;&lt; &quot; height: &quot; &lt;&lt; h &lt;&lt; &quot; first pixel: &quot; &lt;&lt; std::hex &lt;&lt; int(image[0]) &lt;&lt; int(image[1]) &lt;&lt; int(image[2]) &lt;&lt; int(image[3]) &lt;&lt; std::endl;</span>
+<span class="lineNum">     579 </span><span class="lineCov">       1104 : }</span>
+<span class="lineNum">     580 </span>            : 
+<span class="lineNum">     581 </span>            : /*
+<span class="lineNum">     582 </span>            :   //this is test code, it displays the pixels of a 1 bit PNG. To use it, set the flag convert_to_rgba32 to false and load a 1-bit PNG image with a small size (so that its ASCII representation can fit in a console window)
+<span class="lineNum">     583 </span>            :   for(int y = 0; y &lt; h; y++)
+<span class="lineNum">     584 </span>            :   {
+<span class="lineNum">     585 </span>            :     for(int x = 0; x &lt; w; x++)
+<span class="lineNum">     586 </span>            :     {
+<span class="lineNum">     587 </span>            :       int i = y * h + x;
+<span class="lineNum">     588 </span>            :       std::cout &lt;&lt; (((image[i/8] &gt;&gt; (7-i%8)) &amp; 1) ? '.' : '#');
+<span class="lineNum">     589 </span>            :     }
+<span class="lineNum">     590 </span>            :     std::cout &lt;&lt; std::endl;
+<span class="lineNum">     591 </span>            :   }
+<span class="lineNum">     592 </span>            : */
+<span class="lineNum">     593 </span>            : 
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../../../../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

@@ -1,0 +1,200 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - cov-base-libspng-201.info - libspng-cov/examples/example.c</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">libspng-cov/examples</a> - example.c<span style="font-size: 80%;"> (source / <a href="example.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">cov-base-libspng-201.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">52</td>
+            <td class="headerCovTableEntry">66</td>
+            <td class="headerCovTableEntryMed">78.8 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2019-09-01 22:21:52</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">1</td>
+            <td class="headerCovTableEntry">1</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : #include &lt;spng.h&gt;</a>
+<span class="lineNum">       2 </span>            : 
+<span class="lineNum">       3 </span>            : #include &lt;inttypes.h&gt;
+<a name="4"><span class="lineNum">       4 </span>            : #include &lt;stdio.h&gt;</a>
+<span class="lineNum">       5 </span>            : 
+<span class="lineNum">       6 </span><span class="lineCov">        201 : int main(int argc, char **argv)</span>
+<span class="lineNum">       7 </span>            : {
+<span class="lineNum">       8 </span><span class="lineCov">        201 :     int r = 0;</span>
+<span class="lineNum">       9 </span>            :     FILE *png;
+<span class="lineNum">      10 </span><span class="lineCov">        201 :     char *pngbuf = NULL;</span>
+<span class="lineNum">      11 </span><span class="lineCov">        201 :     spng_ctx *ctx = NULL;</span>
+<span class="lineNum">      12 </span><span class="lineCov">        201 :     unsigned char *out = NULL;</span>
+<span class="lineNum">      13 </span>            : 
+<span class="lineNum">      14 </span><span class="lineCov">        201 :     if(argc &lt; 2)</span>
+<span class="lineNum">      15 </span>            :     {
+<span class="lineNum">      16 </span><span class="lineNoCov">          0 :         printf(&quot;no input file\n&quot;);</span>
+<span class="lineNum">      17 </span><span class="lineNoCov">          0 :         goto err;</span>
+<span class="lineNum">      18 </span>            :     }
+<span class="lineNum">      19 </span>            : 
+<span class="lineNum">      20 </span><span class="lineCov">        201 :     png = fopen(argv[1], &quot;rb&quot;);</span>
+<span class="lineNum">      21 </span><span class="lineCov">        201 :     if(png == NULL)</span>
+<span class="lineNum">      22 </span>            :     {
+<span class="lineNum">      23 </span><span class="lineNoCov">          0 :         printf(&quot;error opening input file %s\n&quot;, argv[1]);</span>
+<span class="lineNum">      24 </span><span class="lineNoCov">          0 :         goto err;</span>
+<span class="lineNum">      25 </span>            :     }
+<span class="lineNum">      26 </span>            : 
+<span class="lineNum">      27 </span><span class="lineCov">        201 :     fseek(png, 0, SEEK_END);</span>
+<span class="lineNum">      28 </span>            : 
+<span class="lineNum">      29 </span><span class="lineCov">        201 :     long siz_pngbuf = ftell(png);</span>
+<span class="lineNum">      30 </span><span class="lineCov">        201 :     rewind(png);</span>
+<span class="lineNum">      31 </span>            : 
+<span class="lineNum">      32 </span><span class="lineCov">        201 :     if(siz_pngbuf &lt; 1) goto err;</span>
+<span class="lineNum">      33 </span>            : 
+<span class="lineNum">      34 </span><span class="lineCov">        201 :     pngbuf = malloc(siz_pngbuf);</span>
+<span class="lineNum">      35 </span><span class="lineCov">        201 :     if(pngbuf == NULL)</span>
+<span class="lineNum">      36 </span>            :     {
+<span class="lineNum">      37 </span><span class="lineNoCov">          0 :         printf(&quot;malloc() failed\n&quot;);</span>
+<span class="lineNum">      38 </span><span class="lineNoCov">          0 :         goto err;</span>
+<span class="lineNum">      39 </span>            :     }
+<span class="lineNum">      40 </span>            : 
+<span class="lineNum">      41 </span><span class="lineCov">        201 :     if(fread(pngbuf, siz_pngbuf, 1, png) != 1)</span>
+<span class="lineNum">      42 </span>            :     {
+<span class="lineNum">      43 </span><span class="lineNoCov">          0 :         printf(&quot;fread() failed\n&quot;);</span>
+<span class="lineNum">      44 </span><span class="lineNoCov">          0 :         goto err;</span>
+<span class="lineNum">      45 </span>            :     }
+<span class="lineNum">      46 </span>            : 
+<span class="lineNum">      47 </span><span class="lineCov">        201 :     ctx = spng_ctx_new(0);</span>
+<span class="lineNum">      48 </span><span class="lineCov">        201 :     if(ctx == NULL)</span>
+<span class="lineNum">      49 </span>            :     {
+<span class="lineNum">      50 </span><span class="lineNoCov">          0 :         printf(&quot;spng_ctx_new() failed\n&quot;);</span>
+<span class="lineNum">      51 </span><span class="lineNoCov">          0 :         goto err;</span>
+<span class="lineNum">      52 </span>            :     }
+<span class="lineNum">      53 </span>            : 
+<span class="lineNum">      54 </span><span class="lineCov">        201 :     r = spng_set_crc_action(ctx, SPNG_CRC_USE, SPNG_CRC_USE);</span>
+<span class="lineNum">      55 </span>            : 
+<span class="lineNum">      56 </span><span class="lineCov">        201 :     if(r)</span>
+<span class="lineNum">      57 </span>            :     {
+<span class="lineNum">      58 </span><span class="lineNoCov">          0 :         printf(&quot;spng_set_crc_action() error: %s\n&quot;, spng_strerror(r));</span>
+<span class="lineNum">      59 </span><span class="lineNoCov">          0 :         goto err;</span>
+<span class="lineNum">      60 </span>            :     }
+<span class="lineNum">      61 </span>            : 
+<span class="lineNum">      62 </span><span class="lineCov">        201 :     r = spng_set_png_buffer(ctx, pngbuf, siz_pngbuf);</span>
+<span class="lineNum">      63 </span>            : 
+<span class="lineNum">      64 </span><span class="lineCov">        201 :     if(r)</span>
+<span class="lineNum">      65 </span>            :     {
+<span class="lineNum">      66 </span><span class="lineNoCov">          0 :         printf(&quot;spng_set_png_buffer() error: %s\n&quot;, spng_strerror(r));</span>
+<span class="lineNum">      67 </span><span class="lineNoCov">          0 :         goto err;</span>
+<span class="lineNum">      68 </span>            :     }
+<span class="lineNum">      69 </span>            : 
+<span class="lineNum">      70 </span>            :     struct spng_ihdr ihdr;
+<span class="lineNum">      71 </span><span class="lineCov">        201 :     r = spng_get_ihdr(ctx, &amp;ihdr);</span>
+<span class="lineNum">      72 </span>            : 
+<span class="lineNum">      73 </span><span class="lineCov">        201 :     if(r)</span>
+<span class="lineNum">      74 </span>            :     {
+<span class="lineNum">      75 </span><span class="lineCov">         35 :         printf(&quot;spng_get_ihdr() error: %s\n&quot;, spng_strerror(r));</span>
+<span class="lineNum">      76 </span><span class="lineCov">         35 :         goto err;</span>
+<span class="lineNum">      77 </span>            :     }
+<span class="lineNum">      78 </span>            : 
+<span class="lineNum">      79 </span>            :     char *clr_type_str;
+<span class="lineNum">      80 </span><span class="lineCov">        166 :     if(ihdr.color_type == SPNG_COLOR_TYPE_GRAYSCALE)</span>
+<span class="lineNum">      81 </span><span class="lineCov">         46 :         clr_type_str = &quot;grayscale&quot;;</span>
+<span class="lineNum">      82 </span><span class="lineCov">        120 :     else if(ihdr.color_type == SPNG_COLOR_TYPE_TRUECOLOR)</span>
+<span class="lineNum">      83 </span><span class="lineCov">         40 :         clr_type_str = &quot;truecolor&quot;;</span>
+<span class="lineNum">      84 </span><span class="lineCov">         80 :     else if(ihdr.color_type == SPNG_COLOR_TYPE_INDEXED)</span>
+<span class="lineNum">      85 </span><span class="lineCov">         63 :         clr_type_str = &quot;indexed color&quot;;</span>
+<span class="lineNum">      86 </span><span class="lineCov">         17 :     else if(ihdr.color_type == SPNG_COLOR_TYPE_GRAYSCALE_ALPHA)</span>
+<span class="lineNum">      87 </span><span class="lineCov">          8 :         clr_type_str = &quot;grayscale with alpha&quot;;</span>
+<span class="lineNum">      88 </span>            :     else
+<span class="lineNum">      89 </span><span class="lineCov">          9 :         clr_type_str = &quot;truecolor with alpha&quot;;</span>
+<span class="lineNum">      90 </span>            : 
+<span class="lineNum">      91 </span><span class="lineCov">        332 :     printf(&quot;width: %&quot; PRIu32 &quot;\nheight: %&quot; PRIu32 &quot;\n&quot;</span>
+<span class="lineNum">      92 </span>            :            &quot;bit depth: %&quot; PRIu8 &quot;\ncolor type: %&quot; PRIu8 &quot; - %s\n&quot;,
+<span class="lineNum">      93 </span>            :            ihdr.width, ihdr.height,
+<span class="lineNum">      94 </span><span class="lineCov">        332 :            ihdr.bit_depth, ihdr.color_type, clr_type_str);</span>
+<span class="lineNum">      95 </span><span class="lineCov">        498 :     printf(&quot;compression method: %&quot; PRIu8 &quot;\nfilter method: %&quot; PRIu8 &quot;\n&quot;</span>
+<span class="lineNum">      96 </span>            :            &quot;interlace method: %&quot; PRIu8 &quot;\n&quot;,
+<span class="lineNum">      97 </span><span class="lineCov">        332 :            ihdr.compression_method, ihdr.filter_method,</span>
+<span class="lineNum">      98 </span><span class="lineCov">        166 :            ihdr.interlace_method);</span>
+<span class="lineNum">      99 </span>            : 
+<span class="lineNum">     100 </span>            :     size_t out_size;
+<span class="lineNum">     101 </span>            : 
+<span class="lineNum">     102 </span><span class="lineCov">        166 :     r = spng_decoded_image_size(ctx, SPNG_FMT_RGBA8, &amp;out_size);</span>
+<span class="lineNum">     103 </span>            : 
+<span class="lineNum">     104 </span><span class="lineCov">        166 :     if(r) goto err;</span>
+<span class="lineNum">     105 </span>            : 
+<span class="lineNum">     106 </span><span class="lineCov">        166 :     out = malloc(out_size);</span>
+<span class="lineNum">     107 </span><span class="lineCov">        166 :     if(out == NULL) goto err;</span>
+<span class="lineNum">     108 </span>            : 
+<span class="lineNum">     109 </span><span class="lineCov">        166 :     r = spng_decode_image(ctx, out, out_size, SPNG_FMT_RGBA8, 0);</span>
+<span class="lineNum">     110 </span>            : 
+<span class="lineNum">     111 </span><span class="lineCov">        166 :     if(r)</span>
+<span class="lineNum">     112 </span>            :     {
+<span class="lineNum">     113 </span><span class="lineCov">          1 :         printf(&quot;spng_decode_image() error: %s\n&quot;, spng_strerror(r));</span>
+<span class="lineNum">     114 </span><span class="lineCov">          1 :         goto err;</span>
+<span class="lineNum">     115 </span>            :     }
+<span class="lineNum">     116 </span>            : 
+<span class="lineNum">     117 </span><span class="lineCov">        366 : err:</span>
+<span class="lineNum">     118 </span><span class="lineCov">        201 :     spng_ctx_free(ctx);</span>
+<span class="lineNum">     119 </span>            :     
+<span class="lineNum">     120 </span><span class="lineCov">        201 :     free(out);</span>
+<span class="lineNum">     121 </span><span class="lineCov">        201 :     free(pngbuf);</span>
+<span class="lineNum">     122 </span>            : 
+<span class="lineNum">     123 </span><span class="lineCov">        201 :     return r;</span>
+<span class="lineNum">     124 </span>            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

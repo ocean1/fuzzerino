@@ -1,0 +1,146 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - cov-gfz-all-276.info - pngquant-cov/lib/mempool.c</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">pngquant-cov/lib</a> - mempool.c<span style="font-size: 80%;"> (source / <a href="mempool.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">cov-gfz-all-276.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">20</td>
+            <td class="headerCovTableEntry">23</td>
+            <td class="headerCovTableEntryMed">87.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2019-09-01 22:22:08</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">3</td>
+            <td class="headerCovTableEntry">3</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*</a>
+<span class="lineNum">       2 </span>            : ** © 2009-2017 by Kornel Lesiński.
+<span class="lineNum">       3 </span>            : ** © 1989, 1991 by Jef Poskanzer.
+<span class="lineNum">       4 </span>            : ** © 1997, 2000, 2002 by Greg Roelofs; based on an idea by Stefan Schneider.
+<span class="lineNum">       5 </span>            : **
+<span class="lineNum">       6 </span>            : ** See COPYRIGHT file for license.
+<span class="lineNum">       7 </span>            : */
+<span class="lineNum">       8 </span>            : 
+<span class="lineNum">       9 </span>            : #include &quot;libimagequant.h&quot;
+<span class="lineNum">      10 </span>            : #include &quot;mempool.h&quot;
+<span class="lineNum">      11 </span>            : #include &lt;stdlib.h&gt;
+<span class="lineNum">      12 </span>            : #include &lt;stdint.h&gt;
+<span class="lineNum">      13 </span>            : #include &lt;assert.h&gt;
+<span class="lineNum">      14 </span>            : 
+<span class="lineNum">      15 </span>            : #define ALIGN_MASK 15UL
+<span class="lineNum">      16 </span>            : #define MEMPOOL_RESERVED ((sizeof(struct mempool)+ALIGN_MASK) &amp; ~ALIGN_MASK)
+<span class="lineNum">      17 </span>            : 
+<span class="lineNum">      18 </span>            : struct mempool {
+<span class="lineNum">      19 </span>            :     unsigned int used, size;
+<span class="lineNum">      20 </span>            :     void* (*malloc)(size_t);
+<span class="lineNum">      21 </span>            :     void (*free)(void*);
+<a name="22"><span class="lineNum">      22 </span>            :     struct mempool *next;</a>
+<span class="lineNum">      23 </span>            : };
+<span class="lineNum">      24 </span><span class="lineCov">        288 : LIQ_PRIVATE void* mempool_create(mempoolptr *mptr, const unsigned int size, unsigned int max_size, void* (*malloc)(size_t), void (*free)(void*))</span>
+<span class="lineNum">      25 </span>            : {
+<span class="lineNum">      26 </span><span class="lineCov">        288 :     if (*mptr &amp;&amp; ((*mptr)-&gt;used+size) &lt;= (*mptr)-&gt;size) {</span>
+<span class="lineNum">      27 </span>            :         unsigned int prevused = (*mptr)-&gt;used;
+<span class="lineNum">      28 </span><span class="lineNoCov">          0 :         (*mptr)-&gt;used += (size+15UL) &amp; ~0xFUL;</span>
+<span class="lineNum">      29 </span><span class="lineNoCov">          0 :         return ((char*)(*mptr)) + prevused;</span>
+<span class="lineNum">      30 </span>            :     }
+<span class="lineNum">      31 </span>            : 
+<span class="lineNum">      32 </span>            :     mempoolptr old = *mptr;
+<span class="lineNum">      33 </span><span class="lineCov">        288 :     if (!max_size) max_size = (1&lt;&lt;17);</span>
+<span class="lineNum">      34 </span><span class="lineCov">        288 :     max_size = size+ALIGN_MASK &gt; max_size ? size+ALIGN_MASK : max_size;</span>
+<span class="lineNum">      35 </span>            : 
+<span class="lineNum">      36 </span><span class="lineCov">        288 :     *mptr = malloc(MEMPOOL_RESERVED + max_size);</span>
+<span class="lineNum">      37 </span><span class="lineCov">        288 :     if (!*mptr) return NULL;</span>
+<span class="lineNum">      38 </span><span class="lineCov">        288 :     **mptr = (struct mempool){</span>
+<span class="lineNum">      39 </span>            :         .malloc = malloc,
+<span class="lineNum">      40 </span>            :         .free = free,
+<span class="lineNum">      41 </span><span class="lineCov">        288 :         .size = MEMPOOL_RESERVED + max_size,</span>
+<span class="lineNum">      42 </span>            :         .used = sizeof(struct mempool),
+<span class="lineNum">      43 </span>            :         .next = old,
+<span class="lineNum">      44 </span>            :     };
+<span class="lineNum">      45 </span><span class="lineCov">        288 :     uintptr_t mptr_used_start = (uintptr_t)(*mptr) + (*mptr)-&gt;used;</span>
+<span class="lineNum">      46 </span><span class="lineCov">        288 :     (*mptr)-&gt;used += (ALIGN_MASK + 1 - (mptr_used_start &amp; ALIGN_MASK)) &amp; ALIGN_MASK; // reserve bytes required to make subsequent allocations aligned</span>
+<span class="lineNum">      47 </span>            :     assert(!(((uintptr_t)(*mptr) + (*mptr)-&gt;used) &amp; ALIGN_MASK));
+<span class="lineNum">      48 </span>            : 
+<span class="lineNum">      49 </span><span class="lineCov">        288 :     return mempool_alloc(mptr, size, size);</span>
+<a name="50"><span class="lineNum">      50 </span>            : }</a>
+<span class="lineNum">      51 </span>            : 
+<span class="lineNum">      52 </span><span class="lineCov">       1606 : LIQ_PRIVATE void* mempool_alloc(mempoolptr *mptr, const unsigned int size, const unsigned int max_size)</span>
+<span class="lineNum">      53 </span>            : {
+<span class="lineNum">      54 </span><span class="lineCov">       1606 :     if (((*mptr)-&gt;used+size) &lt;= (*mptr)-&gt;size) {</span>
+<span class="lineNum">      55 </span>            :         unsigned int prevused = (*mptr)-&gt;used;
+<span class="lineNum">      56 </span><span class="lineCov">       1606 :         (*mptr)-&gt;used += (size + ALIGN_MASK) &amp; ~ALIGN_MASK;</span>
+<span class="lineNum">      57 </span><span class="lineCov">       1606 :         return ((char*)(*mptr)) + prevused;</span>
+<span class="lineNum">      58 </span>            :     }
+<span class="lineNum">      59 </span>            : 
+<span class="lineNum">      60 </span><span class="lineNoCov">          0 :     return mempool_create(mptr, size, max_size, (*mptr)-&gt;malloc, (*mptr)-&gt;free);</span>
+<a name="61"><span class="lineNum">      61 </span>            : }</a>
+<span class="lineNum">      62 </span>            : 
+<span class="lineNum">      63 </span><span class="lineCov">        288 : LIQ_PRIVATE void mempool_destroy(mempoolptr m)</span>
+<span class="lineNum">      64 </span>            : {
+<span class="lineNum">      65 </span><span class="lineCov">        864 :     while (m) {</span>
+<span class="lineNum">      66 </span><span class="lineCov">        288 :         mempoolptr next = m-&gt;next;</span>
+<span class="lineNum">      67 </span><span class="lineCov">        288 :         m-&gt;free(m);</span>
+<span class="lineNum">      68 </span>            :         m = next;
+<span class="lineNum">      69 </span>            :     }
+<span class="lineNum">      70 </span><span class="lineCov">        288 : }</span>
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

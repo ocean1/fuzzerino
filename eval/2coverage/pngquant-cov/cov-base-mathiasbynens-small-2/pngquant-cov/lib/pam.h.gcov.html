@@ -1,0 +1,359 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - cov-base-mathiasbynens-small-2.info - pngquant-cov/lib/pam.h</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">pngquant-cov/lib</a> - pam.h<span style="font-size: 80%;"> (source / <a href="pam.h.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">cov-base-mathiasbynens-small-2.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">7</td>
+            <td class="headerCovTableEntry">18</td>
+            <td class="headerCovTableEntryLo">38.9 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2019-09-01 22:22:07</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">1</td>
+            <td class="headerCovTableEntry">1</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /* pam.h - pam (portable alpha map) utility library</a>
+<span class="lineNum">       2 </span>            :  **
+<span class="lineNum">       3 </span>            :  ** Colormap routines.
+<span class="lineNum">       4 </span>            :  **
+<span class="lineNum">       5 </span>            :  ** Copyright (C) 1989, 1991 by Jef Poskanzer.
+<span class="lineNum">       6 </span>            :  ** Copyright (C) 1997 by Greg Roelofs.
+<span class="lineNum">       7 </span>            :  **
+<span class="lineNum">       8 </span>            :  ** Permission to use, copy, modify, and distribute this software and its
+<span class="lineNum">       9 </span>            :  ** documentation for any purpose and without fee is hereby granted, provided
+<span class="lineNum">      10 </span>            :  ** that the above copyright notice appear in all copies and that both that
+<span class="lineNum">      11 </span>            :  ** copyright notice and this permission notice appear in supporting
+<span class="lineNum">      12 </span>            :  ** documentation.  This software is provided &quot;as is&quot; without express or
+<span class="lineNum">      13 </span>            :  ** implied warranty.
+<span class="lineNum">      14 </span>            :  */
+<span class="lineNum">      15 </span>            : 
+<span class="lineNum">      16 </span>            : #ifndef PAM_H
+<span class="lineNum">      17 </span>            : #define PAM_H
+<span class="lineNum">      18 </span>            : 
+<span class="lineNum">      19 </span>            : // accidental debug assertions make color search much slower,
+<span class="lineNum">      20 </span>            : // so force assertions off if there's no explicit setting
+<span class="lineNum">      21 </span>            : #if !defined(NDEBUG) &amp;&amp; !defined(DEBUG)
+<span class="lineNum">      22 </span>            : #define NDEBUG
+<span class="lineNum">      23 </span>            : #endif
+<span class="lineNum">      24 </span>            : 
+<span class="lineNum">      25 </span>            : #include &lt;math.h&gt;
+<span class="lineNum">      26 </span>            : #include &lt;assert.h&gt;
+<span class="lineNum">      27 </span>            : #include &lt;stdlib.h&gt;
+<span class="lineNum">      28 </span>            : #include &lt;stdbool.h&gt;
+<span class="lineNum">      29 </span>            : 
+<span class="lineNum">      30 </span>            : #ifndef MAX
+<span class="lineNum">      31 </span>            : #  define MAX(a,b)  ((a) &gt; (b)? (a) : (b))
+<span class="lineNum">      32 </span>            : #  define MIN(a,b)  ((a) &lt; (b)? (a) : (b))
+<span class="lineNum">      33 </span>            : #endif
+<span class="lineNum">      34 </span>            : 
+<span class="lineNum">      35 </span>            : #define MAX_DIFF 1e20
+<span class="lineNum">      36 </span>            : 
+<span class="lineNum">      37 </span>            : #ifndef USE_SSE
+<span class="lineNum">      38 </span>            : #  if defined(__SSE__) &amp;&amp; (defined(__amd64__) || defined(__X86_64__) || defined(_WIN64) || defined(WIN32) || defined(__WIN32__))
+<span class="lineNum">      39 </span>            : #    define USE_SSE 1
+<span class="lineNum">      40 </span>            : #  else
+<span class="lineNum">      41 </span>            : #    define USE_SSE 0
+<span class="lineNum">      42 </span>            : #  endif
+<span class="lineNum">      43 </span>            : #endif
+<span class="lineNum">      44 </span>            : 
+<span class="lineNum">      45 </span>            : #if USE_SSE
+<span class="lineNum">      46 </span>            : #  include &lt;xmmintrin.h&gt;
+<span class="lineNum">      47 </span>            : #  ifdef _MSC_VER
+<span class="lineNum">      48 </span>            : #    include &lt;intrin.h&gt;
+<span class="lineNum">      49 </span>            : #    define SSE_ALIGN
+<span class="lineNum">      50 </span>            : #  else
+<span class="lineNum">      51 </span>            : #    define SSE_ALIGN __attribute__ ((aligned (16)))
+<span class="lineNum">      52 </span>            : #    if defined(__i386__) &amp;&amp; defined(__PIC__)
+<span class="lineNum">      53 </span>            : #       define cpuid(func,ax,bx,cx,dx)\
+<span class="lineNum">      54 </span>            :         __asm__ __volatile__ ( \
+<span class="lineNum">      55 </span>            :         &quot;push %%ebx\n&quot; \
+<span class="lineNum">      56 </span>            :         &quot;cpuid\n&quot; \
+<span class="lineNum">      57 </span>            :         &quot;mov %%ebx, %1\n&quot; \
+<span class="lineNum">      58 </span>            :         &quot;pop %%ebx\n&quot; \
+<span class="lineNum">      59 </span>            :         : &quot;=a&quot; (ax), &quot;=r&quot; (bx), &quot;=c&quot; (cx), &quot;=d&quot; (dx) \
+<span class="lineNum">      60 </span>            :         : &quot;a&quot; (func));
+<span class="lineNum">      61 </span>            : #    else
+<span class="lineNum">      62 </span>            : #       define cpuid(func,ax,bx,cx,dx)\
+<span class="lineNum">      63 </span>            :         __asm__ __volatile__ (&quot;cpuid&quot;:\
+<span class="lineNum">      64 </span>            :         &quot;=a&quot; (ax), &quot;=b&quot; (bx), &quot;=c&quot; (cx), &quot;=d&quot; (dx) : &quot;a&quot; (func));
+<span class="lineNum">      65 </span>            : #    endif
+<span class="lineNum">      66 </span>            : #endif
+<span class="lineNum">      67 </span>            : #else
+<span class="lineNum">      68 </span>            : #  define SSE_ALIGN
+<span class="lineNum">      69 </span>            : #endif
+<span class="lineNum">      70 </span>            : 
+<span class="lineNum">      71 </span>            : #ifndef _MSC_VER
+<span class="lineNum">      72 </span>            : #define LIQ_ARRAY(type, var, count) type var[count]
+<span class="lineNum">      73 </span>            : #else
+<span class="lineNum">      74 </span>            : #define LIQ_ARRAY(type, var, count) type* var = (type*)_alloca(sizeof(type)*(count))
+<span class="lineNum">      75 </span>            : #endif
+<span class="lineNum">      76 </span>            : 
+<span class="lineNum">      77 </span>            : #if defined(__GNUC__) || defined (__llvm__)
+<span class="lineNum">      78 </span>            : #define ALWAYS_INLINE __attribute__((always_inline)) inline
+<span class="lineNum">      79 </span>            : #define NEVER_INLINE __attribute__ ((noinline))
+<span class="lineNum">      80 </span>            : #elif defined(_MSC_VER)
+<span class="lineNum">      81 </span>            : #define inline __inline
+<span class="lineNum">      82 </span>            : #define restrict __restrict
+<span class="lineNum">      83 </span>            : #define ALWAYS_INLINE __forceinline
+<span class="lineNum">      84 </span>            : #define NEVER_INLINE __declspec(noinline)
+<span class="lineNum">      85 </span>            : #else
+<span class="lineNum">      86 </span>            : #define ALWAYS_INLINE inline
+<span class="lineNum">      87 </span>            : #define NEVER_INLINE
+<span class="lineNum">      88 </span>            : #endif
+<span class="lineNum">      89 </span>            : 
+<span class="lineNum">      90 </span>            : /* from pam.h */
+<span class="lineNum">      91 </span>            : 
+<span class="lineNum">      92 </span>            : typedef struct {
+<span class="lineNum">      93 </span>            :     unsigned char r, g, b, a;
+<span class="lineNum">      94 </span>            : } rgba_pixel;
+<span class="lineNum">      95 </span>            : 
+<span class="lineNum">      96 </span>            : typedef struct {
+<span class="lineNum">      97 </span>            :     float a, r, g, b;
+<span class="lineNum">      98 </span>            : } SSE_ALIGN f_pixel;
+<span class="lineNum">      99 </span>            : 
+<span class="lineNum">     100 </span>            : static const float internal_gamma = 0.5499f;
+<span class="lineNum">     101 </span>            : 
+<span class="lineNum">     102 </span>            : LIQ_PRIVATE void to_f_set_gamma(float gamma_lut[], const double gamma);
+<span class="lineNum">     103 </span>            : 
+<span class="lineNum">     104 </span>            : /**
+<span class="lineNum">     105 </span>            :  Converts 8-bit color to internal gamma and premultiplied alpha.
+<span class="lineNum">     106 </span>            :  (premultiplied color space is much better for blending of semitransparent colors)
+<span class="lineNum">     107 </span>            :  */
+<span class="lineNum">     108 </span>            : ALWAYS_INLINE static f_pixel rgba_to_f(const float gamma_lut[], const rgba_pixel px);
+<span class="lineNum">     109 </span>            : inline static f_pixel rgba_to_f(const float gamma_lut[], const rgba_pixel px)
+<span class="lineNum">     110 </span>            : {
+<span class="lineNum">     111 </span><span class="lineCov">          4 :     float a = px.a/255.f;</span>
+<span class="lineNum">     112 </span>            : 
+<span class="lineNum">     113 </span>            :     return (f_pixel) {
+<span class="lineNum">     114 </span>            :         .a = a,
+<span class="lineNum">     115 </span><span class="lineCov">          4 :         .r = gamma_lut[px.r]*a,</span>
+<span class="lineNum">     116 </span><span class="lineCov">          4 :         .g = gamma_lut[px.g]*a,</span>
+<span class="lineNum">     117 </span><span class="lineCov">          4 :         .b = gamma_lut[px.b]*a,</span>
+<span class="lineNum">     118 </span>            :     };
+<a name="119"><span class="lineNum">     119 </span>            : }</a>
+<span class="lineNum">     120 </span>            : 
+<span class="lineNum">     121 </span><span class="lineCov">          2 : inline static rgba_pixel f_to_rgb(const float gamma, const f_pixel px)</span>
+<span class="lineNum">     122 </span>            : {
+<span class="lineNum">     123 </span><span class="lineCov">          2 :     if (px.a &lt; 1.f/256.f) {</span>
+<span class="lineNum">     124 </span><span class="lineCov">          2 :         return (rgba_pixel){0,0,0,0};</span>
+<span class="lineNum">     125 </span>            :     }
+<span class="lineNum">     126 </span>            : 
+<span class="lineNum">     127 </span><span class="lineNoCov">          0 :     float r = px.r / px.a,</span>
+<span class="lineNum">     128 </span><span class="lineNoCov">          0 :           g = px.g / px.a,</span>
+<span class="lineNum">     129 </span><span class="lineNoCov">          0 :           b = px.b / px.a,</span>
+<span class="lineNum">     130 </span>            :           a = px.a;
+<span class="lineNum">     131 </span>            : 
+<span class="lineNum">     132 </span><span class="lineNoCov">          0 :     r = powf(r, gamma/internal_gamma);</span>
+<span class="lineNum">     133 </span><span class="lineNoCov">          0 :     g = powf(g, gamma/internal_gamma);</span>
+<span class="lineNum">     134 </span><span class="lineNoCov">          0 :     b = powf(b, gamma/internal_gamma);</span>
+<span class="lineNum">     135 </span>            : 
+<span class="lineNum">     136 </span>            :     // 256, because numbers are in range 1..255.9999… rounded down
+<span class="lineNum">     137 </span><span class="lineNoCov">          0 :     r *= 256.f;</span>
+<span class="lineNum">     138 </span><span class="lineNoCov">          0 :     g *= 256.f;</span>
+<span class="lineNum">     139 </span><span class="lineNoCov">          0 :     b *= 256.f;</span>
+<span class="lineNum">     140 </span><span class="lineNoCov">          0 :     a *= 256.f;</span>
+<span class="lineNum">     141 </span>            : 
+<span class="lineNum">     142 </span><span class="lineNoCov">          0 :     return (rgba_pixel){</span>
+<span class="lineNum">     143 </span>            :         .r = r&gt;=255.f ? 255 : r,
+<span class="lineNum">     144 </span>            :         .g = g&gt;=255.f ? 255 : g,
+<span class="lineNum">     145 </span>            :         .b = b&gt;=255.f ? 255 : b,
+<span class="lineNum">     146 </span>            :         .a = a&gt;=255.f ? 255 : a,
+<span class="lineNum">     147 </span>            :     };
+<span class="lineNum">     148 </span>            : }
+<span class="lineNum">     149 </span>            : 
+<span class="lineNum">     150 </span>            : ALWAYS_INLINE static double colordifference_ch(const double x, const double y, const double alphas);
+<span class="lineNum">     151 </span>            : inline static double colordifference_ch(const double x, const double y, const double alphas)
+<span class="lineNum">     152 </span>            : {
+<span class="lineNum">     153 </span>            :     // maximum of channel blended on white, and blended on black
+<span class="lineNum">     154 </span>            :     // premultiplied alpha and backgrounds 0/1 shorten the formula
+<span class="lineNum">     155 </span>            :     const double black = x-y, white = black+alphas;
+<span class="lineNum">     156 </span>            :     return MAX(black*black, white*white);
+<span class="lineNum">     157 </span>            : }
+<span class="lineNum">     158 </span>            : 
+<span class="lineNum">     159 </span>            : ALWAYS_INLINE static float colordifference_stdc(const f_pixel px, const f_pixel py);
+<span class="lineNum">     160 </span>            : inline static float colordifference_stdc(const f_pixel px, const f_pixel py)
+<span class="lineNum">     161 </span>            : {
+<span class="lineNum">     162 </span>            :     // px_b.rgb = px.rgb + 0*(1-px.a) // blend px on black
+<span class="lineNum">     163 </span>            :     // px_b.a   = px.a   + 1*(1-px.a)
+<span class="lineNum">     164 </span>            :     // px_w.rgb = px.rgb + 1*(1-px.a) // blend px on white
+<span class="lineNum">     165 </span>            :     // px_w.a   = px.a   + 1*(1-px.a)
+<span class="lineNum">     166 </span>            : 
+<span class="lineNum">     167 </span>            :     // px_b.rgb = px.rgb              // difference same as in opaque RGB
+<span class="lineNum">     168 </span>            :     // px_b.a   = 1
+<span class="lineNum">     169 </span>            :     // px_w.rgb = px.rgb - px.a       // difference simplifies to formula below
+<span class="lineNum">     170 </span>            :     // px_w.a   = 1
+<span class="lineNum">     171 </span>            : 
+<span class="lineNum">     172 </span>            :     // (px.rgb - px.a) - (py.rgb - py.a)
+<span class="lineNum">     173 </span>            :     // (px.rgb - py.rgb) + (py.a - px.a)
+<span class="lineNum">     174 </span>            : 
+<span class="lineNum">     175 </span>            :     const double alphas = py.a-px.a;
+<span class="lineNum">     176 </span>            :     return colordifference_ch(px.r, py.r, alphas) +
+<span class="lineNum">     177 </span>            :            colordifference_ch(px.g, py.g, alphas) +
+<span class="lineNum">     178 </span>            :            colordifference_ch(px.b, py.b, alphas);
+<span class="lineNum">     179 </span>            : }
+<span class="lineNum">     180 </span>            : 
+<span class="lineNum">     181 </span>            : ALWAYS_INLINE static float colordifference(f_pixel px, f_pixel py);
+<span class="lineNum">     182 </span>            : inline static float colordifference(f_pixel px, f_pixel py)
+<span class="lineNum">     183 </span>            : {
+<span class="lineNum">     184 </span>            : #if USE_SSE
+<span class="lineNum">     185 </span>            :     const __m128 vpx = _mm_load_ps((const float*)&amp;px);
+<span class="lineNum">     186 </span>            :     const __m128 vpy = _mm_load_ps((const float*)&amp;py);
+<span class="lineNum">     187 </span>            : 
+<span class="lineNum">     188 </span>            :     // y.a - x.a
+<span class="lineNum">     189 </span>            :     __m128 alphas = _mm_sub_ss(vpy, vpx);
+<span class="lineNum">     190 </span>            :     alphas = _mm_shuffle_ps(alphas,alphas,0); // copy first to all four
+<span class="lineNum">     191 </span>            : 
+<span class="lineNum">     192 </span>            :     __m128 onblack = _mm_sub_ps(vpx, vpy); // x - y
+<span class="lineNum">     193 </span>            :     __m128 onwhite = _mm_add_ps(onblack, alphas); // x - y + (y.a - x.a)
+<span class="lineNum">     194 </span>            : 
+<span class="lineNum">     195 </span>            :     onblack = _mm_mul_ps(onblack, onblack);
+<span class="lineNum">     196 </span>            :     onwhite = _mm_mul_ps(onwhite, onwhite);
+<span class="lineNum">     197 </span>            :     const __m128 max = _mm_max_ps(onwhite, onblack);
+<span class="lineNum">     198 </span>            : 
+<span class="lineNum">     199 </span>            :     // add rgb, not a
+<span class="lineNum">     200 </span>            :     const __m128 maxhl = _mm_movehl_ps(max, max);
+<span class="lineNum">     201 </span>            :     const __m128 tmp = _mm_add_ps(max, maxhl);
+<span class="lineNum">     202 </span>            :     const __m128 sum = _mm_add_ss(maxhl, _mm_shuffle_ps(tmp, tmp, 1));
+<span class="lineNum">     203 </span>            : 
+<span class="lineNum">     204 </span>            :     const float res = _mm_cvtss_f32(sum);
+<span class="lineNum">     205 </span>            :     assert(fabs(res - colordifference_stdc(px,py)) &lt; 0.001);
+<span class="lineNum">     206 </span>            :     return res;
+<span class="lineNum">     207 </span>            : #else
+<span class="lineNum">     208 </span>            :     return colordifference_stdc(px,py);
+<span class="lineNum">     209 </span>            : #endif
+<span class="lineNum">     210 </span>            : }
+<span class="lineNum">     211 </span>            : 
+<span class="lineNum">     212 </span>            : /* from pamcmap.h */
+<span class="lineNum">     213 </span>            : union rgba_as_int {
+<span class="lineNum">     214 </span>            :     rgba_pixel rgba;
+<span class="lineNum">     215 </span>            :     unsigned int l;
+<span class="lineNum">     216 </span>            : };
+<span class="lineNum">     217 </span>            : 
+<span class="lineNum">     218 </span>            : typedef struct {
+<span class="lineNum">     219 </span>            :     f_pixel acolor;
+<span class="lineNum">     220 </span>            :     float adjusted_weight,   // perceptual weight changed to tweak how mediancut selects colors
+<span class="lineNum">     221 </span>            :           perceptual_weight; // number of pixels weighted by importance of different areas of the picture
+<span class="lineNum">     222 </span>            : 
+<span class="lineNum">     223 </span>            :     float color_weight;      // these two change every time histogram subset is sorted
+<span class="lineNum">     224 </span>            :     union {
+<span class="lineNum">     225 </span>            :         unsigned int sort_value;
+<span class="lineNum">     226 </span>            :         unsigned char likely_colormap_index;
+<span class="lineNum">     227 </span>            :     } tmp;
+<span class="lineNum">     228 </span>            : } hist_item;
+<span class="lineNum">     229 </span>            : 
+<span class="lineNum">     230 </span>            : typedef struct {
+<span class="lineNum">     231 </span>            :     hist_item *achv;
+<span class="lineNum">     232 </span>            :     void (*free)(void*);
+<span class="lineNum">     233 </span>            :     double total_perceptual_weight;
+<span class="lineNum">     234 </span>            :     unsigned int size;
+<span class="lineNum">     235 </span>            :     unsigned int ignorebits;
+<span class="lineNum">     236 </span>            : } histogram;
+<span class="lineNum">     237 </span>            : 
+<span class="lineNum">     238 </span>            : typedef struct {
+<span class="lineNum">     239 </span>            :     f_pixel acolor;
+<span class="lineNum">     240 </span>            :     float popularity;
+<span class="lineNum">     241 </span>            :     bool fixed; // if true it's user-supplied and must not be changed (e.g in K-Means iteration)
+<span class="lineNum">     242 </span>            : } colormap_item;
+<span class="lineNum">     243 </span>            : 
+<span class="lineNum">     244 </span>            : typedef struct colormap {
+<span class="lineNum">     245 </span>            :     unsigned int colors;
+<span class="lineNum">     246 </span>            :     void* (*malloc)(size_t);
+<span class="lineNum">     247 </span>            :     void (*free)(void*);
+<span class="lineNum">     248 </span>            :     colormap_item palette[];
+<span class="lineNum">     249 </span>            : } colormap;
+<span class="lineNum">     250 </span>            : 
+<span class="lineNum">     251 </span>            : struct acolorhist_arr_item {
+<span class="lineNum">     252 </span>            :     union rgba_as_int color;
+<span class="lineNum">     253 </span>            :     unsigned int perceptual_weight;
+<span class="lineNum">     254 </span>            : };
+<span class="lineNum">     255 </span>            : 
+<span class="lineNum">     256 </span>            : struct acolorhist_arr_head {
+<span class="lineNum">     257 </span>            :     struct acolorhist_arr_item inline1, inline2;
+<span class="lineNum">     258 </span>            :     unsigned int used, capacity;
+<span class="lineNum">     259 </span>            :     struct acolorhist_arr_item *other_items;
+<span class="lineNum">     260 </span>            : };
+<span class="lineNum">     261 </span>            : 
+<span class="lineNum">     262 </span>            : struct acolorhash_table {
+<span class="lineNum">     263 </span>            :     struct mempool *mempool;
+<span class="lineNum">     264 </span>            :     unsigned int ignorebits, maxcolors, colors, cols, rows;
+<span class="lineNum">     265 </span>            :     unsigned int hash_size;
+<span class="lineNum">     266 </span>            :     unsigned int freestackp;
+<span class="lineNum">     267 </span>            :     struct acolorhist_arr_item *freestack[512];
+<span class="lineNum">     268 </span>            :     struct acolorhist_arr_head buckets[];
+<span class="lineNum">     269 </span>            : };
+<span class="lineNum">     270 </span>            : 
+<span class="lineNum">     271 </span>            : LIQ_PRIVATE void pam_freeacolorhash(struct acolorhash_table *acht);
+<span class="lineNum">     272 </span>            : LIQ_PRIVATE struct acolorhash_table *pam_allocacolorhash(unsigned int maxcolors, unsigned int surface, unsigned int ignorebits, void* (*malloc)(size_t), void (*free)(void*));
+<span class="lineNum">     273 </span>            : LIQ_PRIVATE histogram *pam_acolorhashtoacolorhist(const struct acolorhash_table *acht, const double gamma, void* (*malloc)(size_t), void (*free)(void*));
+<span class="lineNum">     274 </span>            : LIQ_PRIVATE bool pam_computeacolorhash(struct acolorhash_table *acht, const rgba_pixel *const pixels[], unsigned int cols, unsigned int rows, const unsigned char *importance_map);
+<span class="lineNum">     275 </span>            : LIQ_PRIVATE bool pam_add_to_hash(struct acolorhash_table *acht, unsigned int hash, unsigned int boost, union rgba_as_int px, unsigned int row, unsigned int rows);
+<span class="lineNum">     276 </span>            : 
+<span class="lineNum">     277 </span>            : LIQ_PRIVATE void pam_freeacolorhist(histogram *h);
+<span class="lineNum">     278 </span>            : 
+<span class="lineNum">     279 </span>            : LIQ_PRIVATE colormap *pam_colormap(unsigned int colors, void* (*malloc)(size_t), void (*free)(void*));
+<span class="lineNum">     280 </span>            : LIQ_PRIVATE colormap *pam_duplicate_colormap(colormap *map);
+<span class="lineNum">     281 </span>            : LIQ_PRIVATE void pam_freecolormap(colormap *c);
+<span class="lineNum">     282 </span>            : 
+<span class="lineNum">     283 </span>            : #endif
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

@@ -1,0 +1,550 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - cov-base-libspng-201.info - pngquant-cov/lib/mediancut.c</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">pngquant-cov/lib</a> - mediancut.c<span style="font-size: 80%;"> (source / <a href="mediancut.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">cov-base-libspng-201.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">171</td>
+            <td class="headerCovTableEntry">171</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2019-09-01 22:22:06</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">13</td>
+            <td class="headerCovTableEntry">13</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /*</a>
+<span class="lineNum">       2 </span>            : ** © 2009-2018 by Kornel Lesiński.
+<span class="lineNum">       3 </span>            : ** © 1989, 1991 by Jef Poskanzer.
+<span class="lineNum">       4 </span>            : ** © 1997, 2000, 2002 by Greg Roelofs; based on an idea by Stefan Schneider.
+<span class="lineNum">       5 </span>            : **
+<span class="lineNum">       6 </span>            : ** See COPYRIGHT file for license.
+<span class="lineNum">       7 </span>            : */
+<span class="lineNum">       8 </span>            : 
+<span class="lineNum">       9 </span>            : #include &lt;stdlib.h&gt;
+<span class="lineNum">      10 </span>            : #include &lt;stddef.h&gt;
+<span class="lineNum">      11 </span>            : 
+<span class="lineNum">      12 </span>            : #include &quot;libimagequant.h&quot;
+<span class="lineNum">      13 </span>            : #include &quot;pam.h&quot;
+<span class="lineNum">      14 </span>            : #include &quot;mediancut.h&quot;
+<span class="lineNum">      15 </span>            : 
+<span class="lineNum">      16 </span>            : #define index_of_channel(ch) (offsetof(f_pixel,ch)/sizeof(float))
+<span class="lineNum">      17 </span>            : 
+<span class="lineNum">      18 </span>            : static f_pixel averagepixels(unsigned int clrs, const hist_item achv[]);
+<span class="lineNum">      19 </span>            : 
+<span class="lineNum">      20 </span>            : struct box {
+<span class="lineNum">      21 </span>            :     f_pixel color;
+<span class="lineNum">      22 </span>            :     f_pixel variance;
+<span class="lineNum">      23 </span>            :     double sum, total_error, max_error;
+<span class="lineNum">      24 </span>            :     unsigned int ind;
+<span class="lineNum">      25 </span>            :     unsigned int colors;
+<span class="lineNum">      26 </span>            : };
+<span class="lineNum">      27 </span>            : 
+<span class="lineNum">      28 </span>            : ALWAYS_INLINE static double variance_diff(double val, const double good_enough);
+<span class="lineNum">      29 </span>            : inline static double variance_diff(double val, const double good_enough)
+<span class="lineNum">      30 </span>            : {
+<span class="lineNum">      31 </span><span class="lineCov">    7297640 :     val *= val;</span>
+<span class="lineNum">      32 </span><span class="lineCov">    7297640 :     if (val &lt; good_enough*good_enough) return val*0.25;</span>
+<span class="lineNum">      33 </span>            :     return val;
+<span class="lineNum">      34 </span>            : }
+<a name="35"><span class="lineNum">      35 </span>            : </a>
+<span class="lineNum">      36 </span>            : /** Weighted per-channel variance of the box. It's used to decide which channel to split by */
+<span class="lineNum">      37 </span><span class="lineCov">     111909 : static f_pixel box_variance(const hist_item achv[], const struct box *box)</span>
+<span class="lineNum">      38 </span>            : {
+<span class="lineNum">      39 </span><span class="lineCov">     111909 :     f_pixel mean = box-&gt;color;</span>
+<span class="lineNum">      40 </span>            :     double variancea=0, variancer=0, varianceg=0, varianceb=0;
+<span class="lineNum">      41 </span>            : 
+<span class="lineNum">      42 </span><span class="lineCov">    1936319 :     for(unsigned int i = 0; i &lt; box-&gt;colors; ++i) {</span>
+<span class="lineNum">      43 </span><span class="lineCov">    1824410 :         const f_pixel px = achv[box-&gt;ind + i].acolor;</span>
+<span class="lineNum">      44 </span><span class="lineCov">    1824410 :         double weight = achv[box-&gt;ind + i].adjusted_weight;</span>
+<span class="lineNum">      45 </span><span class="lineCov">    3648820 :         variancea += variance_diff(mean.a - px.a, 2.0/256.0)*weight;</span>
+<span class="lineNum">      46 </span><span class="lineCov">    3648820 :         variancer += variance_diff(mean.r - px.r, 1.0/256.0)*weight;</span>
+<span class="lineNum">      47 </span><span class="lineCov">    3648820 :         varianceg += variance_diff(mean.g - px.g, 1.0/256.0)*weight;</span>
+<span class="lineNum">      48 </span><span class="lineCov">    3648820 :         varianceb += variance_diff(mean.b - px.b, 1.0/256.0)*weight;</span>
+<span class="lineNum">      49 </span>            :     }
+<span class="lineNum">      50 </span>            : 
+<span class="lineNum">      51 </span><span class="lineCov">     111909 :     return (f_pixel){</span>
+<span class="lineNum">      52 </span><span class="lineCov">     111909 :         .a = variancea*(4.0/16.0),</span>
+<span class="lineNum">      53 </span><span class="lineCov">     111909 :         .r = variancer*(7.0/16.0),</span>
+<span class="lineNum">      54 </span><span class="lineCov">     111909 :         .g = varianceg*(9.0/16.0),</span>
+<span class="lineNum">      55 </span><span class="lineCov">     111909 :         .b = varianceb*(5.0/16.0),</span>
+<span class="lineNum">      56 </span>            :     };
+<a name="57"><span class="lineNum">      57 </span>            : }</a>
+<span class="lineNum">      58 </span>            : 
+<span class="lineNum">      59 </span><span class="lineCov">     111909 : static double box_max_error(const hist_item achv[], const struct box *box)</span>
+<span class="lineNum">      60 </span>            : {
+<span class="lineNum">      61 </span><span class="lineCov">     111909 :     f_pixel mean = box-&gt;color;</span>
+<span class="lineNum">      62 </span>            :     double max_error = 0;
+<span class="lineNum">      63 </span>            : 
+<span class="lineNum">      64 </span><span class="lineCov">    1936319 :     for(unsigned int i = 0; i &lt; box-&gt;colors; ++i) {</span>
+<span class="lineNum">      65 </span><span class="lineCov">    3648820 :         const double diff = colordifference(mean, achv[box-&gt;ind + i].acolor);</span>
+<span class="lineNum">      66 </span><span class="lineCov">    1824410 :         if (diff &gt; max_error) {</span>
+<span class="lineNum">      67 </span>            :             max_error = diff;
+<span class="lineNum">      68 </span>            :         }
+<span class="lineNum">      69 </span>            :     }
+<span class="lineNum">      70 </span><span class="lineCov">     111909 :     return max_error;</span>
+<span class="lineNum">      71 </span>            : }
+<span class="lineNum">      72 </span>            : 
+<span class="lineNum">      73 </span>            : ALWAYS_INLINE static double color_weight(f_pixel median, hist_item h);
+<span class="lineNum">      74 </span>            : 
+<span class="lineNum">      75 </span>            : static inline void hist_item_swap(hist_item *l, hist_item *r)
+<span class="lineNum">      76 </span>            : {
+<span class="lineNum">      77 </span><span class="lineCov">    1578841 :     if (l != r) {</span>
+<span class="lineNum">      78 </span><span class="lineCov">    1111777 :         hist_item t = *l;</span>
+<span class="lineNum">      79 </span><span class="lineCov">    1111777 :         *l = *r;</span>
+<span class="lineNum">      80 </span><span class="lineCov">    1111777 :         *r = t;</span>
+<span class="lineNum">      81 </span>            :     }
+<span class="lineNum">      82 </span>            : }
+<span class="lineNum">      83 </span>            : 
+<span class="lineNum">      84 </span>            : ALWAYS_INLINE static unsigned int qsort_pivot(const hist_item *const base, const unsigned int len);
+<span class="lineNum">      85 </span>            : inline static unsigned int qsort_pivot(const hist_item *const base, const unsigned int len)
+<span class="lineNum">      86 </span>            : {
+<span class="lineNum">      87 </span><span class="lineCov">     179337 :     if (len &lt; 32) {</span>
+<span class="lineNum">      88 </span><span class="lineCov">     138521 :         return len/2;</span>
+<span class="lineNum">      89 </span>            :     }
+<span class="lineNum">      90 </span>            : 
+<span class="lineNum">      91 </span><span class="lineCov">      40816 :     const unsigned int aidx=8, bidx=len/2, cidx=len-1;</span>
+<span class="lineNum">      92 </span><span class="lineCov">      40816 :     const unsigned int a=base[aidx].tmp.sort_value, b=base[bidx].tmp.sort_value, c=base[cidx].tmp.sort_value;</span>
+<span class="lineNum">      93 </span>            :     return (a &lt; b) ? ((b &lt; c) ? bidx : ((a &lt; c) ? cidx : aidx ))
+<span class="lineNum">      94 </span><span class="lineCov">      40816 :            : ((b &gt; c) ? bidx : ((a &lt; c) ? aidx : cidx ));</span>
+<span class="lineNum">      95 </span>            : }
+<span class="lineNum">      96 </span>            : 
+<span class="lineNum">      97 </span>            : ALWAYS_INLINE static unsigned int qsort_partition(hist_item *const base, const unsigned int len);
+<span class="lineNum">      98 </span>            : inline static unsigned int qsort_partition(hist_item *const base, const unsigned int len)
+<span class="lineNum">      99 </span>            : {
+<span class="lineNum">     100 </span>            :     unsigned int l = 1, r = len;
+<span class="lineNum">     101 </span><span class="lineCov">     430914 :     if (len &gt;= 8) {</span>
+<span class="lineNum">     102 </span><span class="lineCov">     179337 :         hist_item_swap(&amp;base[0], &amp;base[qsort_pivot(base,len)]);</span>
+<span class="lineNum">     103 </span>            :     }
+<span class="lineNum">     104 </span>            : 
+<span class="lineNum">     105 </span><span class="lineCov">     430914 :     const unsigned int pivot_value = base[0].tmp.sort_value;</span>
+<span class="lineNum">     106 </span><span class="lineCov">    4729447 :     while (l &lt; r) {</span>
+<span class="lineNum">     107 </span><span class="lineCov">    4298533 :         if (base[l].tmp.sort_value &gt;= pivot_value) {</span>
+<span class="lineNum">     108 </span><span class="lineCov">    3329943 :             l++;</span>
+<span class="lineNum">     109 </span>            :         } else {
+<span class="lineNum">     110 </span><span class="lineCov">    3638681 :             while(l &lt; --r &amp;&amp; base[r].tmp.sort_value &lt;= pivot_value) {}</span>
+<span class="lineNum">     111 </span><span class="lineCov">     968590 :             hist_item_swap(&amp;base[l], &amp;base[r]);</span>
+<span class="lineNum">     112 </span>            :         }
+<span class="lineNum">     113 </span>            :     }
+<span class="lineNum">     114 </span><span class="lineCov">     430914 :     l--;</span>
+<span class="lineNum">     115 </span><span class="lineCov">     430914 :     hist_item_swap(&amp;base[0], &amp;base[l]);</span>
+<span class="lineNum">     116 </span>            : 
+<span class="lineNum">     117 </span>            :     return l;
+<span class="lineNum">     118 </span>            : }
+<a name="119"><span class="lineNum">     119 </span>            : </a>
+<span class="lineNum">     120 </span>            : /** quick select algorithm */
+<span class="lineNum">     121 </span><span class="lineCov">      55845 : static void hist_item_sort_range(hist_item base[], unsigned int len, unsigned int sort_start)</span>
+<span class="lineNum">     122 </span>            : {
+<span class="lineNum">     123 </span>            :     for(;;) {
+<span class="lineNum">     124 </span>            :         const unsigned int l = qsort_partition(base, len), r = l+1;
+<span class="lineNum">     125 </span>            : 
+<span class="lineNum">     126 </span><span class="lineCov">     179832 :         if (l &gt; 0 &amp;&amp; sort_start &lt; l) {</span>
+<span class="lineNum">     127 </span>            :             len = l;
+<span class="lineNum">     128 </span>            :         }
+<span class="lineNum">     129 </span><span class="lineCov">     119071 :         else if (r &lt; len &amp;&amp; sort_start &gt; r) {</span>
+<span class="lineNum">     130 </span><span class="lineCov">      63226 :             base += r; len -= r; sort_start -= r;</span>
+<span class="lineNum">     131 </span>            :         }
+<span class="lineNum">     132 </span>            :         else break;
+<span class="lineNum">     133 </span>            :     }
+<span class="lineNum">     134 </span><span class="lineCov">      55845 : }</span>
+<a name="135"><span class="lineNum">     135 </span>            : </a>
+<span class="lineNum">     136 </span>            : /** sorts array to make sum of weights lower than halfvar one side, returns edge between &lt;halfvar and &gt;halfvar parts of the set */
+<span class="lineNum">     137 </span><span class="lineCov">     123817 : static hist_item *hist_item_sort_halfvar(hist_item base[], unsigned int len, double *const lowervar, const double halfvar)</span>
+<span class="lineNum">     138 </span>            : {
+<span class="lineNum">     139 </span><span class="lineCov">     127265 :     do {</span>
+<span class="lineNum">     140 </span>            :         const unsigned int l = qsort_partition(base, len), r = l+1;
+<span class="lineNum">     141 </span>            : 
+<span class="lineNum">     142 </span>            :         // check if sum of left side is smaller than half,
+<span class="lineNum">     143 </span>            :         // if it is, then it doesn't need to be sorted
+<span class="lineNum">     144 </span><span class="lineCov">     251082 :         unsigned int t = 0; double tmpsum = *lowervar;</span>
+<span class="lineNum">     145 </span><span class="lineCov">     251082 :         while (t &lt;= l &amp;&amp; tmpsum &lt; halfvar) tmpsum += base[t++].color_weight;</span>
+<span class="lineNum">     146 </span>            : 
+<span class="lineNum">     147 </span><span class="lineCov">     251082 :         if (tmpsum &lt; halfvar) {</span>
+<span class="lineNum">     148 </span><span class="lineCov">     139173 :             *lowervar = tmpsum;</span>
+<span class="lineNum">     149 </span>            :         } else {
+<span class="lineNum">     150 </span><span class="lineCov">     111909 :             if (l &gt; 0) {</span>
+<span class="lineNum">     151 </span><span class="lineCov">      67972 :                 hist_item *res = hist_item_sort_halfvar(base, l, lowervar, halfvar);</span>
+<span class="lineNum">     152 </span><span class="lineCov">      67972 :                 if (res) return res;</span>
+<span class="lineNum">     153 </span>            :             } else {
+<span class="lineNum">     154 </span>            :                 // End of left recursion. This will be executed in order from the first element.
+<span class="lineNum">     155 </span><span class="lineCov">      43937 :                 *lowervar += base[0].color_weight;</span>
+<span class="lineNum">     156 </span><span class="lineCov">      43937 :                 if (*lowervar &gt; halfvar) return &amp;base[0];</span>
+<span class="lineNum">     157 </span>            :             }
+<span class="lineNum">     158 </span>            :         }
+<span class="lineNum">     159 </span>            : 
+<span class="lineNum">     160 </span><span class="lineCov">     139227 :         if (len &gt; r) {</span>
+<span class="lineNum">     161 </span><span class="lineCov">     127265 :             base += r; len -= r; // tail-recursive &quot;call&quot;</span>
+<span class="lineNum">     162 </span>            :         } else {
+<span class="lineNum">     163 </span><span class="lineCov">      11962 :             *lowervar += base[r].color_weight;</span>
+<span class="lineNum">     164 </span><span class="lineCov">      11962 :             return (*lowervar &gt; halfvar) ? &amp;base[r] : NULL;</span>
+<span class="lineNum">     165 </span>            :         }
+<span class="lineNum">     166 </span>            :     } while(1);
+<span class="lineNum">     167 </span>            : }
+<span class="lineNum">     168 </span>            : 
+<span class="lineNum">     169 </span>            : static f_pixel get_median(const struct box *b, hist_item achv[]);
+<span class="lineNum">     170 </span>            : 
+<span class="lineNum">     171 </span>            : typedef struct {
+<span class="lineNum">     172 </span>            :     unsigned int chan; float variance;
+<a name="173"><span class="lineNum">     173 </span>            : } channelvariance;</a>
+<span class="lineNum">     174 </span>            : 
+<span class="lineNum">     175 </span><span class="lineCov">     263218 : static int comparevariance(const void *ch1, const void *ch2)</span>
+<span class="lineNum">     176 </span>            : {
+<span class="lineNum">     177 </span><span class="lineCov">     428095 :     return ((const channelvariance*)ch1)-&gt;variance &gt; ((const channelvariance*)ch2)-&gt;variance ? -1 :</span>
+<span class="lineNum">     178 </span><span class="lineCov">     164877 :            (((const channelvariance*)ch1)-&gt;variance &lt; ((const channelvariance*)ch2)-&gt;variance ? 1 : 0);</span>
+<span class="lineNum">     179 </span>            : }
+<a name="180"><span class="lineNum">     180 </span>            : </a>
+<span class="lineNum">     181 </span>            : /** Finds which channels need to be sorted first and preproceses achv for fast sort */
+<span class="lineNum">     182 </span><span class="lineCov">      55845 : static double prepare_sort(struct box *b, hist_item achv[])</span>
+<span class="lineNum">     183 </span>            : {
+<span class="lineNum">     184 </span>            :     /*
+<span class="lineNum">     185 </span>            :      ** Sort dimensions by their variance, and then sort colors first by dimension with highest variance
+<span class="lineNum">     186 </span>            :      */
+<span class="lineNum">     187 </span><span class="lineCov">     279225 :     channelvariance channels[4] = {</span>
+<span class="lineNum">     188 </span><span class="lineCov">      55845 :         {index_of_channel(a), b-&gt;variance.a},</span>
+<span class="lineNum">     189 </span><span class="lineCov">      55845 :         {index_of_channel(r), b-&gt;variance.r},</span>
+<span class="lineNum">     190 </span><span class="lineCov">      55845 :         {index_of_channel(g), b-&gt;variance.g},</span>
+<span class="lineNum">     191 </span><span class="lineCov">      55845 :         {index_of_channel(b), b-&gt;variance.b},</span>
+<span class="lineNum">     192 </span>            :     };
+<span class="lineNum">     193 </span>            : 
+<span class="lineNum">     194 </span><span class="lineCov">      55845 :     qsort(channels, 4, sizeof(channels[0]), comparevariance);</span>
+<span class="lineNum">     195 </span>            : 
+<span class="lineNum">     196 </span><span class="lineCov">      55845 :     const unsigned int ind1 = b-&gt;ind;</span>
+<span class="lineNum">     197 </span><span class="lineCov">      55845 :     const unsigned int colors = b-&gt;colors;</span>
+<span class="lineNum">     198 </span>            : #if __GNUC__ &gt;= 9
+<span class="lineNum">     199 </span>            :     #pragma omp parallel for if (colors &gt; 25000) \
+<span class="lineNum">     200 </span>            :         schedule(static) default(none) shared(achv, channels, colors, ind1)
+<span class="lineNum">     201 </span>            : #else
+<span class="lineNum">     202 </span>            :     #pragma omp parallel for if (colors &gt; 25000) \
+<span class="lineNum">     203 </span>            :         schedule(static) default(none) shared(achv, channels)
+<span class="lineNum">     204 </span>            : #endif
+<span class="lineNum">     205 </span><span class="lineCov">    1684309 :     for(unsigned int i=0; i &lt; colors; i++) {</span>
+<span class="lineNum">     206 </span><span class="lineCov">    1628464 :         const float *chans = (const float *)&amp;achv[ind1 + i].acolor;</span>
+<span class="lineNum">     207 </span>            :         // Only the first channel really matters. When trying median cut many times
+<span class="lineNum">     208 </span>            :         // with different histogram weights, I don't want sort randomness to influence outcome.
+<span class="lineNum">     209 </span><span class="lineCov">    3256928 :         achv[ind1 + i].tmp.sort_value = ((unsigned int)(chans[channels[0].chan]*65535.0)&lt;&lt;16) |</span>
+<span class="lineNum">     210 </span><span class="lineCov">    1628464 :                                         (unsigned int)((chans[channels[2].chan] + chans[channels[1].chan]/2.0 + chans[channels[3].chan]/4.0)*65535.0);</span>
+<span class="lineNum">     211 </span>            :     }
+<span class="lineNum">     212 </span>            : 
+<span class="lineNum">     213 </span><span class="lineCov">      55845 :     const f_pixel median = get_median(b, achv);</span>
+<span class="lineNum">     214 </span>            : 
+<span class="lineNum">     215 </span>            :     // box will be split to make color_weight of each side even
+<span class="lineNum">     216 </span><span class="lineCov">      55845 :     const unsigned int ind = b-&gt;ind, end = ind+b-&gt;colors;</span>
+<span class="lineNum">     217 </span>            :     double totalvar = 0;
+<span class="lineNum">     218 </span>            :     #pragma omp parallel for if (end - ind &gt; 15000) \
+<span class="lineNum">     219 </span>            :         schedule(static) default(shared) reduction(+:totalvar)
+<span class="lineNum">     220 </span><span class="lineCov">    1684309 :     for(unsigned int j=ind; j &lt; end; j++) totalvar += (achv[j].color_weight = color_weight(median, achv[j]));</span>
+<span class="lineNum">     221 </span><span class="lineCov">      55845 :     return totalvar / 2.0;</span>
+<span class="lineNum">     222 </span>            : }
+<a name="223"><span class="lineNum">     223 </span>            : </a>
+<span class="lineNum">     224 </span>            : /** finds median in unsorted set by sorting only minimum required */
+<span class="lineNum">     225 </span><span class="lineCov">      55845 : static f_pixel get_median(const struct box *b, hist_item achv[])</span>
+<span class="lineNum">     226 </span>            : {
+<span class="lineNum">     227 </span><span class="lineCov">      55845 :     const unsigned int median_start = (b-&gt;colors-1)/2;</span>
+<span class="lineNum">     228 </span>            : 
+<span class="lineNum">     229 </span><span class="lineCov">      55845 :     hist_item_sort_range(&amp;(achv[b-&gt;ind]), b-&gt;colors,</span>
+<span class="lineNum">     230 </span>            :                          median_start);
+<span class="lineNum">     231 </span>            : 
+<span class="lineNum">     232 </span><span class="lineCov">      55845 :     if (b-&gt;colors&amp;1) return achv[b-&gt;ind + median_start].acolor;</span>
+<span class="lineNum">     233 </span>            : 
+<span class="lineNum">     234 </span>            :     // technically the second color is not guaranteed to be sorted correctly
+<span class="lineNum">     235 </span>            :     // but most of the time it is good enough to be useful
+<span class="lineNum">     236 </span><span class="lineCov">      28245 :     return averagepixels(2, &amp;achv[b-&gt;ind + median_start]);</span>
+<span class="lineNum">     237 </span>            : }
+<span class="lineNum">     238 </span>            : 
+<span class="lineNum">     239 </span>            : /*
+<a name="240"><span class="lineNum">     240 </span>            :  ** Find the best splittable box. -1 if no boxes are splittable.</a>
+<span class="lineNum">     241 </span>            :  */
+<span class="lineNum">     242 </span><span class="lineCov">      55845 : static int best_splittable_box(struct box bv[], unsigned int boxes, const double max_mse)</span>
+<span class="lineNum">     243 </span>            : {
+<span class="lineNum">     244 </span>            :     int bi=-1; double maxsum=0;
+<span class="lineNum">     245 </span><span class="lineCov">    7204005 :     for(unsigned int i=0; i &lt; boxes; i++) {</span>
+<span class="lineNum">     246 </span><span class="lineCov">    7148160 :         if (bv[i].colors &lt; 2) {</span>
+<span class="lineNum">     247 </span><span class="lineCov">     583252 :             continue;</span>
+<span class="lineNum">     248 </span>            :         }
+<span class="lineNum">     249 </span>            : 
+<span class="lineNum">     250 </span>            :         // looks only at max variance, because it's only going to split by it
+<span class="lineNum">     251 </span><span class="lineCov">    6564908 :         const double cv = MAX(bv[i].variance.r, MAX(bv[i].variance.g,bv[i].variance.b));</span>
+<span class="lineNum">     252 </span><span class="lineCov">    6564908 :         double thissum = bv[i].sum * MAX(bv[i].variance.a, cv);</span>
+<span class="lineNum">     253 </span>            : 
+<span class="lineNum">     254 </span><span class="lineCov">    6564908 :         if (bv[i].max_error &gt; max_mse) {</span>
+<span class="lineNum">     255 </span><span class="lineCov">     944077 :             thissum = thissum* bv[i].max_error/max_mse;</span>
+<span class="lineNum">     256 </span>            :         }
+<span class="lineNum">     257 </span>            : 
+<span class="lineNum">     258 </span><span class="lineCov">    6564908 :         if (thissum &gt; maxsum) {</span>
+<span class="lineNum">     259 </span>            :             maxsum = thissum;
+<span class="lineNum">     260 </span><span class="lineCov">     269318 :             bi = i;</span>
+<span class="lineNum">     261 </span>            :         }
+<span class="lineNum">     262 </span>            :     }
+<span class="lineNum">     263 </span><span class="lineCov">      55845 :     return bi;</span>
+<span class="lineNum">     264 </span>            : }
+<span class="lineNum">     265 </span>            : 
+<span class="lineNum">     266 </span>            : inline static double color_weight(f_pixel median, hist_item h)
+<span class="lineNum">     267 </span>            : {
+<span class="lineNum">     268 </span>            :     float diff = colordifference(median, h.acolor);
+<span class="lineNum">     269 </span><span class="lineCov">    1628464 :     return sqrt(diff) * (sqrt(1.0+h.adjusted_weight)-1.0);</span>
+<span class="lineNum">     270 </span>            : }
+<span class="lineNum">     271 </span>            : 
+<span class="lineNum">     272 </span>            : static void set_colormap_from_boxes(colormap *map, struct box bv[], unsigned int boxes, hist_item *achv);
+<a name="273"><span class="lineNum">     273 </span>            : static void adjust_histogram(hist_item *achv, const struct box bv[], unsigned int boxes);</a>
+<span class="lineNum">     274 </span>            : 
+<span class="lineNum">     275 </span><span class="lineCov">       2265 : static double box_error(const struct box *box, const hist_item achv[])</span>
+<span class="lineNum">     276 </span>            : {
+<span class="lineNum">     277 </span><span class="lineCov">       2265 :     f_pixel avg = box-&gt;color;</span>
+<span class="lineNum">     278 </span>            : 
+<span class="lineNum">     279 </span>            :     double total_error=0;
+<span class="lineNum">     280 </span><span class="lineCov">     220945 :     for (unsigned int i = 0; i &lt; box-&gt;colors; ++i) {</span>
+<span class="lineNum">     281 </span><span class="lineCov">     437360 :         total_error += colordifference(avg, achv[box-&gt;ind + i].acolor) * achv[box-&gt;ind + i].perceptual_weight;</span>
+<span class="lineNum">     282 </span>            :     }
+<span class="lineNum">     283 </span>            : 
+<span class="lineNum">     284 </span><span class="lineCov">       2265 :     return total_error;</span>
+<span class="lineNum">     285 </span>            : }
+<a name="286"><span class="lineNum">     286 </span>            : </a>
+<span class="lineNum">     287 </span>            : 
+<span class="lineNum">     288 </span><span class="lineCov">      55845 : static bool total_box_error_below_target(double target_mse, struct box bv[], unsigned int boxes, const histogram *hist)</span>
+<span class="lineNum">     289 </span>            : {
+<span class="lineNum">     290 </span><span class="lineCov">      55845 :     target_mse *= hist-&gt;total_perceptual_weight;</span>
+<span class="lineNum">     291 </span>            :     double total_error=0;
+<span class="lineNum">     292 </span>            : 
+<span class="lineNum">     293 </span><span class="lineCov">     124642 :     for(unsigned int i=0; i &lt; boxes; i++) {</span>
+<span class="lineNum">     294 </span>            :         // error is (re)calculated lazily
+<span class="lineNum">     295 </span><span class="lineCov">     178602 :         if (bv[i].total_error &gt;= 0) {</span>
+<span class="lineNum">     296 </span><span class="lineCov">      71911 :             total_error += bv[i].total_error;</span>
+<span class="lineNum">     297 </span>            :         }
+<span class="lineNum">     298 </span><span class="lineCov">     178602 :         if (total_error &gt; target_mse) return false;</span>
+<span class="lineNum">     299 </span>            :     }
+<span class="lineNum">     300 </span>            : 
+<span class="lineNum">     301 </span><span class="lineCov">        838 :     for(unsigned int i=0; i &lt; boxes; i++) {</span>
+<span class="lineNum">     302 </span><span class="lineCov">       2723 :         if (bv[i].total_error &lt; 0) {</span>
+<span class="lineNum">     303 </span><span class="lineCov">       2265 :             bv[i].total_error = box_error(&amp;bv[i], hist-&gt;achv);</span>
+<span class="lineNum">     304 </span><span class="lineCov">       2265 :             total_error += bv[i].total_error;</span>
+<span class="lineNum">     305 </span>            :         }
+<span class="lineNum">     306 </span><span class="lineCov">       2723 :         if (total_error &gt; target_mse) return false;</span>
+<span class="lineNum">     307 </span>            :     }
+<span class="lineNum">     308 </span>            : 
+<span class="lineNum">     309 </span>            :     return true;
+<a name="310"><span class="lineNum">     310 </span>            : }</a>
+<span class="lineNum">     311 </span>            : 
+<span class="lineNum">     312 </span><span class="lineCov">     111909 : static void box_init(struct box *box, const hist_item *achv, const unsigned int ind, const unsigned int colors, const double sum) {</span>
+<span class="lineNum">     313 </span><span class="lineCov">     111909 :     box-&gt;ind = ind;</span>
+<span class="lineNum">     314 </span><span class="lineCov">     111909 :     box-&gt;colors = colors;</span>
+<span class="lineNum">     315 </span><span class="lineCov">     111909 :     box-&gt;sum = sum;</span>
+<span class="lineNum">     316 </span><span class="lineCov">     111909 :     box-&gt;total_error = -1;</span>
+<span class="lineNum">     317 </span>            : 
+<span class="lineNum">     318 </span><span class="lineCov">     111909 :     box-&gt;color = averagepixels(colors, &amp;achv[ind]);</span>
+<span class="lineNum">     319 </span>            :     #pragma omp task if (colors &gt; 5000)
+<span class="lineNum">     320 </span><span class="lineCov">     111909 :     box-&gt;variance = box_variance(achv, box);</span>
+<span class="lineNum">     321 </span>            :     #pragma omp task if (colors &gt; 8000)
+<span class="lineNum">     322 </span><span class="lineCov">     111909 :     box-&gt;max_error = box_max_error(achv, box);</span>
+<span class="lineNum">     323 </span><span class="lineCov">     111909 : }</span>
+<span class="lineNum">     324 </span>            : 
+<span class="lineNum">     325 </span>            : /*
+<span class="lineNum">     326 </span>            :  ** Here is the fun part, the median-cut colormap generator.  This is based
+<span class="lineNum">     327 </span>            :  ** on Paul Heckbert's paper, &quot;Color Image Quantization for Frame Buffer
+<a name="328"><span class="lineNum">     328 </span>            :  ** Display,&quot; SIGGRAPH 1982 Proceedings, page 297.</a>
+<span class="lineNum">     329 </span>            :  */
+<span class="lineNum">     330 </span><span class="lineCov">        219 : LIQ_PRIVATE colormap *mediancut(histogram *hist, unsigned int newcolors, const double target_mse, const double max_mse, void* (*malloc)(size_t), void (*free)(void*))</span>
+<span class="lineNum">     331 </span><span class="lineCov">        219 : {</span>
+<span class="lineNum">     332 </span><span class="lineCov">        219 :     hist_item *achv = hist-&gt;achv;</span>
+<span class="lineNum">     333 </span><span class="lineCov">        219 :     LIQ_ARRAY(struct box, bv, newcolors);</span>
+<span class="lineNum">     334 </span>            :     unsigned int boxes = 1;
+<span class="lineNum">     335 </span>            : 
+<span class="lineNum">     336 </span>            :     /*
+<span class="lineNum">     337 </span>            :      ** Set up the initial box.
+<span class="lineNum">     338 </span>            :      */
+<span class="lineNum">     339 </span>            :     #pragma omp parallel
+<span class="lineNum">     340 </span>            :     #pragma omp single
+<span class="lineNum">     341 </span>            :     {
+<span class="lineNum">     342 </span>            :         double sum = 0;
+<span class="lineNum">     343 </span><span class="lineCov">     196165 :         for(unsigned int i=0; i &lt; hist-&gt;size; i++) {</span>
+<span class="lineNum">     344 </span><span class="lineCov">     195946 :             sum += achv[i].adjusted_weight;</span>
+<span class="lineNum">     345 </span>            :         }
+<span class="lineNum">     346 </span>            :         #pragma omp taskgroup
+<span class="lineNum">     347 </span>            :         {
+<span class="lineNum">     348 </span><span class="lineCov">        219 :             box_init(&amp;bv[0], achv, 0, hist-&gt;size, sum);</span>
+<span class="lineNum">     349 </span>            :         }
+<span class="lineNum">     350 </span>            : 
+<span class="lineNum">     351 </span>            : 
+<span class="lineNum">     352 </span>            :         /*
+<span class="lineNum">     353 </span>            :          ** Main loop: split boxes until we have enough.
+<span class="lineNum">     354 </span>            :          */
+<span class="lineNum">     355 </span><span class="lineCov">        219 :         while (boxes &lt; newcolors) {</span>
+<span class="lineNum">     356 </span>            : 
+<span class="lineNum">     357 </span>            :             // first splits boxes that exceed quality limit (to have colors for things like odd green pixel),
+<span class="lineNum">     358 </span>            :             // later raises the limit to allow large smooth areas/gradients get colors.
+<span class="lineNum">     359 </span><span class="lineCov">      55845 :             const double current_max_mse = max_mse + (boxes/(double)newcolors)*16.0*max_mse;</span>
+<span class="lineNum">     360 </span><span class="lineCov">      55845 :             const int bi = best_splittable_box(bv, boxes, current_max_mse);</span>
+<span class="lineNum">     361 </span><span class="lineCov">      55845 :             if (bi &lt; 0) {</span>
+<span class="lineNum">     362 </span>            :                 break;    /* ran out of colors! */
+<span class="lineNum">     363 </span>            :             }
+<span class="lineNum">     364 </span>            : 
+<span class="lineNum">     365 </span><span class="lineCov">      55845 :             unsigned int indx = bv[bi].ind;</span>
+<span class="lineNum">     366 </span><span class="lineCov">      55845 :             unsigned int clrs = bv[bi].colors;</span>
+<span class="lineNum">     367 </span>            : 
+<span class="lineNum">     368 </span>            :             /*
+<span class="lineNum">     369 </span>            :              Classic implementation tries to get even number of colors or pixels in each subdivision.
+<span class="lineNum">     370 </span>            : 
+<span class="lineNum">     371 </span>            :              Here, instead of popularity I use (sqrt(popularity)*variance) metric.
+<span class="lineNum">     372 </span>            :              Each subdivision balances number of pixels (popular colors) and low variance -
+<span class="lineNum">     373 </span>            :              boxes can be large if they have similar colors. Later boxes with high variance
+<span class="lineNum">     374 </span>            :              will be more likely to be split.
+<span class="lineNum">     375 </span>            : 
+<span class="lineNum">     376 </span>            :              Median used as expected value gives much better results than mean.
+<span class="lineNum">     377 </span>            :              */
+<span class="lineNum">     378 </span>            : 
+<span class="lineNum">     379 </span><span class="lineCov">      55845 :             const double halfvar = prepare_sort(&amp;bv[bi], achv);</span>
+<span class="lineNum">     380 </span><span class="lineCov">      55845 :             double lowervar=0;</span>
+<span class="lineNum">     381 </span>            : 
+<span class="lineNum">     382 </span>            :             // hist_item_sort_halfvar sorts and sums lowervar at the same time
+<span class="lineNum">     383 </span>            :             // returns item to break at …minus one, which does smell like an off-by-one error.
+<span class="lineNum">     384 </span><span class="lineCov">      55845 :             hist_item *break_p = hist_item_sort_halfvar(&amp;achv[indx], clrs, &amp;lowervar, halfvar);</span>
+<span class="lineNum">     385 </span><span class="lineCov">      55845 :             unsigned int break_at = MIN(clrs-1, break_p - &amp;achv[indx] + 1);</span>
+<span class="lineNum">     386 </span>            : 
+<span class="lineNum">     387 </span>            :             /*
+<span class="lineNum">     388 </span>            :              ** Split the box.
+<span class="lineNum">     389 </span>            :              */
+<span class="lineNum">     390 </span><span class="lineCov">      55845 :             double sm = bv[bi].sum;</span>
+<span class="lineNum">     391 </span>            :             double lowersum = 0;
+<span class="lineNum">     392 </span><span class="lineCov">      55845 :             for(unsigned int i=0; i &lt; break_at; i++) lowersum += achv[indx + i].adjusted_weight;</span>
+<span class="lineNum">     393 </span>            : 
+<span class="lineNum">     394 </span>            :             #pragma omp taskgroup
+<span class="lineNum">     395 </span>            :             {
+<span class="lineNum">     396 </span><span class="lineCov">      55845 :                 box_init(&amp;bv[bi], achv, indx, break_at, lowersum);</span>
+<span class="lineNum">     397 </span><span class="lineCov">      55845 :                 box_init(&amp;bv[boxes], achv, indx + break_at, clrs - break_at, sm - lowersum);</span>
+<span class="lineNum">     398 </span>            :             }
+<span class="lineNum">     399 </span>            : 
+<span class="lineNum">     400 </span><span class="lineCov">      55845 :             ++boxes;</span>
+<span class="lineNum">     401 </span>            : 
+<span class="lineNum">     402 </span><span class="lineCov">      55845 :             if (total_box_error_below_target(target_mse, bv, boxes, hist)) {</span>
+<span class="lineNum">     403 </span>            :                 break;
+<span class="lineNum">     404 </span>            :             }
+<span class="lineNum">     405 </span>            :         }
+<span class="lineNum">     406 </span>            :     }
+<span class="lineNum">     407 </span>            : 
+<span class="lineNum">     408 </span><span class="lineCov">        219 :     colormap *map = pam_colormap(boxes, malloc, free);</span>
+<span class="lineNum">     409 </span>            :     set_colormap_from_boxes(map, bv, boxes, achv);
+<span class="lineNum">     410 </span>            : 
+<span class="lineNum">     411 </span>            :     adjust_histogram(achv, bv, boxes);
+<span class="lineNum">     412 </span>            : 
+<span class="lineNum">     413 </span><span class="lineCov">        219 :     return map;</span>
+<span class="lineNum">     414 </span>            : }
+<span class="lineNum">     415 </span>            : 
+<span class="lineNum">     416 </span>            : static void set_colormap_from_boxes(colormap *map, struct box* bv, unsigned int boxes, hist_item *achv)
+<span class="lineNum">     417 </span>            : {
+<span class="lineNum">     418 </span>            :     /*
+<span class="lineNum">     419 </span>            :      ** Ok, we've got enough boxes.  Now choose a representative color for
+<span class="lineNum">     420 </span>            :      ** each box.  There are a number of possible ways to make this choice.
+<span class="lineNum">     421 </span>            :      ** One would be to choose the center of the box; this ignores any structure
+<span class="lineNum">     422 </span>            :      ** within the boxes.  Another method would be to average all the colors in
+<span class="lineNum">     423 </span>            :      ** the box - this is the method specified in Heckbert's paper.
+<span class="lineNum">     424 </span>            :      */
+<span class="lineNum">     425 </span>            : 
+<span class="lineNum">     426 </span><span class="lineCov">      56064 :     for(unsigned int bi = 0; bi &lt; boxes; ++bi) {</span>
+<span class="lineNum">     427 </span><span class="lineCov">      56064 :         map-&gt;palette[bi].acolor = bv[bi].color;</span>
+<span class="lineNum">     428 </span>            : 
+<span class="lineNum">     429 </span>            :         /* store total color popularity (perceptual_weight is approximation of it) */
+<span class="lineNum">     430 </span><span class="lineCov">      56064 :         map-&gt;palette[bi].popularity = 0;</span>
+<span class="lineNum">     431 </span><span class="lineCov">     252010 :         for(unsigned int i=bv[bi].ind; i &lt; bv[bi].ind+bv[bi].colors; i++) {</span>
+<span class="lineNum">     432 </span><span class="lineCov">     195946 :             map-&gt;palette[bi].popularity += achv[i].perceptual_weight;</span>
+<span class="lineNum">     433 </span>            :         }
+<span class="lineNum">     434 </span>            :     }
+<span class="lineNum">     435 </span>            : }
+<span class="lineNum">     436 </span>            : 
+<span class="lineNum">     437 </span>            : /* increase histogram popularity by difference from the final color (this is used as part of feedback loop) */
+<span class="lineNum">     438 </span>            : static void adjust_histogram(hist_item *achv, const struct box* bv, unsigned int boxes)
+<span class="lineNum">     439 </span>            : {
+<span class="lineNum">     440 </span><span class="lineCov">      56064 :     for(unsigned int bi = 0; bi &lt; boxes; ++bi) {</span>
+<span class="lineNum">     441 </span><span class="lineCov">     252010 :         for(unsigned int i=bv[bi].ind; i &lt; bv[bi].ind+bv[bi].colors; i++) {</span>
+<span class="lineNum">     442 </span><span class="lineCov">     195946 :             achv[i].tmp.likely_colormap_index = bi;</span>
+<span class="lineNum">     443 </span>            :         }
+<span class="lineNum">     444 </span>            :     }
+<a name="445"><span class="lineNum">     445 </span>            : }</a>
+<span class="lineNum">     446 </span>            : 
+<span class="lineNum">     447 </span><span class="lineCov">     140154 : static f_pixel averagepixels(unsigned int clrs, const hist_item achv[])</span>
+<span class="lineNum">     448 </span>            : {
+<span class="lineNum">     449 </span>            :     double r = 0, g = 0, b = 0, a = 0, sum = 0;
+<span class="lineNum">     450 </span>            : 
+<span class="lineNum">     451 </span>            :     #pragma omp parallel for if (clrs &gt; 25000) \
+<span class="lineNum">     452 </span>            :         schedule(static) default(shared) reduction(+:a) reduction(+:r) reduction(+:g) reduction(+:b) reduction(+:sum)
+<span class="lineNum">     453 </span><span class="lineCov">    2021054 :     for(unsigned int i = 0; i &lt; clrs; i++) {</span>
+<span class="lineNum">     454 </span><span class="lineCov">    1880900 :         const f_pixel px = achv[i].acolor;</span>
+<span class="lineNum">     455 </span><span class="lineCov">    1880900 :         const double weight = achv[i].adjusted_weight;</span>
+<span class="lineNum">     456 </span>            : 
+<span class="lineNum">     457 </span><span class="lineCov">    1880900 :         sum += weight;</span>
+<span class="lineNum">     458 </span><span class="lineCov">    1880900 :         a += px.a * weight;</span>
+<span class="lineNum">     459 </span><span class="lineCov">    1880900 :         r += px.r * weight;</span>
+<span class="lineNum">     460 </span><span class="lineCov">    1880900 :         g += px.g * weight;</span>
+<span class="lineNum">     461 </span><span class="lineCov">    1880900 :         b += px.b * weight;</span>
+<span class="lineNum">     462 </span>            :     }
+<span class="lineNum">     463 </span>            : 
+<span class="lineNum">     464 </span><span class="lineCov">     140154 :     if (sum) {</span>
+<span class="lineNum">     465 </span><span class="lineCov">     140154 :         a /= sum;</span>
+<span class="lineNum">     466 </span><span class="lineCov">     140154 :         r /= sum;</span>
+<span class="lineNum">     467 </span><span class="lineCov">     140154 :         g /= sum;</span>
+<span class="lineNum">     468 </span><span class="lineCov">     140154 :         b /= sum;</span>
+<span class="lineNum">     469 </span>            :     }
+<span class="lineNum">     470 </span>            : 
+<span class="lineNum">     471 </span>            :     assert(!isnan(r) &amp;&amp; !isnan(g) &amp;&amp; !isnan(b) &amp;&amp; !isnan(a));
+<span class="lineNum">     472 </span>            : 
+<span class="lineNum">     473 </span><span class="lineCov">     140154 :     return (f_pixel){.r=r, .g=g, .b=b, .a=a};</span>
+<span class="lineNum">     474 </span>            : }
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>

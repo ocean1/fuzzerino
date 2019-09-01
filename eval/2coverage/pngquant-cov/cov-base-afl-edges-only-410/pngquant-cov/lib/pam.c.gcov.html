@@ -1,0 +1,362 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - cov-base-afl-edges-only-410.info - pngquant-cov/lib/pam.c</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="title">LCOV - code coverage report</td></tr>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+    <tr>
+      <td width="100%">
+        <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="35%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">pngquant-cov/lib</a> - pam.c<span style="font-size: 80%;"> (source / <a href="pam.c.func-sort-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="15%"></td>
+            <td width="10%" class="headerCovTableHead">Hit</td>
+            <td width="10%" class="headerCovTableHead">Total</td>
+            <td width="15%" class="headerCovTableHead">Coverage</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">cov-base-afl-edges-only-410.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntry">88</td>
+            <td class="headerCovTableEntry">131</td>
+            <td class="headerCovTableEntryLo">67.2 %</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Date:</td>
+            <td class="headerValue">2019-09-01 22:22:05</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntry">10</td>
+            <td class="headerCovTableEntry">10</td>
+            <td class="headerCovTableEntryHi">100.0 %</td>
+          </tr>
+          <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+        </table>
+      </td>
+    </tr>
+
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+  </table>
+
+  <table cellpadding=0 cellspacing=0 border=0>
+    <tr>
+      <td><br></td>
+    </tr>
+    <tr>
+      <td>
+<pre class="sourceHeading">          Line data    Source code</pre>
+<pre class="source">
+<a name="1"><span class="lineNum">       1 </span>            : /* pam.c - pam (portable alpha map) utility library</a>
+<span class="lineNum">       2 </span>            : **
+<span class="lineNum">       3 </span>            : ** © 2009-2017 by Kornel Lesiński.
+<span class="lineNum">       4 </span>            : ** © 1989, 1991 by Jef Poskanzer.
+<span class="lineNum">       5 </span>            : ** © 1997, 2000, 2002 by Greg Roelofs; based on an idea by Stefan Schneider.
+<span class="lineNum">       6 </span>            : **
+<span class="lineNum">       7 </span>            : ** See COPYRIGHT file for license.
+<span class="lineNum">       8 </span>            : */
+<span class="lineNum">       9 </span>            : 
+<span class="lineNum">      10 </span>            : #include &lt;stdlib.h&gt;
+<span class="lineNum">      11 </span>            : #include &lt;string.h&gt;
+<span class="lineNum">      12 </span>            : 
+<span class="lineNum">      13 </span>            : #include &quot;libimagequant.h&quot;
+<span class="lineNum">      14 </span>            : #include &quot;pam.h&quot;
+<a name="15"><span class="lineNum">      15 </span>            : #include &quot;mempool.h&quot;</a>
+<span class="lineNum">      16 </span>            : 
+<span class="lineNum">      17 </span><span class="lineCov">         30 : LIQ_PRIVATE bool pam_computeacolorhash(struct acolorhash_table *acht, const rgba_pixel *const pixels[], unsigned int cols, unsigned int rows, const unsigned char *importance_map)</span>
+<span class="lineNum">      18 </span>            : {
+<span class="lineNum">      19 </span><span class="lineCov">         30 :     const unsigned int ignorebits = acht-&gt;ignorebits;</span>
+<span class="lineNum">      20 </span><span class="lineCov">         30 :     const unsigned int channel_mask = 255U&gt;&gt;ignorebits&lt;&lt;ignorebits;</span>
+<span class="lineNum">      21 </span><span class="lineCov">         30 :     const unsigned int channel_hmask = (255U&gt;&gt;ignorebits) ^ 0xFFU;</span>
+<span class="lineNum">      22 </span><span class="lineCov">         30 :     const unsigned int posterize_mask = channel_mask &lt;&lt; 24 | channel_mask &lt;&lt; 16 | channel_mask &lt;&lt; 8 | channel_mask;</span>
+<span class="lineNum">      23 </span><span class="lineCov">         30 :     const unsigned int posterize_high_mask = channel_hmask &lt;&lt; 24 | channel_hmask &lt;&lt; 16 | channel_hmask &lt;&lt; 8 | channel_hmask;</span>
+<span class="lineNum">      24 </span>            : 
+<span class="lineNum">      25 </span><span class="lineCov">         30 :     const unsigned int hash_size = acht-&gt;hash_size;</span>
+<span class="lineNum">      26 </span>            : 
+<span class="lineNum">      27 </span>            :     /* Go through the entire image, building a hash table of colors. */
+<span class="lineNum">      28 </span><span class="lineCov">        974 :     for(unsigned int row = 0; row &lt; rows; ++row) {</span>
+<span class="lineNum">      29 </span>            : 
+<span class="lineNum">      30 </span><span class="lineCov">      30208 :         for(unsigned int col = 0; col &lt; cols; ++col) {</span>
+<span class="lineNum">      31 </span>            :             unsigned int boost;
+<span class="lineNum">      32 </span>            : 
+<span class="lineNum">      33 </span>            :             // RGBA color is casted to long for easier hasing/comparisons
+<span class="lineNum">      34 </span><span class="lineCov">      30208 :             union rgba_as_int px = {pixels[row][col]};</span>
+<span class="lineNum">      35 </span>            :             unsigned int hash;
+<span class="lineNum">      36 </span><span class="lineCov">      30208 :             if (!px.rgba.a) {</span>
+<span class="lineNum">      37 </span>            :                 // &quot;dirty alpha&quot; has different RGBA values that end up being the same fully transparent color
+<span class="lineNum">      38 </span><span class="lineNoCov">          0 :                 px.l=0; hash=0;</span>
+<span class="lineNum">      39 </span>            : 
+<span class="lineNum">      40 </span>            :                 boost = 2000;
+<span class="lineNum">      41 </span><span class="lineNoCov">          0 :                 if (importance_map) {</span>
+<span class="lineNum">      42 </span><span class="lineNoCov">          0 :                     importance_map++;</span>
+<span class="lineNum">      43 </span>            :                 }
+<span class="lineNum">      44 </span>            :             } else {
+<span class="lineNum">      45 </span>            :                 // mask posterizes all 4 channels in one go
+<span class="lineNum">      46 </span><span class="lineCov">      30208 :                 px.l = (px.l &amp; posterize_mask) | ((px.l &amp; posterize_high_mask) &gt;&gt; (8-ignorebits));</span>
+<span class="lineNum">      47 </span>            :                 // fancier hashing algorithms didn't improve much
+<span class="lineNum">      48 </span><span class="lineCov">      30208 :                 hash = px.l % hash_size;</span>
+<span class="lineNum">      49 </span>            : 
+<span class="lineNum">      50 </span><span class="lineCov">      30208 :                 if (importance_map) {</span>
+<span class="lineNum">      51 </span><span class="lineCov">      30208 :                     boost = *importance_map++;</span>
+<span class="lineNum">      52 </span>            :                 } else {
+<span class="lineNum">      53 </span>            :                     boost = 255;
+<span class="lineNum">      54 </span>            :                 }
+<span class="lineNum">      55 </span>            :             }
+<span class="lineNum">      56 </span>            : 
+<span class="lineNum">      57 </span><span class="lineCov">      30208 :             if (!pam_add_to_hash(acht, hash, boost, px, row, rows)) {</span>
+<span class="lineNum">      58 </span><span class="lineNoCov">          0 :                 return false;</span>
+<span class="lineNum">      59 </span>            :             }
+<span class="lineNum">      60 </span>            :         }
+<span class="lineNum">      61 </span>            : 
+<span class="lineNum">      62 </span>            :     }
+<span class="lineNum">      63 </span><span class="lineCov">         30 :     acht-&gt;cols = cols;</span>
+<span class="lineNum">      64 </span><span class="lineCov">         30 :     acht-&gt;rows += rows;</span>
+<span class="lineNum">      65 </span><span class="lineCov">         30 :     return true;</span>
+<a name="66"><span class="lineNum">      66 </span>            : }</a>
+<span class="lineNum">      67 </span>            : 
+<span class="lineNum">      68 </span><span class="lineCov">      30208 : LIQ_PRIVATE bool pam_add_to_hash(struct acolorhash_table *acht, unsigned int hash, unsigned int boost, union rgba_as_int px, unsigned int row, unsigned int rows)</span>
+<span class="lineNum">      69 </span>            : {
+<span class="lineNum">      70 </span>            :             /* head of the hash function stores first 2 colors inline (achl-&gt;used = 1..2),
+<span class="lineNum">      71 </span>            :                to reduce number of allocations of achl-&gt;other_items.
+<span class="lineNum">      72 </span>            :              */
+<span class="lineNum">      73 </span>            :             struct acolorhist_arr_head *achl = &amp;acht-&gt;buckets[hash];
+<span class="lineNum">      74 </span><span class="lineCov">      30208 :             if (achl-&gt;inline1.color.l == px.l &amp;&amp; achl-&gt;used) {</span>
+<span class="lineNum">      75 </span><span class="lineCov">      30087 :                 achl-&gt;inline1.perceptual_weight += boost;</span>
+<span class="lineNum">      76 </span><span class="lineCov">      30087 :                 return true;</span>
+<span class="lineNum">      77 </span>            :             }
+<span class="lineNum">      78 </span><span class="lineCov">        121 :             if (achl-&gt;used) {</span>
+<span class="lineNum">      79 </span><span class="lineNoCov">          0 :                 if (achl-&gt;used &gt; 1) {</span>
+<span class="lineNum">      80 </span><span class="lineNoCov">          0 :                     if (achl-&gt;inline2.color.l == px.l) {</span>
+<span class="lineNum">      81 </span><span class="lineNoCov">          0 :                         achl-&gt;inline2.perceptual_weight += boost;</span>
+<span class="lineNum">      82 </span><span class="lineNoCov">          0 :                         return true;</span>
+<span class="lineNum">      83 </span>            :                     }
+<span class="lineNum">      84 </span>            :                     // other items are stored as an array (which gets reallocated if needed)
+<span class="lineNum">      85 </span><span class="lineNoCov">          0 :                     struct acolorhist_arr_item *other_items = achl-&gt;other_items;</span>
+<span class="lineNum">      86 </span>            :                     unsigned int i = 0;
+<span class="lineNum">      87 </span><span class="lineNoCov">          0 :                     for (; i &lt; achl-&gt;used-2; i++) {</span>
+<span class="lineNum">      88 </span><span class="lineNoCov">          0 :                         if (other_items[i].color.l == px.l) {</span>
+<span class="lineNum">      89 </span><span class="lineNoCov">          0 :                             other_items[i].perceptual_weight += boost;</span>
+<span class="lineNum">      90 </span><span class="lineNoCov">          0 :                             return true;</span>
+<span class="lineNum">      91 </span>            :                         }
+<span class="lineNum">      92 </span>            :                     }
+<span class="lineNum">      93 </span>            : 
+<span class="lineNum">      94 </span>            :                     // the array was allocated with spare items
+<span class="lineNum">      95 </span><span class="lineNoCov">          0 :                     if (i &lt; achl-&gt;capacity) {</span>
+<span class="lineNum">      96 </span><span class="lineNoCov">          0 :                         other_items[i] = (struct acolorhist_arr_item){</span>
+<span class="lineNum">      97 </span>            :                             .color = px,
+<span class="lineNum">      98 </span>            :                             .perceptual_weight = boost,
+<span class="lineNum">      99 </span>            :                         };
+<span class="lineNum">     100 </span><span class="lineNoCov">          0 :                         achl-&gt;used++;</span>
+<span class="lineNum">     101 </span><span class="lineNoCov">          0 :                         ++acht-&gt;colors;</span>
+<span class="lineNum">     102 </span><span class="lineNoCov">          0 :                         return true;</span>
+<span class="lineNum">     103 </span>            :                     }
+<span class="lineNum">     104 </span>            : 
+<span class="lineNum">     105 </span><span class="lineNoCov">          0 :                     if (++acht-&gt;colors &gt; acht-&gt;maxcolors) {</span>
+<span class="lineNum">     106 </span>            :                         return false;
+<span class="lineNum">     107 </span>            :                     }
+<span class="lineNum">     108 </span>            : 
+<span class="lineNum">     109 </span>            :                     struct acolorhist_arr_item *new_items;
+<span class="lineNum">     110 </span>            :                     unsigned int capacity;
+<span class="lineNum">     111 </span><span class="lineNoCov">          0 :                     if (!other_items) { // there was no array previously, alloc &quot;small&quot; array</span>
+<span class="lineNum">     112 </span>            :                         capacity = 8;
+<span class="lineNum">     113 </span><span class="lineNoCov">          0 :                         if (acht-&gt;freestackp &lt;= 0) {</span>
+<span class="lineNum">     114 </span>            :                             // estimate how many colors are going to be + headroom
+<span class="lineNum">     115 </span><span class="lineNoCov">          0 :                             const size_t mempool_size = ((acht-&gt;rows + rows-row) * 2 * acht-&gt;colors / (acht-&gt;rows + row + 1) + 1024) * sizeof(struct acolorhist_arr_item);</span>
+<span class="lineNum">     116 </span><span class="lineNoCov">          0 :                             new_items = mempool_alloc(&amp;acht-&gt;mempool, sizeof(struct acolorhist_arr_item)*capacity, mempool_size);</span>
+<span class="lineNum">     117 </span>            :                         } else {
+<span class="lineNum">     118 </span>            :                             // freestack stores previously freed (reallocated) arrays that can be reused
+<span class="lineNum">     119 </span>            :                             // (all pesimistically assumed to be capacity = 8)
+<span class="lineNum">     120 </span><span class="lineNoCov">          0 :                             new_items = acht-&gt;freestack[--acht-&gt;freestackp];</span>
+<span class="lineNum">     121 </span>            :                         }
+<span class="lineNum">     122 </span>            :                     } else {
+<span class="lineNum">     123 </span>            :                         const unsigned int stacksize = sizeof(acht-&gt;freestack)/sizeof(acht-&gt;freestack[0]);
+<span class="lineNum">     124 </span>            : 
+<span class="lineNum">     125 </span>            :                         // simply reallocs and copies array to larger capacity
+<span class="lineNum">     126 </span><span class="lineNoCov">          0 :                         capacity = achl-&gt;capacity*2 + 16;</span>
+<span class="lineNum">     127 </span><span class="lineNoCov">          0 :                         if (acht-&gt;freestackp &lt; stacksize-1) {</span>
+<span class="lineNum">     128 </span><span class="lineNoCov">          0 :                             acht-&gt;freestack[acht-&gt;freestackp++] = other_items;</span>
+<span class="lineNum">     129 </span>            :                         }
+<span class="lineNum">     130 </span><span class="lineNoCov">          0 :                         const size_t mempool_size = ((acht-&gt;rows + rows-row) * 2 * acht-&gt;colors / (acht-&gt;rows + row + 1) + 32*capacity) * sizeof(struct acolorhist_arr_item);</span>
+<span class="lineNum">     131 </span><span class="lineNoCov">          0 :                         new_items = mempool_alloc(&amp;acht-&gt;mempool, sizeof(struct acolorhist_arr_item)*capacity, mempool_size);</span>
+<span class="lineNum">     132 </span><span class="lineNoCov">          0 :                         if (!new_items) return false;</span>
+<span class="lineNum">     133 </span><span class="lineNoCov">          0 :                         memcpy(new_items, other_items, sizeof(other_items[0])*achl-&gt;capacity);</span>
+<span class="lineNum">     134 </span>            :                     }
+<span class="lineNum">     135 </span>            : 
+<span class="lineNum">     136 </span><span class="lineNoCov">          0 :                     achl-&gt;other_items = new_items;</span>
+<span class="lineNum">     137 </span><span class="lineNoCov">          0 :                     achl-&gt;capacity = capacity;</span>
+<span class="lineNum">     138 </span><span class="lineNoCov">          0 :                     new_items[i] = (struct acolorhist_arr_item){</span>
+<span class="lineNum">     139 </span>            :                         .color = px,
+<span class="lineNum">     140 </span>            :                         .perceptual_weight = boost,
+<span class="lineNum">     141 </span>            :                     };
+<span class="lineNum">     142 </span><span class="lineNoCov">          0 :                     achl-&gt;used++;</span>
+<span class="lineNum">     143 </span>            :                 } else {
+<span class="lineNum">     144 </span>            :                     // these are elses for first checks whether first and second inline-stored colors are used
+<span class="lineNum">     145 </span><span class="lineNoCov">          0 :                     achl-&gt;inline2.color.l = px.l;</span>
+<span class="lineNum">     146 </span><span class="lineNoCov">          0 :                     achl-&gt;inline2.perceptual_weight = boost;</span>
+<span class="lineNum">     147 </span><span class="lineNoCov">          0 :                     achl-&gt;used = 2;</span>
+<span class="lineNum">     148 </span><span class="lineNoCov">          0 :                     ++acht-&gt;colors;</span>
+<span class="lineNum">     149 </span>            :                 }
+<span class="lineNum">     150 </span>            :             } else {
+<span class="lineNum">     151 </span><span class="lineCov">        121 :                 achl-&gt;inline1.color.l = px.l;</span>
+<span class="lineNum">     152 </span><span class="lineCov">        121 :                 achl-&gt;inline1.perceptual_weight = boost;</span>
+<span class="lineNum">     153 </span><span class="lineCov">        121 :                 achl-&gt;used = 1;</span>
+<span class="lineNum">     154 </span><span class="lineCov">        121 :                 ++acht-&gt;colors;</span>
+<span class="lineNum">     155 </span>            :             }
+<span class="lineNum">     156 </span>            :     return true;
+<a name="157"><span class="lineNum">     157 </span>            : }</a>
+<span class="lineNum">     158 </span>            : 
+<span class="lineNum">     159 </span><span class="lineCov">         30 : LIQ_PRIVATE struct acolorhash_table *pam_allocacolorhash(unsigned int maxcolors, unsigned int surface, unsigned int ignorebits, void* (*malloc)(size_t), void (*free)(void*))</span>
+<span class="lineNum">     160 </span>            : {
+<span class="lineNum">     161 </span><span class="lineCov">         30 :     const size_t estimated_colors = MIN(maxcolors, surface/(ignorebits + (surface &gt; 512*512 ? 6 : 5)));</span>
+<span class="lineNum">     162 </span><span class="lineCov">         30 :     const size_t hash_size = estimated_colors &lt; 66000 ? 6673 : (estimated_colors &lt; 200000 ? 12011 : 24019);</span>
+<span class="lineNum">     163 </span>            : 
+<span class="lineNum">     164 </span><span class="lineCov">         30 :     mempoolptr m = NULL;</span>
+<span class="lineNum">     165 </span><span class="lineCov">         30 :     const size_t buckets_size = hash_size * sizeof(struct acolorhist_arr_head);</span>
+<span class="lineNum">     166 </span><span class="lineCov">         30 :     const size_t mempool_size = sizeof(struct acolorhash_table) + buckets_size + estimated_colors * sizeof(struct acolorhist_arr_item);</span>
+<span class="lineNum">     167 </span><span class="lineCov">         30 :     struct acolorhash_table *t = mempool_create(&amp;m, sizeof(*t) + buckets_size, mempool_size, malloc, free);</span>
+<span class="lineNum">     168 </span><span class="lineCov">         30 :     if (!t) return NULL;</span>
+<span class="lineNum">     169 </span><span class="lineCov">         30 :     *t = (struct acolorhash_table){</span>
+<span class="lineNum">     170 </span>            :         .mempool = m,
+<span class="lineNum">     171 </span>            :         .hash_size = hash_size,
+<span class="lineNum">     172 </span>            :         .maxcolors = maxcolors,
+<span class="lineNum">     173 </span>            :         .ignorebits = ignorebits,
+<span class="lineNum">     174 </span>            :     };
+<span class="lineNum">     175 </span><span class="lineCov">         30 :     memset(t-&gt;buckets, 0, buckets_size);</span>
+<span class="lineNum">     176 </span><span class="lineCov">         30 :     return t;</span>
+<span class="lineNum">     177 </span>            : }
+<span class="lineNum">     178 </span>            : 
+<span class="lineNum">     179 </span>            : ALWAYS_INLINE static float pam_add_to_hist(const float *gamma_lut, hist_item *achv, unsigned int *j, const struct acolorhist_arr_item *entry, const float max_perceptual_weight)
+<span class="lineNum">     180 </span>            : {
+<span class="lineNum">     181 </span><span class="lineCov">        121 :     if (entry-&gt;perceptual_weight == 0) {</span>
+<span class="lineNum">     182 </span>            :         return 0;
+<span class="lineNum">     183 </span>            :     }
+<span class="lineNum">     184 </span><span class="lineCov">        121 :     const float w = MIN(entry-&gt;perceptual_weight/128.f, max_perceptual_weight);</span>
+<span class="lineNum">     185 </span><span class="lineCov">        121 :     achv[*j].adjusted_weight = achv[*j].perceptual_weight = w;</span>
+<span class="lineNum">     186 </span><span class="lineCov">        121 :     achv[*j].acolor = rgba_to_f(gamma_lut, entry-&gt;color.rgba);</span>
+<span class="lineNum">     187 </span><span class="lineCov">        121 :     *j += 1;</span>
+<span class="lineNum">     188 </span>            :     return w;
+<a name="189"><span class="lineNum">     189 </span>            : }</a>
+<span class="lineNum">     190 </span>            : 
+<span class="lineNum">     191 </span><span class="lineCov">         30 : LIQ_PRIVATE histogram *pam_acolorhashtoacolorhist(const struct acolorhash_table *acht, const double gamma, void* (*malloc)(size_t), void (*free)(void*))</span>
+<span class="lineNum">     192 </span>            : {
+<span class="lineNum">     193 </span><span class="lineCov">         30 :     histogram *hist = malloc(sizeof(hist[0]));</span>
+<span class="lineNum">     194 </span><span class="lineCov">         30 :     if (!hist || !acht) return NULL;</span>
+<span class="lineNum">     195 </span><span class="lineCov">         30 :     *hist = (histogram){</span>
+<span class="lineNum">     196 </span><span class="lineCov">         30 :         .achv = malloc(MAX(1,acht-&gt;colors) * sizeof(hist-&gt;achv[0])),</span>
+<span class="lineNum">     197 </span><span class="lineCov">         30 :         .size = acht-&gt;colors,</span>
+<span class="lineNum">     198 </span>            :         .free = free,
+<span class="lineNum">     199 </span><span class="lineCov">         30 :         .ignorebits = acht-&gt;ignorebits,</span>
+<span class="lineNum">     200 </span>            :     };
+<span class="lineNum">     201 </span><span class="lineCov">         30 :     if (!hist-&gt;achv) return NULL;</span>
+<span class="lineNum">     202 </span>            : 
+<span class="lineNum">     203 </span>            :     float gamma_lut[256];
+<span class="lineNum">     204 </span><span class="lineCov">         30 :     to_f_set_gamma(gamma_lut, gamma);</span>
+<span class="lineNum">     205 </span>            : 
+<span class="lineNum">     206 </span>            :     /* Limit perceptual weight to 1/10th of the image surface area to prevent
+<span class="lineNum">     207 </span>            :        a single color from dominating all others. */
+<span class="lineNum">     208 </span><span class="lineCov">         30 :     float max_perceptual_weight = 0.1f * acht-&gt;cols * acht-&gt;rows;</span>
+<span class="lineNum">     209 </span>            :     double total_weight = 0;
+<span class="lineNum">     210 </span>            : 
+<span class="lineNum">     211 </span>            :     unsigned int j=0;
+<span class="lineNum">     212 </span><span class="lineCov">     200220 :     for(unsigned int i=0; i &lt; acht-&gt;hash_size; ++i) {</span>
+<span class="lineNum">     213 </span>            :         const struct acolorhist_arr_head *const achl = &amp;acht-&gt;buckets[i];
+<span class="lineNum">     214 </span><span class="lineCov">     200190 :         if (achl-&gt;used) {</span>
+<span class="lineNum">     215 </span><span class="lineCov">        242 :             total_weight += pam_add_to_hist(gamma_lut, hist-&gt;achv, &amp;j, &amp;achl-&gt;inline1, max_perceptual_weight);</span>
+<span class="lineNum">     216 </span>            : 
+<span class="lineNum">     217 </span><span class="lineCov">        121 :             if (achl-&gt;used &gt; 1) {</span>
+<span class="lineNum">     218 </span><span class="lineNoCov">          0 :                 total_weight += pam_add_to_hist(gamma_lut, hist-&gt;achv, &amp;j, &amp;achl-&gt;inline2, max_perceptual_weight);</span>
+<span class="lineNum">     219 </span>            : 
+<span class="lineNum">     220 </span><span class="lineNoCov">          0 :                 for(unsigned int k=0; k &lt; achl-&gt;used-2; k++) {</span>
+<span class="lineNum">     221 </span><span class="lineNoCov">          0 :                     total_weight += pam_add_to_hist(gamma_lut, hist-&gt;achv, &amp;j, &amp;achl-&gt;other_items[k], max_perceptual_weight);</span>
+<span class="lineNum">     222 </span>            :                 }
+<span class="lineNum">     223 </span>            :             }
+<span class="lineNum">     224 </span>            :         }
+<span class="lineNum">     225 </span>            :     }
+<span class="lineNum">     226 </span><span class="lineCov">         30 :     hist-&gt;size = j;</span>
+<span class="lineNum">     227 </span><span class="lineCov">         30 :     hist-&gt;total_perceptual_weight = total_weight;</span>
+<span class="lineNum">     228 </span><span class="lineCov">         30 :     if (!j) {</span>
+<span class="lineNum">     229 </span>            :         pam_freeacolorhist(hist);
+<span class="lineNum">     230 </span><span class="lineNoCov">          0 :         return NULL;</span>
+<span class="lineNum">     231 </span>            :     }
+<span class="lineNum">     232 </span>            :     return hist;
+<span class="lineNum">     233 </span>            : }
+<a name="234"><span class="lineNum">     234 </span>            : </a>
+<span class="lineNum">     235 </span>            : 
+<span class="lineNum">     236 </span><span class="lineCov">         60 : LIQ_PRIVATE void pam_freeacolorhash(struct acolorhash_table *acht)</span>
+<span class="lineNum">     237 </span>            : {
+<span class="lineNum">     238 </span><span class="lineCov">         60 :     if (acht) {</span>
+<span class="lineNum">     239 </span><span class="lineCov">         30 :         mempool_destroy(acht-&gt;mempool);</span>
+<span class="lineNum">     240 </span>            :     }
+<a name="241"><span class="lineNum">     241 </span><span class="lineCov">         60 : }</span></a>
+<span class="lineNum">     242 </span>            : 
+<span class="lineNum">     243 </span><span class="lineCov">         30 : LIQ_PRIVATE void pam_freeacolorhist(histogram *hist)</span>
+<span class="lineNum">     244 </span>            : {
+<span class="lineNum">     245 </span><span class="lineCov">         30 :     hist-&gt;free(hist-&gt;achv);</span>
+<span class="lineNum">     246 </span><span class="lineCov">         30 :     hist-&gt;free(hist);</span>
+<a name="247"><span class="lineNum">     247 </span><span class="lineCov">         30 : }</span></a>
+<span class="lineNum">     248 </span>            : 
+<span class="lineNum">     249 </span><span class="lineCov">         60 : LIQ_PRIVATE colormap *pam_colormap(unsigned int colors, void* (*malloc)(size_t), void (*free)(void*))</span>
+<span class="lineNum">     250 </span>            : {
+<span class="lineNum">     251 </span>            :     assert(colors &gt; 0 &amp;&amp; colors &lt; 65536);
+<span class="lineNum">     252 </span>            : 
+<span class="lineNum">     253 </span>            :     colormap *map;
+<span class="lineNum">     254 </span><span class="lineCov">         60 :     const size_t colors_size = colors * sizeof(map-&gt;palette[0]);</span>
+<span class="lineNum">     255 </span><span class="lineCov">         60 :     map = malloc(sizeof(colormap) + colors_size);</span>
+<span class="lineNum">     256 </span><span class="lineCov">         60 :     if (!map) return NULL;</span>
+<span class="lineNum">     257 </span><span class="lineCov">         60 :     *map = (colormap){</span>
+<span class="lineNum">     258 </span>            :         .malloc = malloc,
+<span class="lineNum">     259 </span>            :         .free = free,
+<span class="lineNum">     260 </span>            :         .colors = colors,
+<span class="lineNum">     261 </span>            :     };
+<span class="lineNum">     262 </span><span class="lineCov">         60 :     memset(map-&gt;palette, 0, colors_size);</span>
+<span class="lineNum">     263 </span><span class="lineCov">         60 :     return map;</span>
+<a name="264"><span class="lineNum">     264 </span>            : }</a>
+<span class="lineNum">     265 </span>            : 
+<span class="lineNum">     266 </span><span class="lineCov">         30 : LIQ_PRIVATE colormap *pam_duplicate_colormap(colormap *map)</span>
+<span class="lineNum">     267 </span>            : {
+<span class="lineNum">     268 </span><span class="lineCov">         30 :     colormap *dupe = pam_colormap(map-&gt;colors, map-&gt;malloc, map-&gt;free);</span>
+<span class="lineNum">     269 </span><span class="lineCov">        151 :     for(unsigned int i=0; i &lt; map-&gt;colors; i++) {</span>
+<span class="lineNum">     270 </span><span class="lineCov">        121 :         dupe-&gt;palette[i] = map-&gt;palette[i];</span>
+<span class="lineNum">     271 </span>            :     }
+<span class="lineNum">     272 </span><span class="lineCov">         30 :     return dupe;</span>
+<a name="273"><span class="lineNum">     273 </span>            : }</a>
+<span class="lineNum">     274 </span>            : 
+<span class="lineNum">     275 </span><span class="lineCov">         60 : LIQ_PRIVATE void pam_freecolormap(colormap *c)</span>
+<span class="lineNum">     276 </span>            : {
+<span class="lineNum">     277 </span><span class="lineCov">         60 :     c-&gt;free(c);</span>
+<a name="278"><span class="lineNum">     278 </span><span class="lineCov">         60 : }</span></a>
+<span class="lineNum">     279 </span>            : 
+<span class="lineNum">     280 </span><span class="lineCov">        120 : LIQ_PRIVATE void to_f_set_gamma(float gamma_lut[], const double gamma)</span>
+<span class="lineNum">     281 </span>            : {
+<span class="lineNum">     282 </span><span class="lineCov">      30840 :     for(int i=0; i &lt; 256; i++) {</span>
+<span class="lineNum">     283 </span><span class="lineCov">      30720 :         gamma_lut[i] = pow((double)i/255.0, internal_gamma/gamma);</span>
+<span class="lineNum">     284 </span>            :     }
+<span class="lineNum">     285 </span><span class="lineCov">        120 : }</span>
+<span class="lineNum">     286 </span>            : 
+</pre>
+      </td>
+    </tr>
+  </table>
+  <br>
+
+  <table width="100%" border=0 cellspacing=0 cellpadding=0>
+    <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+    <tr><td class="versionInfo">Generated by: <a href="http://ltp.sourceforge.net/coverage/lcov.php" target="_parent">LCOV version 1.13</a></td></tr>
+  </table>
+  <br>
+
+</body>
+</html>
