@@ -428,9 +428,6 @@ static void __gfz_start_forkserver(void) {
 
   while(1) {
 
-    // u8 *inststat = getenv("GFZ_STAT_VAL");
-    // u8 insval = (inststat == NULL) ? 1 : atoi(inststat);
-    
     u32 was_killed;
     int status;
 
@@ -442,7 +439,7 @@ static void __gfz_start_forkserver(void) {
        condition and afl-fuzz already issued SIGKILL, write off the old
        process. */
 
-    if ( child_stopped ) { //&& was_killed) {
+    if ( child_stopped ) {
       child_stopped = 0;
       if (waitpid(child_pid, &status, 0) < 0)
         _exit(1);

@@ -1,0 +1,30 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/ok_png.c
+ok_png.h
+/home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/ok_png.h
+stdlib.h
+-
+string.h
+-
+
+/home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/ok_png.h
+stdbool.h
+-
+stdint.h
+-
+stdio.h
+-
+
+/home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/ok_png_cov.c
+stdio.h
+-
+ok_png.h
+/home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/ok_png.h
+

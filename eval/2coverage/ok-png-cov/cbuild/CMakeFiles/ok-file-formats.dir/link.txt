@@ -1,0 +1,2 @@
+/usr/bin/ar qc libokfileformats.a  CMakeFiles/ok-file-formats.dir/ok_png.c.o CMakeFiles/ok-file-formats.dir/ok_png_cov.c.o
+/usr/bin/ranlib libokfileformats.a
