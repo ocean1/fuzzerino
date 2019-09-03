@@ -467,7 +467,7 @@ configure:13071: gcc -o conftest --coverage   conftest.c  >&5
 conftest.c:48:6: warning: conflicting types for built-in function 'pow' [-Wbuiltin-declaration-mismatch]
  char pow ();
       ^~~
-/tmp/cc2EEd1S.o: In function `main':
+/tmp/ccd8irpe.o: In function `main':
 conftest.c:(.text+0x1c): undefined reference to `pow'
 collect2: error: ld returned 1 exit status
 configure:13071: $? = 1

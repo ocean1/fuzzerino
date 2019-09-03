@@ -30,28 +30,28 @@ The CXX compiler identification is GNU, found in "/home/irons/fuzzing/fuzzerino/
 Determining if the C compiler works passed with the following output:
 Change Dir: /home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp
 
-Run Build Command:"/usr/bin/make" "cmTC_1fab9/fast"
-/usr/bin/make -f CMakeFiles/cmTC_1fab9.dir/build.make CMakeFiles/cmTC_1fab9.dir/build
+Run Build Command:"/usr/bin/make" "cmTC_27186/fast"
+/usr/bin/make -f CMakeFiles/cmTC_27186.dir/build.make CMakeFiles/cmTC_27186.dir/build
 make[1]: Entering directory '/home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp'
-Building C object CMakeFiles/cmTC_1fab9.dir/testCCompiler.c.o
-/usr/bin/cc   --coverage    -o CMakeFiles/cmTC_1fab9.dir/testCCompiler.c.o   -c /home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp/testCCompiler.c
-Linking C executable cmTC_1fab9
-/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_1fab9.dir/link.txt --verbose=1
-/usr/bin/cc --coverage     -rdynamic CMakeFiles/cmTC_1fab9.dir/testCCompiler.c.o  -o cmTC_1fab9 
+Building C object CMakeFiles/cmTC_27186.dir/testCCompiler.c.o
+/usr/bin/cc   --coverage    -o CMakeFiles/cmTC_27186.dir/testCCompiler.c.o   -c /home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp/testCCompiler.c
+Linking C executable cmTC_27186
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_27186.dir/link.txt --verbose=1
+/usr/bin/cc --coverage     -rdynamic CMakeFiles/cmTC_27186.dir/testCCompiler.c.o  -o cmTC_27186 
 make[1]: Leaving directory '/home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp'
 
 
 Detecting C compiler ABI info compiled with the following output:
 Change Dir: /home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp
 
-Run Build Command:"/usr/bin/make" "cmTC_2d45d/fast"
-/usr/bin/make -f CMakeFiles/cmTC_2d45d.dir/build.make CMakeFiles/cmTC_2d45d.dir/build
+Run Build Command:"/usr/bin/make" "cmTC_f34f3/fast"
+/usr/bin/make -f CMakeFiles/cmTC_f34f3.dir/build.make CMakeFiles/cmTC_f34f3.dir/build
 make[1]: Entering directory '/home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp'
-Building C object CMakeFiles/cmTC_2d45d.dir/CMakeCCompilerABI.c.o
-/usr/bin/cc   --coverage    -o CMakeFiles/cmTC_2d45d.dir/CMakeCCompilerABI.c.o   -c /usr/share/cmake-3.10/Modules/CMakeCCompilerABI.c
-Linking C executable cmTC_2d45d
-/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_2d45d.dir/link.txt --verbose=1
-/usr/bin/cc --coverage    -v -rdynamic CMakeFiles/cmTC_2d45d.dir/CMakeCCompilerABI.c.o  -o cmTC_2d45d 
+Building C object CMakeFiles/cmTC_f34f3.dir/CMakeCCompilerABI.c.o
+/usr/bin/cc   --coverage    -o CMakeFiles/cmTC_f34f3.dir/CMakeCCompilerABI.c.o   -c /usr/share/cmake-3.10/Modules/CMakeCCompilerABI.c
+Linking C executable cmTC_f34f3
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_f34f3.dir/link.txt --verbose=1
+/usr/bin/cc --coverage    -v -rdynamic CMakeFiles/cmTC_f34f3.dir/CMakeCCompilerABI.c.o  -o cmTC_f34f3 
 Using built-in specs.
 COLLECT_GCC=/usr/bin/cc
 COLLECT_LTO_WRAPPER=/usr/lib/gcc/x86_64-linux-gnu/7/lto-wrapper
@@ -63,9 +63,9 @@ Thread model: posix
 gcc version 7.4.0 (Ubuntu 7.4.0-1ubuntu1~18.04.1) 
 COMPILER_PATH=/usr/lib/gcc/x86_64-linux-gnu/7/:/usr/lib/gcc/x86_64-linux-gnu/7/:/usr/lib/gcc/x86_64-linux-gnu/:/usr/lib/gcc/x86_64-linux-gnu/7/:/usr/lib/gcc/x86_64-linux-gnu/
 LIBRARY_PATH=/usr/lib/gcc/x86_64-linux-gnu/7/:/usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu/:/usr/lib/gcc/x86_64-linux-gnu/7/../../../../lib/:/lib/x86_64-linux-gnu/:/lib/../lib/:/usr/lib/x86_64-linux-gnu/:/usr/lib/../lib/:/usr/lib/gcc/x86_64-linux-gnu/7/../../../:/lib/:/usr/lib/
-COLLECT_GCC_OPTIONS='-coverage' '-v' '-rdynamic' '-o' 'cmTC_2d45d' '-mtune=generic' '-march=x86-64'
- /usr/lib/gcc/x86_64-linux-gnu/7/collect2 -plugin /usr/lib/gcc/x86_64-linux-gnu/7/liblto_plugin.so -plugin-opt=/usr/lib/gcc/x86_64-linux-gnu/7/lto-wrapper -plugin-opt=-fresolution=/tmp/ccrnNAUS.res -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s --sysroot=/ --build-id --eh-frame-hdr -m elf_x86_64 --hash-style=gnu --as-needed -export-dynamic -dynamic-linker /lib64/ld-linux-x86-64.so.2 -pie -z now -z relro -o cmTC_2d45d /usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu/Scrt1.o /usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu/crti.o /usr/lib/gcc/x86_64-linux-gnu/7/crtbeginS.o -L/usr/lib/gcc/x86_64-linux-gnu/7 -L/usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu -L/usr/lib/gcc/x86_64-linux-gnu/7/../../../../lib -L/lib/x86_64-linux-gnu -L/lib/../lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib/../lib -L/usr/lib/gcc/x86_64-linux-gnu/7/../../.. CMakeFiles/cmTC_2d45d.dir/CMakeCCompilerABI.c.o -lgcov -lgcc --push-state --as-needed -lgcc_s --pop-state -lc -lgcc --push-state --as-needed -lgcc_s --pop-state /usr/lib/gcc/x86_64-linux-gnu/7/crtendS.o /usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu/crtn.o
-COLLECT_GCC_OPTIONS='-coverage' '-v' '-rdynamic' '-o' 'cmTC_2d45d' '-mtune=generic' '-march=x86-64'
+COLLECT_GCC_OPTIONS='-coverage' '-v' '-rdynamic' '-o' 'cmTC_f34f3' '-mtune=generic' '-march=x86-64'
+ /usr/lib/gcc/x86_64-linux-gnu/7/collect2 -plugin /usr/lib/gcc/x86_64-linux-gnu/7/liblto_plugin.so -plugin-opt=/usr/lib/gcc/x86_64-linux-gnu/7/lto-wrapper -plugin-opt=-fresolution=/tmp/cc6CvVBl.res -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s --sysroot=/ --build-id --eh-frame-hdr -m elf_x86_64 --hash-style=gnu --as-needed -export-dynamic -dynamic-linker /lib64/ld-linux-x86-64.so.2 -pie -z now -z relro -o cmTC_f34f3 /usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu/Scrt1.o /usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu/crti.o /usr/lib/gcc/x86_64-linux-gnu/7/crtbeginS.o -L/usr/lib/gcc/x86_64-linux-gnu/7 -L/usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu -L/usr/lib/gcc/x86_64-linux-gnu/7/../../../../lib -L/lib/x86_64-linux-gnu -L/lib/../lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib/../lib -L/usr/lib/gcc/x86_64-linux-gnu/7/../../.. CMakeFiles/cmTC_f34f3.dir/CMakeCCompilerABI.c.o -lgcov -lgcc --push-state --as-needed -lgcc_s --pop-state -lc -lgcc --push-state --as-needed -lgcc_s --pop-state /usr/lib/gcc/x86_64-linux-gnu/7/crtendS.o /usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu/crtn.o
+COLLECT_GCC_OPTIONS='-coverage' '-v' '-rdynamic' '-o' 'cmTC_f34f3' '-mtune=generic' '-march=x86-64'
 make[1]: Leaving directory '/home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp'
 
 
@@ -73,14 +73,14 @@ Parsed C implicit link information from above output:
   link line regex: [^( *|.*[/\])(ld|CMAKE_LINK_STARTFILE-NOTFOUND|([^/\]+-)?ld|collect2)[^/\]*( |$)]
   ignore line: [Change Dir: /home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp]
   ignore line: []
-  ignore line: [Run Build Command:"/usr/bin/make" "cmTC_2d45d/fast"]
-  ignore line: [/usr/bin/make -f CMakeFiles/cmTC_2d45d.dir/build.make CMakeFiles/cmTC_2d45d.dir/build]
+  ignore line: [Run Build Command:"/usr/bin/make" "cmTC_f34f3/fast"]
+  ignore line: [/usr/bin/make -f CMakeFiles/cmTC_f34f3.dir/build.make CMakeFiles/cmTC_f34f3.dir/build]
   ignore line: [make[1]: Entering directory '/home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp']
-  ignore line: [Building C object CMakeFiles/cmTC_2d45d.dir/CMakeCCompilerABI.c.o]
-  ignore line: [/usr/bin/cc   --coverage    -o CMakeFiles/cmTC_2d45d.dir/CMakeCCompilerABI.c.o   -c /usr/share/cmake-3.10/Modules/CMakeCCompilerABI.c]
-  ignore line: [Linking C executable cmTC_2d45d]
-  ignore line: [/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_2d45d.dir/link.txt --verbose=1]
-  ignore line: [/usr/bin/cc --coverage    -v -rdynamic CMakeFiles/cmTC_2d45d.dir/CMakeCCompilerABI.c.o  -o cmTC_2d45d ]
+  ignore line: [Building C object CMakeFiles/cmTC_f34f3.dir/CMakeCCompilerABI.c.o]
+  ignore line: [/usr/bin/cc   --coverage    -o CMakeFiles/cmTC_f34f3.dir/CMakeCCompilerABI.c.o   -c /usr/share/cmake-3.10/Modules/CMakeCCompilerABI.c]
+  ignore line: [Linking C executable cmTC_f34f3]
+  ignore line: [/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_f34f3.dir/link.txt --verbose=1]
+  ignore line: [/usr/bin/cc --coverage    -v -rdynamic CMakeFiles/cmTC_f34f3.dir/CMakeCCompilerABI.c.o  -o cmTC_f34f3 ]
   ignore line: [Using built-in specs.]
   ignore line: [COLLECT_GCC=/usr/bin/cc]
   ignore line: [COLLECT_LTO_WRAPPER=/usr/lib/gcc/x86_64-linux-gnu/7/lto-wrapper]
@@ -92,13 +92,13 @@ Parsed C implicit link information from above output:
   ignore line: [gcc version 7.4.0 (Ubuntu 7.4.0-1ubuntu1~18.04.1) ]
   ignore line: [COMPILER_PATH=/usr/lib/gcc/x86_64-linux-gnu/7/:/usr/lib/gcc/x86_64-linux-gnu/7/:/usr/lib/gcc/x86_64-linux-gnu/:/usr/lib/gcc/x86_64-linux-gnu/7/:/usr/lib/gcc/x86_64-linux-gnu/]
   ignore line: [LIBRARY_PATH=/usr/lib/gcc/x86_64-linux-gnu/7/:/usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu/:/usr/lib/gcc/x86_64-linux-gnu/7/../../../../lib/:/lib/x86_64-linux-gnu/:/lib/../lib/:/usr/lib/x86_64-linux-gnu/:/usr/lib/../lib/:/usr/lib/gcc/x86_64-linux-gnu/7/../../../:/lib/:/usr/lib/]
-  ignore line: [COLLECT_GCC_OPTIONS='-coverage' '-v' '-rdynamic' '-o' 'cmTC_2d45d' '-mtune=generic' '-march=x86-64']
-  link line: [ /usr/lib/gcc/x86_64-linux-gnu/7/collect2 -plugin /usr/lib/gcc/x86_64-linux-gnu/7/liblto_plugin.so -plugin-opt=/usr/lib/gcc/x86_64-linux-gnu/7/lto-wrapper -plugin-opt=-fresolution=/tmp/ccrnNAUS.res -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s --sysroot=/ --build-id --eh-frame-hdr -m elf_x86_64 --hash-style=gnu --as-needed -export-dynamic -dynamic-linker /lib64/ld-linux-x86-64.so.2 -pie -z now -z relro -o cmTC_2d45d /usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu/Scrt1.o /usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu/crti.o /usr/lib/gcc/x86_64-linux-gnu/7/crtbeginS.o -L/usr/lib/gcc/x86_64-linux-gnu/7 -L/usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu -L/usr/lib/gcc/x86_64-linux-gnu/7/../../../../lib -L/lib/x86_64-linux-gnu -L/lib/../lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib/../lib -L/usr/lib/gcc/x86_64-linux-gnu/7/../../.. CMakeFiles/cmTC_2d45d.dir/CMakeCCompilerABI.c.o -lgcov -lgcc --push-state --as-needed -lgcc_s --pop-state -lc -lgcc --push-state --as-needed -lgcc_s --pop-state /usr/lib/gcc/x86_64-linux-gnu/7/crtendS.o /usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu/crtn.o]
+  ignore line: [COLLECT_GCC_OPTIONS='-coverage' '-v' '-rdynamic' '-o' 'cmTC_f34f3' '-mtune=generic' '-march=x86-64']
+  link line: [ /usr/lib/gcc/x86_64-linux-gnu/7/collect2 -plugin /usr/lib/gcc/x86_64-linux-gnu/7/liblto_plugin.so -plugin-opt=/usr/lib/gcc/x86_64-linux-gnu/7/lto-wrapper -plugin-opt=-fresolution=/tmp/cc6CvVBl.res -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lgcc_s --sysroot=/ --build-id --eh-frame-hdr -m elf_x86_64 --hash-style=gnu --as-needed -export-dynamic -dynamic-linker /lib64/ld-linux-x86-64.so.2 -pie -z now -z relro -o cmTC_f34f3 /usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu/Scrt1.o /usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu/crti.o /usr/lib/gcc/x86_64-linux-gnu/7/crtbeginS.o -L/usr/lib/gcc/x86_64-linux-gnu/7 -L/usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu -L/usr/lib/gcc/x86_64-linux-gnu/7/../../../../lib -L/lib/x86_64-linux-gnu -L/lib/../lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib/../lib -L/usr/lib/gcc/x86_64-linux-gnu/7/../../.. CMakeFiles/cmTC_f34f3.dir/CMakeCCompilerABI.c.o -lgcov -lgcc --push-state --as-needed -lgcc_s --pop-state -lc -lgcc --push-state --as-needed -lgcc_s --pop-state /usr/lib/gcc/x86_64-linux-gnu/7/crtendS.o /usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu/crtn.o]
     arg [/usr/lib/gcc/x86_64-linux-gnu/7/collect2] ==> ignore
     arg [-plugin] ==> ignore
     arg [/usr/lib/gcc/x86_64-linux-gnu/7/liblto_plugin.so] ==> ignore
     arg [-plugin-opt=/usr/lib/gcc/x86_64-linux-gnu/7/lto-wrapper] ==> ignore
-    arg [-plugin-opt=-fresolution=/tmp/ccrnNAUS.res] ==> ignore
+    arg [-plugin-opt=-fresolution=/tmp/cc6CvVBl.res] ==> ignore
     arg [-plugin-opt=-pass-through=-lgcc] ==> ignore
     arg [-plugin-opt=-pass-through=-lgcc_s] ==> ignore
     arg [-plugin-opt=-pass-through=-lc] ==> ignore
@@ -118,7 +118,7 @@ Parsed C implicit link information from above output:
     arg [-znow] ==> ignore
     arg [-zrelro] ==> ignore
     arg [-o] ==> ignore
-    arg [cmTC_2d45d] ==> ignore
+    arg [cmTC_f34f3] ==> ignore
     arg [/usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu/Scrt1.o] ==> ignore
     arg [/usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu/crti.o] ==> ignore
     arg [/usr/lib/gcc/x86_64-linux-gnu/7/crtbeginS.o] ==> ignore
@@ -130,7 +130,7 @@ Parsed C implicit link information from above output:
     arg [-L/usr/lib/x86_64-linux-gnu] ==> dir [/usr/lib/x86_64-linux-gnu]
     arg [-L/usr/lib/../lib] ==> dir [/usr/lib/../lib]
     arg [-L/usr/lib/gcc/x86_64-linux-gnu/7/../../..] ==> dir [/usr/lib/gcc/x86_64-linux-gnu/7/../../..]
-    arg [CMakeFiles/cmTC_2d45d.dir/CMakeCCompilerABI.c.o] ==> ignore
+    arg [CMakeFiles/cmTC_f34f3.dir/CMakeCCompilerABI.c.o] ==> ignore
     arg [-lgcov] ==> lib [gcov]
     arg [-lgcc] ==> lib [gcc]
     arg [--push-state] ==> ignore
@@ -163,14 +163,14 @@ Parsed C implicit link information from above output:
 Detecting C [-std=c11] compiler features compiled with the following output:
 Change Dir: /home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp
 
-Run Build Command:"/usr/bin/make" "cmTC_e76f0/fast"
-/usr/bin/make -f CMakeFiles/cmTC_e76f0.dir/build.make CMakeFiles/cmTC_e76f0.dir/build
+Run Build Command:"/usr/bin/make" "cmTC_47b05/fast"
+/usr/bin/make -f CMakeFiles/cmTC_47b05.dir/build.make CMakeFiles/cmTC_47b05.dir/build
 make[1]: Entering directory '/home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp'
-Building C object CMakeFiles/cmTC_e76f0.dir/feature_tests.c.o
-/usr/bin/cc   --coverage    -std=c11 -o CMakeFiles/cmTC_e76f0.dir/feature_tests.c.o   -c /home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/feature_tests.c
-Linking C executable cmTC_e76f0
-/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_e76f0.dir/link.txt --verbose=1
-/usr/bin/cc --coverage     -rdynamic CMakeFiles/cmTC_e76f0.dir/feature_tests.c.o  -o cmTC_e76f0 
+Building C object CMakeFiles/cmTC_47b05.dir/feature_tests.c.o
+/usr/bin/cc   --coverage    -std=c11 -o CMakeFiles/cmTC_47b05.dir/feature_tests.c.o   -c /home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/feature_tests.c
+Linking C executable cmTC_47b05
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_47b05.dir/link.txt --verbose=1
+/usr/bin/cc --coverage     -rdynamic CMakeFiles/cmTC_47b05.dir/feature_tests.c.o  -o cmTC_47b05 
 make[1]: Leaving directory '/home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp'
 
 
@@ -183,14 +183,14 @@ make[1]: Leaving directory '/home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-
 Detecting C [-std=c99] compiler features compiled with the following output:
 Change Dir: /home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp
 
-Run Build Command:"/usr/bin/make" "cmTC_889b7/fast"
-/usr/bin/make -f CMakeFiles/cmTC_889b7.dir/build.make CMakeFiles/cmTC_889b7.dir/build
+Run Build Command:"/usr/bin/make" "cmTC_2ed1f/fast"
+/usr/bin/make -f CMakeFiles/cmTC_2ed1f.dir/build.make CMakeFiles/cmTC_2ed1f.dir/build
 make[1]: Entering directory '/home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp'
-Building C object CMakeFiles/cmTC_889b7.dir/feature_tests.c.o
-/usr/bin/cc   --coverage    -std=c99 -o CMakeFiles/cmTC_889b7.dir/feature_tests.c.o   -c /home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/feature_tests.c
-Linking C executable cmTC_889b7
-/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_889b7.dir/link.txt --verbose=1
-/usr/bin/cc --coverage     -rdynamic CMakeFiles/cmTC_889b7.dir/feature_tests.c.o  -o cmTC_889b7 
+Building C object CMakeFiles/cmTC_2ed1f.dir/feature_tests.c.o
+/usr/bin/cc   --coverage    -std=c99 -o CMakeFiles/cmTC_2ed1f.dir/feature_tests.c.o   -c /home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/feature_tests.c
+Linking C executable cmTC_2ed1f
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_2ed1f.dir/link.txt --verbose=1
+/usr/bin/cc --coverage     -rdynamic CMakeFiles/cmTC_2ed1f.dir/feature_tests.c.o  -o cmTC_2ed1f 
 make[1]: Leaving directory '/home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp'
 
 
@@ -203,14 +203,14 @@ make[1]: Leaving directory '/home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-
 Detecting C [-std=c90] compiler features compiled with the following output:
 Change Dir: /home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp
 
-Run Build Command:"/usr/bin/make" "cmTC_638e5/fast"
-/usr/bin/make -f CMakeFiles/cmTC_638e5.dir/build.make CMakeFiles/cmTC_638e5.dir/build
+Run Build Command:"/usr/bin/make" "cmTC_36b35/fast"
+/usr/bin/make -f CMakeFiles/cmTC_36b35.dir/build.make CMakeFiles/cmTC_36b35.dir/build
 make[1]: Entering directory '/home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp'
-Building C object CMakeFiles/cmTC_638e5.dir/feature_tests.c.o
-/usr/bin/cc   --coverage    -std=c90 -o CMakeFiles/cmTC_638e5.dir/feature_tests.c.o   -c /home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/feature_tests.c
-Linking C executable cmTC_638e5
-/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_638e5.dir/link.txt --verbose=1
-/usr/bin/cc --coverage     -rdynamic CMakeFiles/cmTC_638e5.dir/feature_tests.c.o  -o cmTC_638e5 
+Building C object CMakeFiles/cmTC_36b35.dir/feature_tests.c.o
+/usr/bin/cc   --coverage    -std=c90 -o CMakeFiles/cmTC_36b35.dir/feature_tests.c.o   -c /home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/feature_tests.c
+Linking C executable cmTC_36b35
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_36b35.dir/link.txt --verbose=1
+/usr/bin/cc --coverage     -rdynamic CMakeFiles/cmTC_36b35.dir/feature_tests.c.o  -o cmTC_36b35 
 make[1]: Leaving directory '/home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp'
 
 
@@ -221,28 +221,28 @@ make[1]: Leaving directory '/home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-
 Determining if the CXX compiler works passed with the following output:
 Change Dir: /home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp
 
-Run Build Command:"/usr/bin/make" "cmTC_556a0/fast"
-/usr/bin/make -f CMakeFiles/cmTC_556a0.dir/build.make CMakeFiles/cmTC_556a0.dir/build
+Run Build Command:"/usr/bin/make" "cmTC_5986c/fast"
+/usr/bin/make -f CMakeFiles/cmTC_5986c.dir/build.make CMakeFiles/cmTC_5986c.dir/build
 make[1]: Entering directory '/home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp'
-Building CXX object CMakeFiles/cmTC_556a0.dir/testCXXCompiler.cxx.o
-/usr/bin/c++     -o CMakeFiles/cmTC_556a0.dir/testCXXCompiler.cxx.o -c /home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp/testCXXCompiler.cxx
-Linking CXX executable cmTC_556a0
-/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_556a0.dir/link.txt --verbose=1
-/usr/bin/c++       -rdynamic CMakeFiles/cmTC_556a0.dir/testCXXCompiler.cxx.o  -o cmTC_556a0 
+Building CXX object CMakeFiles/cmTC_5986c.dir/testCXXCompiler.cxx.o
+/usr/bin/c++     -o CMakeFiles/cmTC_5986c.dir/testCXXCompiler.cxx.o -c /home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp/testCXXCompiler.cxx
+Linking CXX executable cmTC_5986c
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_5986c.dir/link.txt --verbose=1
+/usr/bin/c++       -rdynamic CMakeFiles/cmTC_5986c.dir/testCXXCompiler.cxx.o  -o cmTC_5986c 
 make[1]: Leaving directory '/home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp'
 
 
 Detecting CXX compiler ABI info compiled with the following output:
 Change Dir: /home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp
 
-Run Build Command:"/usr/bin/make" "cmTC_a007c/fast"
-/usr/bin/make -f CMakeFiles/cmTC_a007c.dir/build.make CMakeFiles/cmTC_a007c.dir/build
+Run Build Command:"/usr/bin/make" "cmTC_a5e1c/fast"
+/usr/bin/make -f CMakeFiles/cmTC_a5e1c.dir/build.make CMakeFiles/cmTC_a5e1c.dir/build
 make[1]: Entering directory '/home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp'
-Building CXX object CMakeFiles/cmTC_a007c.dir/CMakeCXXCompilerABI.cpp.o
-/usr/bin/c++     -o CMakeFiles/cmTC_a007c.dir/CMakeCXXCompilerABI.cpp.o -c /usr/share/cmake-3.10/Modules/CMakeCXXCompilerABI.cpp
-Linking CXX executable cmTC_a007c
-/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_a007c.dir/link.txt --verbose=1
-/usr/bin/c++      -v -rdynamic CMakeFiles/cmTC_a007c.dir/CMakeCXXCompilerABI.cpp.o  -o cmTC_a007c 
+Building CXX object CMakeFiles/cmTC_a5e1c.dir/CMakeCXXCompilerABI.cpp.o
+/usr/bin/c++     -o CMakeFiles/cmTC_a5e1c.dir/CMakeCXXCompilerABI.cpp.o -c /usr/share/cmake-3.10/Modules/CMakeCXXCompilerABI.cpp
+Linking CXX executable cmTC_a5e1c
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_a5e1c.dir/link.txt --verbose=1
+/usr/bin/c++      -v -rdynamic CMakeFiles/cmTC_a5e1c.dir/CMakeCXXCompilerABI.cpp.o  -o cmTC_a5e1c 
 Using built-in specs.
 COLLECT_GCC=/usr/bin/c++
 COLLECT_LTO_WRAPPER=/usr/lib/gcc/x86_64-linux-gnu/7/lto-wrapper
@@ -254,9 +254,9 @@ Thread model: posix
 gcc version 7.4.0 (Ubuntu 7.4.0-1ubuntu1~18.04.1) 
 COMPILER_PATH=/usr/lib/gcc/x86_64-linux-gnu/7/:/usr/lib/gcc/x86_64-linux-gnu/7/:/usr/lib/gcc/x86_64-linux-gnu/:/usr/lib/gcc/x86_64-linux-gnu/7/:/usr/lib/gcc/x86_64-linux-gnu/
 LIBRARY_PATH=/usr/lib/gcc/x86_64-linux-gnu/7/:/usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu/:/usr/lib/gcc/x86_64-linux-gnu/7/../../../../lib/:/lib/x86_64-linux-gnu/:/lib/../lib/:/usr/lib/x86_64-linux-gnu/:/usr/lib/../lib/:/usr/lib/gcc/x86_64-linux-gnu/7/../../../:/lib/:/usr/lib/
-COLLECT_GCC_OPTIONS='-v' '-rdynamic' '-o' 'cmTC_a007c' '-shared-libgcc' '-mtune=generic' '-march=x86-64'
- /usr/lib/gcc/x86_64-linux-gnu/7/collect2 -plugin /usr/lib/gcc/x86_64-linux-gnu/7/liblto_plugin.so -plugin-opt=/usr/lib/gcc/x86_64-linux-gnu/7/lto-wrapper -plugin-opt=-fresolution=/tmp/ccV91u69.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --sysroot=/ --build-id --eh-frame-hdr -m elf_x86_64 --hash-style=gnu --as-needed -export-dynamic -dynamic-linker /lib64/ld-linux-x86-64.so.2 -pie -z now -z relro -o cmTC_a007c /usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu/Scrt1.o /usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu/crti.o /usr/lib/gcc/x86_64-linux-gnu/7/crtbeginS.o -L/usr/lib/gcc/x86_64-linux-gnu/7 -L/usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu -L/usr/lib/gcc/x86_64-linux-gnu/7/../../../../lib -L/lib/x86_64-linux-gnu -L/lib/../lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib/../lib -L/usr/lib/gcc/x86_64-linux-gnu/7/../../.. CMakeFiles/cmTC_a007c.dir/CMakeCXXCompilerABI.cpp.o -lstdc++ -lm -lgcc_s -lgcc -lc -lgcc_s -lgcc /usr/lib/gcc/x86_64-linux-gnu/7/crtendS.o /usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu/crtn.o
-COLLECT_GCC_OPTIONS='-v' '-rdynamic' '-o' 'cmTC_a007c' '-shared-libgcc' '-mtune=generic' '-march=x86-64'
+COLLECT_GCC_OPTIONS='-v' '-rdynamic' '-o' 'cmTC_a5e1c' '-shared-libgcc' '-mtune=generic' '-march=x86-64'
+ /usr/lib/gcc/x86_64-linux-gnu/7/collect2 -plugin /usr/lib/gcc/x86_64-linux-gnu/7/liblto_plugin.so -plugin-opt=/usr/lib/gcc/x86_64-linux-gnu/7/lto-wrapper -plugin-opt=-fresolution=/tmp/cc5NCD3J.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --sysroot=/ --build-id --eh-frame-hdr -m elf_x86_64 --hash-style=gnu --as-needed -export-dynamic -dynamic-linker /lib64/ld-linux-x86-64.so.2 -pie -z now -z relro -o cmTC_a5e1c /usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu/Scrt1.o /usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu/crti.o /usr/lib/gcc/x86_64-linux-gnu/7/crtbeginS.o -L/usr/lib/gcc/x86_64-linux-gnu/7 -L/usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu -L/usr/lib/gcc/x86_64-linux-gnu/7/../../../../lib -L/lib/x86_64-linux-gnu -L/lib/../lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib/../lib -L/usr/lib/gcc/x86_64-linux-gnu/7/../../.. CMakeFiles/cmTC_a5e1c.dir/CMakeCXXCompilerABI.cpp.o -lstdc++ -lm -lgcc_s -lgcc -lc -lgcc_s -lgcc /usr/lib/gcc/x86_64-linux-gnu/7/crtendS.o /usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu/crtn.o
+COLLECT_GCC_OPTIONS='-v' '-rdynamic' '-o' 'cmTC_a5e1c' '-shared-libgcc' '-mtune=generic' '-march=x86-64'
 make[1]: Leaving directory '/home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp'
 
 
@@ -264,14 +264,14 @@ Parsed CXX implicit link information from above output:
   link line regex: [^( *|.*[/\])(ld|CMAKE_LINK_STARTFILE-NOTFOUND|([^/\]+-)?ld|collect2)[^/\]*( |$)]
   ignore line: [Change Dir: /home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp]
   ignore line: []
-  ignore line: [Run Build Command:"/usr/bin/make" "cmTC_a007c/fast"]
-  ignore line: [/usr/bin/make -f CMakeFiles/cmTC_a007c.dir/build.make CMakeFiles/cmTC_a007c.dir/build]
+  ignore line: [Run Build Command:"/usr/bin/make" "cmTC_a5e1c/fast"]
+  ignore line: [/usr/bin/make -f CMakeFiles/cmTC_a5e1c.dir/build.make CMakeFiles/cmTC_a5e1c.dir/build]
   ignore line: [make[1]: Entering directory '/home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp']
-  ignore line: [Building CXX object CMakeFiles/cmTC_a007c.dir/CMakeCXXCompilerABI.cpp.o]
-  ignore line: [/usr/bin/c++     -o CMakeFiles/cmTC_a007c.dir/CMakeCXXCompilerABI.cpp.o -c /usr/share/cmake-3.10/Modules/CMakeCXXCompilerABI.cpp]
-  ignore line: [Linking CXX executable cmTC_a007c]
-  ignore line: [/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_a007c.dir/link.txt --verbose=1]
-  ignore line: [/usr/bin/c++      -v -rdynamic CMakeFiles/cmTC_a007c.dir/CMakeCXXCompilerABI.cpp.o  -o cmTC_a007c ]
+  ignore line: [Building CXX object CMakeFiles/cmTC_a5e1c.dir/CMakeCXXCompilerABI.cpp.o]
+  ignore line: [/usr/bin/c++     -o CMakeFiles/cmTC_a5e1c.dir/CMakeCXXCompilerABI.cpp.o -c /usr/share/cmake-3.10/Modules/CMakeCXXCompilerABI.cpp]
+  ignore line: [Linking CXX executable cmTC_a5e1c]
+  ignore line: [/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_a5e1c.dir/link.txt --verbose=1]
+  ignore line: [/usr/bin/c++      -v -rdynamic CMakeFiles/cmTC_a5e1c.dir/CMakeCXXCompilerABI.cpp.o  -o cmTC_a5e1c ]
   ignore line: [Using built-in specs.]
   ignore line: [COLLECT_GCC=/usr/bin/c++]
   ignore line: [COLLECT_LTO_WRAPPER=/usr/lib/gcc/x86_64-linux-gnu/7/lto-wrapper]
@@ -283,13 +283,13 @@ Parsed CXX implicit link information from above output:
   ignore line: [gcc version 7.4.0 (Ubuntu 7.4.0-1ubuntu1~18.04.1) ]
   ignore line: [COMPILER_PATH=/usr/lib/gcc/x86_64-linux-gnu/7/:/usr/lib/gcc/x86_64-linux-gnu/7/:/usr/lib/gcc/x86_64-linux-gnu/:/usr/lib/gcc/x86_64-linux-gnu/7/:/usr/lib/gcc/x86_64-linux-gnu/]
   ignore line: [LIBRARY_PATH=/usr/lib/gcc/x86_64-linux-gnu/7/:/usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu/:/usr/lib/gcc/x86_64-linux-gnu/7/../../../../lib/:/lib/x86_64-linux-gnu/:/lib/../lib/:/usr/lib/x86_64-linux-gnu/:/usr/lib/../lib/:/usr/lib/gcc/x86_64-linux-gnu/7/../../../:/lib/:/usr/lib/]
-  ignore line: [COLLECT_GCC_OPTIONS='-v' '-rdynamic' '-o' 'cmTC_a007c' '-shared-libgcc' '-mtune=generic' '-march=x86-64']
-  link line: [ /usr/lib/gcc/x86_64-linux-gnu/7/collect2 -plugin /usr/lib/gcc/x86_64-linux-gnu/7/liblto_plugin.so -plugin-opt=/usr/lib/gcc/x86_64-linux-gnu/7/lto-wrapper -plugin-opt=-fresolution=/tmp/ccV91u69.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --sysroot=/ --build-id --eh-frame-hdr -m elf_x86_64 --hash-style=gnu --as-needed -export-dynamic -dynamic-linker /lib64/ld-linux-x86-64.so.2 -pie -z now -z relro -o cmTC_a007c /usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu/Scrt1.o /usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu/crti.o /usr/lib/gcc/x86_64-linux-gnu/7/crtbeginS.o -L/usr/lib/gcc/x86_64-linux-gnu/7 -L/usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu -L/usr/lib/gcc/x86_64-linux-gnu/7/../../../../lib -L/lib/x86_64-linux-gnu -L/lib/../lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib/../lib -L/usr/lib/gcc/x86_64-linux-gnu/7/../../.. CMakeFiles/cmTC_a007c.dir/CMakeCXXCompilerABI.cpp.o -lstdc++ -lm -lgcc_s -lgcc -lc -lgcc_s -lgcc /usr/lib/gcc/x86_64-linux-gnu/7/crtendS.o /usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu/crtn.o]
+  ignore line: [COLLECT_GCC_OPTIONS='-v' '-rdynamic' '-o' 'cmTC_a5e1c' '-shared-libgcc' '-mtune=generic' '-march=x86-64']
+  link line: [ /usr/lib/gcc/x86_64-linux-gnu/7/collect2 -plugin /usr/lib/gcc/x86_64-linux-gnu/7/liblto_plugin.so -plugin-opt=/usr/lib/gcc/x86_64-linux-gnu/7/lto-wrapper -plugin-opt=-fresolution=/tmp/cc5NCD3J.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --sysroot=/ --build-id --eh-frame-hdr -m elf_x86_64 --hash-style=gnu --as-needed -export-dynamic -dynamic-linker /lib64/ld-linux-x86-64.so.2 -pie -z now -z relro -o cmTC_a5e1c /usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu/Scrt1.o /usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu/crti.o /usr/lib/gcc/x86_64-linux-gnu/7/crtbeginS.o -L/usr/lib/gcc/x86_64-linux-gnu/7 -L/usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu -L/usr/lib/gcc/x86_64-linux-gnu/7/../../../../lib -L/lib/x86_64-linux-gnu -L/lib/../lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib/../lib -L/usr/lib/gcc/x86_64-linux-gnu/7/../../.. CMakeFiles/cmTC_a5e1c.dir/CMakeCXXCompilerABI.cpp.o -lstdc++ -lm -lgcc_s -lgcc -lc -lgcc_s -lgcc /usr/lib/gcc/x86_64-linux-gnu/7/crtendS.o /usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu/crtn.o]
     arg [/usr/lib/gcc/x86_64-linux-gnu/7/collect2] ==> ignore
     arg [-plugin] ==> ignore
     arg [/usr/lib/gcc/x86_64-linux-gnu/7/liblto_plugin.so] ==> ignore
     arg [-plugin-opt=/usr/lib/gcc/x86_64-linux-gnu/7/lto-wrapper] ==> ignore
-    arg [-plugin-opt=-fresolution=/tmp/ccV91u69.res] ==> ignore
+    arg [-plugin-opt=-fresolution=/tmp/cc5NCD3J.res] ==> ignore
     arg [-plugin-opt=-pass-through=-lgcc_s] ==> ignore
     arg [-plugin-opt=-pass-through=-lgcc] ==> ignore
     arg [-plugin-opt=-pass-through=-lc] ==> ignore
@@ -309,7 +309,7 @@ Parsed CXX implicit link information from above output:
     arg [-znow] ==> ignore
     arg [-zrelro] ==> ignore
     arg [-o] ==> ignore
-    arg [cmTC_a007c] ==> ignore
+    arg [cmTC_a5e1c] ==> ignore
     arg [/usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu/Scrt1.o] ==> ignore
     arg [/usr/lib/gcc/x86_64-linux-gnu/7/../../../x86_64-linux-gnu/crti.o] ==> ignore
     arg [/usr/lib/gcc/x86_64-linux-gnu/7/crtbeginS.o] ==> ignore
@@ -321,7 +321,7 @@ Parsed CXX implicit link information from above output:
     arg [-L/usr/lib/x86_64-linux-gnu] ==> dir [/usr/lib/x86_64-linux-gnu]
     arg [-L/usr/lib/../lib] ==> dir [/usr/lib/../lib]
     arg [-L/usr/lib/gcc/x86_64-linux-gnu/7/../../..] ==> dir [/usr/lib/gcc/x86_64-linux-gnu/7/../../..]
-    arg [CMakeFiles/cmTC_a007c.dir/CMakeCXXCompilerABI.cpp.o] ==> ignore
+    arg [CMakeFiles/cmTC_a5e1c.dir/CMakeCXXCompilerABI.cpp.o] ==> ignore
     arg [-lstdc++] ==> lib [stdc++]
     arg [-lm] ==> lib [m]
     arg [-lgcc_s] ==> lib [gcc_s]
@@ -349,14 +349,14 @@ Parsed CXX implicit link information from above output:
 Detecting CXX [-std=c++1z] compiler features compiled with the following output:
 Change Dir: /home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp
 
-Run Build Command:"/usr/bin/make" "cmTC_6edef/fast"
-/usr/bin/make -f CMakeFiles/cmTC_6edef.dir/build.make CMakeFiles/cmTC_6edef.dir/build
+Run Build Command:"/usr/bin/make" "cmTC_9218d/fast"
+/usr/bin/make -f CMakeFiles/cmTC_9218d.dir/build.make CMakeFiles/cmTC_9218d.dir/build
 make[1]: Entering directory '/home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp'
-Building CXX object CMakeFiles/cmTC_6edef.dir/feature_tests.cxx.o
-/usr/bin/c++    -std=c++1z -o CMakeFiles/cmTC_6edef.dir/feature_tests.cxx.o -c /home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/feature_tests.cxx
-Linking CXX executable cmTC_6edef
-/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_6edef.dir/link.txt --verbose=1
-/usr/bin/c++       -rdynamic CMakeFiles/cmTC_6edef.dir/feature_tests.cxx.o  -o cmTC_6edef 
+Building CXX object CMakeFiles/cmTC_9218d.dir/feature_tests.cxx.o
+/usr/bin/c++    -std=c++1z -o CMakeFiles/cmTC_9218d.dir/feature_tests.cxx.o -c /home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/feature_tests.cxx
+Linking CXX executable cmTC_9218d
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_9218d.dir/link.txt --verbose=1
+/usr/bin/c++       -rdynamic CMakeFiles/cmTC_9218d.dir/feature_tests.cxx.o  -o cmTC_9218d 
 make[1]: Leaving directory '/home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp'
 
 
@@ -422,14 +422,14 @@ make[1]: Leaving directory '/home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-
 Detecting CXX [-std=c++14] compiler features compiled with the following output:
 Change Dir: /home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp
 
-Run Build Command:"/usr/bin/make" "cmTC_803e6/fast"
-/usr/bin/make -f CMakeFiles/cmTC_803e6.dir/build.make CMakeFiles/cmTC_803e6.dir/build
+Run Build Command:"/usr/bin/make" "cmTC_fb86d/fast"
+/usr/bin/make -f CMakeFiles/cmTC_fb86d.dir/build.make CMakeFiles/cmTC_fb86d.dir/build
 make[1]: Entering directory '/home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp'
-Building CXX object CMakeFiles/cmTC_803e6.dir/feature_tests.cxx.o
-/usr/bin/c++    -std=c++14 -o CMakeFiles/cmTC_803e6.dir/feature_tests.cxx.o -c /home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/feature_tests.cxx
-Linking CXX executable cmTC_803e6
-/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_803e6.dir/link.txt --verbose=1
-/usr/bin/c++       -rdynamic CMakeFiles/cmTC_803e6.dir/feature_tests.cxx.o  -o cmTC_803e6 
+Building CXX object CMakeFiles/cmTC_fb86d.dir/feature_tests.cxx.o
+/usr/bin/c++    -std=c++14 -o CMakeFiles/cmTC_fb86d.dir/feature_tests.cxx.o -c /home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/feature_tests.cxx
+Linking CXX executable cmTC_fb86d
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_fb86d.dir/link.txt --verbose=1
+/usr/bin/c++       -rdynamic CMakeFiles/cmTC_fb86d.dir/feature_tests.cxx.o  -o cmTC_fb86d 
 make[1]: Leaving directory '/home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp'
 
 
@@ -495,14 +495,14 @@ make[1]: Leaving directory '/home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-
 Detecting CXX [-std=c++11] compiler features compiled with the following output:
 Change Dir: /home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp
 
-Run Build Command:"/usr/bin/make" "cmTC_21306/fast"
-/usr/bin/make -f CMakeFiles/cmTC_21306.dir/build.make CMakeFiles/cmTC_21306.dir/build
+Run Build Command:"/usr/bin/make" "cmTC_1f536/fast"
+/usr/bin/make -f CMakeFiles/cmTC_1f536.dir/build.make CMakeFiles/cmTC_1f536.dir/build
 make[1]: Entering directory '/home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp'
-Building CXX object CMakeFiles/cmTC_21306.dir/feature_tests.cxx.o
-/usr/bin/c++    -std=c++11 -o CMakeFiles/cmTC_21306.dir/feature_tests.cxx.o -c /home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/feature_tests.cxx
-Linking CXX executable cmTC_21306
-/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_21306.dir/link.txt --verbose=1
-/usr/bin/c++       -rdynamic CMakeFiles/cmTC_21306.dir/feature_tests.cxx.o  -o cmTC_21306 
+Building CXX object CMakeFiles/cmTC_1f536.dir/feature_tests.cxx.o
+/usr/bin/c++    -std=c++11 -o CMakeFiles/cmTC_1f536.dir/feature_tests.cxx.o -c /home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/feature_tests.cxx
+Linking CXX executable cmTC_1f536
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_1f536.dir/link.txt --verbose=1
+/usr/bin/c++       -rdynamic CMakeFiles/cmTC_1f536.dir/feature_tests.cxx.o  -o cmTC_1f536 
 make[1]: Leaving directory '/home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp'
 
 
@@ -568,14 +568,14 @@ make[1]: Leaving directory '/home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-
 Detecting CXX [-std=c++98] compiler features compiled with the following output:
 Change Dir: /home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp
 
-Run Build Command:"/usr/bin/make" "cmTC_cdc72/fast"
-/usr/bin/make -f CMakeFiles/cmTC_cdc72.dir/build.make CMakeFiles/cmTC_cdc72.dir/build
+Run Build Command:"/usr/bin/make" "cmTC_fe350/fast"
+/usr/bin/make -f CMakeFiles/cmTC_fe350.dir/build.make CMakeFiles/cmTC_fe350.dir/build
 make[1]: Entering directory '/home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp'
-Building CXX object CMakeFiles/cmTC_cdc72.dir/feature_tests.cxx.o
-/usr/bin/c++    -std=c++98 -o CMakeFiles/cmTC_cdc72.dir/feature_tests.cxx.o -c /home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/feature_tests.cxx
-Linking CXX executable cmTC_cdc72
-/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_cdc72.dir/link.txt --verbose=1
-/usr/bin/c++       -rdynamic CMakeFiles/cmTC_cdc72.dir/feature_tests.cxx.o  -o cmTC_cdc72 
+Building CXX object CMakeFiles/cmTC_fe350.dir/feature_tests.cxx.o
+/usr/bin/c++    -std=c++98 -o CMakeFiles/cmTC_fe350.dir/feature_tests.cxx.o -c /home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/feature_tests.cxx
+Linking CXX executable cmTC_fe350
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_fe350.dir/link.txt --verbose=1
+/usr/bin/c++       -rdynamic CMakeFiles/cmTC_fe350.dir/feature_tests.cxx.o  -o cmTC_fe350 
 make[1]: Leaving directory '/home/irons/fuzzing/fuzzerino/eval/2coverage/ok-png-cov/cbuild/CMakeFiles/CMakeTmp'
 
 

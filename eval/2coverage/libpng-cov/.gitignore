@@ -1,0 +1,11 @@
+.libs/pngcp
+.libs/pngfix
+.libs/pngimage
+.libs/pngstest
+.libs/pngtest
+.libs/pngunknown
+.libs/pngvalid
+.libs/timepng
+config.log
+contrib/libtests/readpng
+png-fix-itxt
