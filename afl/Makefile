@@ -30,7 +30,7 @@ SOURCES     = $(patsubst %, %.c, $(EXECS))
 PROGS 		= $(patsubst %, $(OUTDIR)/%, $(EXECS))
 SH_PROGS    = afl-plot afl-cmin afl-whatsup
 
-CFLAGS     ?= -O0 -g -funroll-loops
+CFLAGS     ?= -O3 -g -funroll-loops
 CFLAGS     += -Wall -D_FORTIFY_SOURCE=2 -g -Wno-pointer-sign \
 	      -DAFL_PATH=\"$(HELPER_PATH)\" -DDOC_PATH=\"$(DOC_PATH)\" \
 	      -DBIN_PATH=\"$(BIN_PATH)\"

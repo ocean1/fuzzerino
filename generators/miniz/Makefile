@@ -1,9 +1,9 @@
 CC         = ../../afl/bin/gfz-clang-fast
-CFLAGS     = -g -I./amalgamation -I.
+CFLAGS     = -O3 -I./amalgamation -I.
 OBJDIR     = obj
 
 all: cleangfz
-	mkdir $(OBJDIR)
+	mkdir -p $(OBJDIR)
 	$(CC) $(CFLAGS) -c miniz.c -o $(OBJDIR)/miniz_instr.o
 	$(CC) $(CFLAGS) -c miniz_tdef.c -o $(OBJDIR)/miniz_tdef_instr.o
 	$(CC) $(CFLAGS) -c miniz_tinfl.c -o $(OBJDIR)/miniz_tinfl_instr.o

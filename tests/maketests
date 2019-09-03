@@ -3,6 +3,7 @@
 
 DEBUG ?= 0
 EMIT_LLVM ?= 0
+OPT ?= opt
 
 CC ?= gfz-clang-fast
 
@@ -26,7 +27,7 @@ gtest:
 	$(CC) $(CFLAGS) $(LDFLAGS) -S -emit-llvm g.c -o $@.ll
 	
 	# Verify LLVM IR of test program with instrumentation
-	opt -verify $@.ll -o /dev/null
+	$(OPT) -verify $@.ll -o /dev/null
 
 	# Build test program with instrumentation
 	@rm -f /dev/shm/gfzidfile

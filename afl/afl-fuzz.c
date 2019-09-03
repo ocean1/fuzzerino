@@ -8750,17 +8750,13 @@ gfuzz:
         for ( loc = 0; loc < __gfz_ptr_locs; ++loc ) {
 
           sprintf(tmp, "dry %s/%u (ptr)", branch ? DI(branch) : (u8*)"-", loc);
-          
           for ( i = 0; i < GFZ_NUM_DRY_POINTERS + __gfz_dict_len; ++i ) {
 
             show_stats();
 
             if (i < GFZ_NUM_DRY_POINTERS) {
-            
               __gfz_ptr_map[loc] = dry_pointers[i];
-            
             } else {
-              
               memcpy(__gfz_ptr_buf, __gfz_dict_entries[i - GFZ_NUM_DRY_POINTERS], GFZ_PTR_BUF_SIZE);
               __gfz_ptr_map[loc] = GFZ_CUSTOM_BUF;
 
