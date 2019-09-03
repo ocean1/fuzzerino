@@ -1,6 +1,8 @@
 fuzzerino
 -----------
 
+![alt text](resources/alpaca_small.jpg)
+
 Kang inverse fuzzing (10.000 execs - 5 secs) then switches to normal fuzzer, with fuzzerino we can cover more space:
   - we apply coverage also to the generator since we might be exploring a new path (not present in Kang)
   - we propose it's better to simply run the generator for a certain amount of time (like 2 hours?) and explore as many paths in the generator, and the output "quality" is measured by means of: fuzz values that do NOT crash the program, that generate a unique seed, and that increase the coverage of G. We argue that the generated outputs while not excerting new states in a given program, might do so in others, and once you run the "inverse" fuzzer, better keep them stored and resuse it across several programs (e.g. run them directly and use t-min on them, to select those before running afl and mutating them :))

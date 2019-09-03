@@ -32,6 +32,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>
 
 static u8*  obj_path;               /* Path to runtime libraries         */
 static u8** cc_params;              /* Parameters passed to the real CC  */
@@ -305,6 +306,21 @@ static void edit_params(u32 argc, char** argv) {
 
     }
 
+    /*
+      Link process memory map parsing library from:
+         
+         https://github.com/ouadev/proc_maps_parser
+    */
+
+    cc_params[cc_par_cnt++] = alloc_printf("%s/pmparser.o", obj_path);
+
+    /* Add obj_path to search path for binaries and object files used implicitly. 
+       This replaces the linker with gfz-ld wrapper for injecting the number of
+       instrumented locations. */
+
+    cc_params[cc_par_cnt++] = "-B";
+    cc_params[cc_par_cnt++] = obj_path;
+
   }
 
   cc_params[cc_par_cnt] = NULL;
@@ -319,9 +335,9 @@ int main(int argc, char** argv) {
   if (isatty(2) && !getenv("AFL_QUIET")) {
 
 #ifdef USE_TRACE_PC
-    SAYF(cCYA "gfz-clang-fast [tpcg] " cBRI VERSION  cRST " by <lszekeres@google.com>\n");
+    SAYF(cCYA "gfz-clang-fast [tpcg] " cBRI VERSION  cRST " by <lszekeres@google.com>, <limi7break>\n");
 #else
-    SAYF(cCYA "gfz-clang-fast " cBRI VERSION  cRST " by <lszekeres@google.com>\n");
+    SAYF(cCYA "gfz-clang-fast " cBRI VERSION  cRST " by <lszekeres@google.com>, <limi7break>\n");
 #endif /* ^USE_TRACE_PC */
 
   }
@@ -346,7 +362,6 @@ int main(int argc, char** argv) {
     exit(1);
 
   }
-
 
   find_obj(argv[0]);
 

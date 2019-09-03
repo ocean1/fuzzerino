@@ -1,27 +1,30 @@
-.PHONY: FORCE all clean tests afl fuzzerino dogen generators emit
+.PHONY: FORCE all clean generators
 
-LLVM_CONFIG=llvm-config-6.0
-CC=clang-6.0
-AFL_DONT_OPTIMIZE?=true
-
-export CC
-export LLVM_CONFIG
-export AFL_DONT_OPTIMIZE
-
-all: afl dogen
-
-tests: emit
-	make -C tests
+all: afl gfz dogen generators
 
 afl:
-	make -C afl
+	CC=clang-6.0 make -C afl
 
 gfz: afl
 	cd afl && ./mk.sh
 
+dogen:
+	cd tests && ./dotests.sh
+
+generators:
+	make -C generators/gif2apng
+	make -C generators/miniz
+	make -C generators/stb/tests
+
+emit:
+	cd tests && ./emitall.sh
+
 clean:
 	make -C afl clean
 	make -C tests clean
+	make -C generators/gif2apng clean
+	make -C generators/miniz clean
+	make -C generators/stb/tests clean
 
 cleanll: clean
 	make -C tests cleanll

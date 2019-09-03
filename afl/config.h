@@ -21,7 +21,7 @@
 
 /* Version string: */
 
-#define VERSION             "2.52b"
+#define VERSION             "1.00"
 
 /******************************************************
  *                                                    *
@@ -316,10 +316,6 @@
 #define MAP_SIZE_POW2       16
 #define MAP_SIZE            (1 << MAP_SIZE_POW2)
 
-/* size for pool containing values to be used in mutations, 4KB seems good */
-#define RAND_POOL_SIZE_POW  12
-#define RAND_POOL_SIZE      (1 << RAND_POOL_SIZE_POW)
-
 /* Maximum allocator request size (keep well under INT_MAX): */
 
 #define MAX_ALLOC           0x40000000
@@ -351,8 +347,157 @@
 
 // #define IGNORE_FINDS
 
-#define IDTMPFILE "/dev/shm/gfzidfile"
-#define MAX_FSIZE 50*1024*1024 // 50 MB of file are enough for now .. :)
 
+
+/* gFuzz stuff! */
+
+/* Environment variable used to pass SHM ID to the called program. */
+
+#define GFZ_NUM_SHM_ENV_VAR     "__GFZ_NUM_SHM_ID"
+#define GFZ_PTR_SHM_ENV_VAR     "__GFZ_PTR_SHM_ID"
+#define GFZ_BNC_SHM_ENV_VAR     "__GFZ_BNC_SHM_ID"
+#define GFZ_BUF_SHM_ENV_VAR     "__GFZ_BUF_SHM_ID"
+#define GFZ_COV_SHM_ENV_VAR     "__GFZ_COV_SHM_ID"
+
+/* Size for map containing numeric locations (2MB) */
+
+#define GFZ_NUM_MAP_SIZE_POW2   21
+#define GFZ_NUM_MAP_SIZE        (1 << GFZ_NUM_MAP_SIZE_POW2)
+
+/* Size for map containing pointer locations (2MB) */
+
+#define GFZ_PTR_MAP_SIZE_POW2   21
+#define GFZ_PTR_MAP_SIZE        (1 << GFZ_PTR_MAP_SIZE_POW2)
+
+/* Size for map containing branch locations (16k) */
+
+#define GFZ_BNC_MAP_SIZE_POW2   14
+#define GFZ_BNC_MAP_SIZE        (1 << GFZ_BNC_MAP_SIZE_POW2)
+
+/* Size for helper buffer for ptr instrumentation (128 bytes) */
+
+#define GFZ_PTR_BUF_SIZE_POW2   7
+#define GFZ_PTR_BUF_SIZE        (1 << GFZ_PTR_BUF_SIZE_POW2)
+
+/* Size for generator coverage map (64k) */
+
+#define GFZ_COV_MAP_SIZE_POW2   16
+#define GFZ_COV_MAP_SIZE        (1 << GFZ_COV_MAP_SIZE_POW2)
+
+/* Size for pool containing values to be used in mutations, 4KB seems good */
+
+#define GFZ_RAND_POOL_SIZE_POW2 12
+#define GFZ_RAND_POOL_SIZE      (1 << GFZ_RAND_POOL_SIZE_POW2)
+
+/* File for keeping track of instrumented locations */
+
+#define GFZ_IDFILE              "/dev/shm/gfzidfile"
+
+/* Output file size limit (1GB) */
+
+#define GFZ_OUTPUT_LIMIT_POW2   30
+#define GFZ_OUTPUT_LIMIT        (1 << GFZ_OUTPUT_LIMIT_POW2)
+
+/* Random stuff */
+
+#define GFZ_UPDATE_GEN          10000  /* Max number of generated files before __gfz_update                         */
+#define GFZ_UPDATE_SEC          15     /* Time interval between calls to __gfz_update                               */
+#define GFZ_TMOUT_SEC           20     /* Time after which location is skipped (dry run) or mutations reset (havoc) */
+#define GFZ_MAX_DICT_ENTRIES    100    /* Maximum dictionary entries                                                */
+#define GFZ_HAVOC_BRANCH_EXECS  1000   /* Number of executions between every branch location flip (havoc)           */
+#define GFZ_MAX_CMIN_TARGETS    10     /* Maximum afl-cmin targets                                                  */
+#define GFZ_MAX_GEN_CMDLINES    10     /* Maximum generator cmdlines (TODO)                                         */
+
+/* Mutations */
+
+#define GFZ_N_MUTATIONS         13
+
+#define GFZ_KEEP_ORIGINAL       1      // 0000 0000 0000 0001
+
+/* Numeric mutations */
+
+#define GFZ_PLUS_ONE            2      // 0000 0000 0000 0010
+#define GFZ_MINUS_ONE           4      // 0000 0000 0000 0100
+#define GFZ_INTERESTING_1       8      // 0000 0000 0000 1000
+#define GFZ_INTERESTING_2       16     // 0000 0000 0001 0000
+#define GFZ_INTERESTING_3       32     // 0000 0000 0010 0000
+#define GFZ_INTERESTING_4       64     // 0000 0000 0100 0000
+#define GFZ_INTERESTING_5       128    // 0000 0000 1000 0000
+#define GFZ_INTERESTING_6       256    // 0000 0001 0000 0000
+#define GFZ_INTERESTING_7       512    // 0000 0010 0000 0000
+#define GFZ_INTERESTING_8       1024   // 0000 0100 0000 0000
+#define GFZ_PLUS_MAX            2048   // 0000 1000 0000 0000
+#define GFZ_PLUS_RAND           4096   // 0001 0000 0000 0000
+#define GFZ_RESERVED_1          8192   // 0010 0000 0000 0000
+#define GFZ_RESERVED_2          16384  // 0100 0000 0000 0000
+#define GFZ_RESERVED_3          32768  // 1000 0000 0000 0000
+
+/* Pointer mutations */
+
+#define GFZ_BITFLIP             2      // 0000 0000 0000 0010
+#define GFZ_BYTEFLIP            4      // 0000 0000 0000 0100
+#define GFZ_ARITH               8      // 0000 0000 0000 1000
+#define GFZ_INTERESTING         16     // 0000 0000 0001 0000
+#define GFZ_CUSTOM_BUF          32     // 0000 0000 0010 0000
+#define GFZ_LEN_1               64     // 0000 0000 0100 0000
+#define GFZ_LEN_2               128    // 0000 0000 1000 0000
+#define GFZ_LEN_3               256    // 0000 0001 0000 0000
+#define GFZ_STRIDE_LEN_1        512    // 0000 0010 0000 0000
+#define GFZ_STRIDE_LEN_2        1024   // 0000 0100 0000 0000
+#define GFZ_STRIDE_LEN_3        2048   // 0000 1000 0000 0000
+#define GFZ_STRIDE_LEN_4        4096   // 0001 0000 0000 0000
+#define GFZ_STRIDE_LEN_5        8192   // 0010 0000 0000 0000
+#define GFZ_STRIDE_LEN_6        16384  // 0100 0000 0000 0000
+#define GFZ_STRIDE_LEN_7        32768  // 1000 0000 0000 0000
+
+/* Dry run stuff - TODO: tune these values */
+
+#define GFZ_BAN_RATIO           0.3
+
+/* Deterministic mutation combinations to use in dry run */
+
+#define GFZ_NUM_DRY_NUMERIC     24
+
+#define GFZ_DRY_NUMERIC \
+  GFZ_PLUS_ONE | GFZ_KEEP_ORIGINAL,                         \
+  GFZ_MINUS_ONE | GFZ_KEEP_ORIGINAL,                        \
+  GFZ_INTERESTING_1 | GFZ_KEEP_ORIGINAL,                    \
+  GFZ_INTERESTING_2 | GFZ_KEEP_ORIGINAL,                    \
+  GFZ_INTERESTING_3 | GFZ_KEEP_ORIGINAL,                    \
+  GFZ_INTERESTING_4 | GFZ_KEEP_ORIGINAL,                    \
+  GFZ_INTERESTING_5 | GFZ_KEEP_ORIGINAL,                    \
+  GFZ_INTERESTING_6 | GFZ_KEEP_ORIGINAL,                    \
+  GFZ_INTERESTING_7 | GFZ_KEEP_ORIGINAL,                    \
+  GFZ_INTERESTING_8 | GFZ_KEEP_ORIGINAL,                    \
+  GFZ_PLUS_MAX | GFZ_KEEP_ORIGINAL,                         \
+  GFZ_PLUS_RAND | GFZ_KEEP_ORIGINAL,                        \
+  GFZ_PLUS_ONE,                                             \
+  GFZ_MINUS_ONE,                                            \
+  GFZ_INTERESTING_1,                                        \
+  GFZ_INTERESTING_2,                                        \
+  GFZ_INTERESTING_3,                                        \
+  GFZ_INTERESTING_4,                                        \
+  GFZ_INTERESTING_5,                                        \
+  GFZ_INTERESTING_6,                                        \
+  GFZ_INTERESTING_7,                                        \
+  GFZ_INTERESTING_8,                                        \
+  GFZ_PLUS_MAX,                                             \
+  GFZ_PLUS_RAND
+
+#define GFZ_NUM_DRY_POINTERS    12
+
+#define GFZ_DRY_POINTERS \
+  GFZ_BITFLIP,                                              \
+  GFZ_BITFLIP | GFZ_LEN_1,                                  \
+  GFZ_BITFLIP | GFZ_LEN_2,                                  \
+  GFZ_BITFLIP | GFZ_LEN_1 | GFZ_LEN_2,                      \
+  GFZ_BITFLIP | GFZ_LEN_3,                                  \
+  GFZ_BITFLIP | GFZ_LEN_1 | GFZ_LEN_3,                      \
+  GFZ_BITFLIP | GFZ_LEN_2 | GFZ_LEN_3,                      \
+  GFZ_BITFLIP | GFZ_LEN_1 | GFZ_LEN_2 | GFZ_LEN_3,          \
+  GFZ_BYTEFLIP,                                             \
+  GFZ_BYTEFLIP | GFZ_LEN_1,                                 \
+  GFZ_BYTEFLIP | GFZ_LEN_2,                                 \
+  GFZ_BYTEFLIP | GFZ_LEN_1 | GFZ_LEN_2
 
 #endif /* ! _HAVE_CONFIG_H */

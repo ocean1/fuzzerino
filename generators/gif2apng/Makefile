@@ -1,11 +1,11 @@
 PACKAGE    = gif2apng
-CC         ?= clang
-CXX        ?= clang++
+CC         = ../../afl/bin/gfz-clang-fast
+CXX        = ../../afl/bin/gfz-clang-fast
 SRC_DIRS   = . 7z zopfli
 CFLAGS     = -Wall -pedantic -g
 #CFLAGS     += -fsanitize=address
-CFLAGS    += -fxray-instrument -fxray-instruction-threshold=1
-CXXFLAGS    += -fxray-instrument -fxray-instruction-threshold=1
+#CFLAGS    += -fxray-instrument -fxray-instruction-threshold=1
+#CXXFLAGS    += -fxray-instrument -fxray-instruction-threshold=1
 CFLAGS_OPT = -O2
 CFLAGS_7Z  = -Wno-sign-compare -Wno-reorder -Wno-maybe-uninitialized -Wno-parentheses
 LDFLAGS    = -s
@@ -18,7 +18,10 @@ OBJECTS := $(OBJECTS:.c=.o)
 OBJECTS := $(OBJECTS:.cc=.o)
 OBJECTS := $(OBJECTS:.cpp=.o)
 
-all : $(PACKAGE)
+all : cleangfz $(PACKAGE)
+
+cleangfz:
+	rm -rf /dev/shm/gfzidfile
 
 $(PACKAGE) : objdirs $(OBJECTS)
 	$(CXX) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJECTS) $(LIBS)
@@ -39,3 +42,6 @@ obj/%.o : %.cc
 
 clean :
 	rm -rf $(PACKAGE) obj
+	rm -rf out
+	rm -rf gfz.log
+	rm -rf gfz_plot_data

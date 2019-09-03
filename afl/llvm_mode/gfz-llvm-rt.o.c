@@ -22,6 +22,7 @@
 #include "../config.h"
 #include "../debug.h"
 #include "../types.h"
+#include "../pmparser.h"
 
 #include <assert.h>
 #include <signal.h>
@@ -30,6 +31,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <time.h>
+#include <errno.h>
 
 #include <sys/mman.h>
 #include <sys/resource.h>
@@ -37,8 +39,10 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 
 #include <malloc.h>
+#include <fcntl.h>
 
 /* This is a somewhat ugly hack for the experimental 'trace-pc-guard' mode.
    Basically, we need to make sure that the forkserver is initialized after
@@ -51,7 +55,7 @@
 #endif /* ^USE_TRACE_PC */
 
 /* Globals needed by the injected instrumentation. The __afl_area_initial region
-   is used for instrumentation output before __afl_map_shm() has a chance to
+   is used for instrumentation output before __gfz_map_shm() has a chance to
    run. It will end up as .comm, so it shouldn't be too wasteful. */
 
 u8 __afl_area_initial[MAP_SIZE];
@@ -59,38 +63,78 @@ u8 *__afl_area_ptr = __afl_area_initial;
 
 __thread u32 __afl_prev_loc;
 
-/* "Rand" area gets filled by the thread itself every time we change fuzz
- * strategy or when all values have been used, for example filled with low/high
- * values, or random values */
-u32 *__gfz_map_area = NULL;
-u8 *__gfz_rand_area = NULL;
-u32 __gfz_rand_idx;
-
-/* keep 4MB of map, it's quite a lot of space, and our test targets
-   will happily work with this, we can later optimize by storing inst_inst
-   and merging global vars in a LTO pass (or brutally patched with lief) */
-const ssize_t __gfz_map_size = 4 * 1024 * 1024;
-
 /* Running in persistent mode? */
 
 static u8 is_persistent;
 
-/* SHM setup. */
-
 // override free, generators are short lived programs (http://www.drdobbs.com/cpp/increasing-compiler-speed-by-over-75/240158941)
 // https://twitter.com/johnregehr/status/1073801738707070977
 // we could also override malloc to provide a little bit more space to reduce SEGFAULTs
+
 void free(void *ptr)
 {
 }
+
+/* Extern variables which will be linked against by gfz-ld wrapper
+   through a command line flag called "--defsym".
+
+   They are filled with data taken from GFZ_IDFILE at the end of the
+   compiling process, to avoid LTO. */
+
+extern u32 __gfz_num_locs_defsym;    /* Number of instrumented numeric locations in the target binary. */
+extern u32 __gfz_ptr_locs_defsym;    /* Number of instrumented pointer locations in the target binary. */
+extern u32 __gfz_branch_locs_defsym; /* Number of instrumented branches in the target binary. */
+extern u32 __gfz_total_bbs_defsym;   /* Number of (whitelisted) basic blocks in the target binary. */
+
+/* gFuzz structure to send to the fuzzer. */
+
+struct gfz_data __gfz_data;
+
+/* Numeric locations bitmap SHM */
+
+u16* __gfz_num_map;
+
+/* Pointer locations bitmap SHM */
+
+u16* __gfz_ptr_map;
+
+/* Branch locations bitmap SHM */
+
+u8* __gfz_branch_map;
+
+/* Buffer for ptr dict instrumentation (custom buffer) */
+
+u8* __gfz_ptr_buf;
+
+/* Map for generator coverage */
+
+u8* __gfz_cov_map;
+
+/* Saved pointers to argc, argv */
+
+int *__gfz_argc;
+char ***__gfz_argv;
+
+/* Random file descriptor for populating __gfz_rand_area. */
+
+FILE* rfd;
+
+/* "Rand" area gets filled by the thread itself every time we change fuzz
+ * strategy or when all values have been used, for example filled with low/high
+ * values, or random values */
+
+u8* __gfz_rand_area = NULL;
+u32 __gfz_rand_idx;
+
+/* SHM setup. */
 
 static void __afl_map_shm(void) {
 
   u8 *id_str = getenv(SHM_ENV_VAR);
 
-  /* If we're running under AFL, attach to the appropriate region, replacing the
-     early-stage __afl_area_initial region that is needed to allow some really
-     hacky .init code to work correctly in projects such as OpenSSL. */
+  // If we're running under AFL, attach to the appropriate region, replacing the
+  // early-stage __afl_area_initial region that is needed to allow some really
+  // hacky .init code to work correctly in projects such as OpenSSL.
 
   if (id_str) {
 
@@ -98,42 +142,299 @@ static void __afl_map_shm(void) {
 
     __afl_area_ptr = shmat(shm_id, NULL, 0);
 
-    /* Whooooops. */
+    // Whooooops.
 
     if (__afl_area_ptr == (void *)-1)
       _exit(1);
 
-    /* Write something into the bitmap so that even with low AFL_INST_RATIO,
-       our parent doesn't give up on us. */
+    // Write something into the bitmap so that even with low AFL_INST_RATIO,
+    // our parent doesn't give up on us.
 
     __afl_area_ptr[0] = 1;
   }
 }
 
+/* Attach the five SHMs in order to be able to control
+   them 'from the outside' (i.e. the fuzzer) */
+
+static void __gfz_map_shm(void) {
+
+  /* Attach __gfz_num_map */
+
+  u8 *id_str = getenv(GFZ_NUM_SHM_ENV_VAR);
+
+  if (id_str) {
+    u32 shm_id = atoi(id_str);
+    __gfz_num_map = shmat(shm_id, NULL, 0);
+
+    // Whooooops.
+    if (__gfz_num_map == (void *)-1) {
+      _exit(1);
+    }
+  } else {
+    __gfz_num_map = calloc(GFZ_NUM_MAP_SIZE, 1);
+  }
+
+  /* Attach __gfz_ptr_map */
+
+  id_str = getenv(GFZ_PTR_SHM_ENV_VAR);
+
+  if (id_str) {
+    u32 shm_id = atoi(id_str);
+    __gfz_ptr_map = shmat(shm_id, NULL, 0);
+
+    // Whooooops.
+    if (__gfz_ptr_map == (void *)-1) {
+      _exit(1);
+    }
+  } else {
+    __gfz_ptr_map = calloc(GFZ_PTR_MAP_SIZE, 1);
+  }
+
+  /* Attach __gfz_branch_map */
+
+  id_str = getenv(GFZ_BNC_SHM_ENV_VAR);
+
+  if (id_str) {
+    u32 shm_id = atoi(id_str);
+    __gfz_branch_map = shmat(shm_id, NULL, 0);
+
+    // Whooooops.
+    if (__gfz_branch_map == (void *)-1) {
+      _exit(1);
+    }
+  } else {
+    __gfz_branch_map = calloc(GFZ_BNC_MAP_SIZE, 1);
+  }
+
+  /* Attach __gfz_ptr_buf */
+
+  id_str = getenv(GFZ_BUF_SHM_ENV_VAR);
+
+  if (id_str) {
+    u32 shm_id = atoi(id_str);
+    __gfz_ptr_buf = shmat(shm_id, NULL, 0);
+
+    // Whooooops.
+    if (__gfz_ptr_buf == (void *)-1) {
+      _exit(1);
+    }
+  } else {
+    __gfz_ptr_buf = malloc(GFZ_PTR_BUF_SIZE);
+    
+    int i = 0;
+    for (i = 0; i < GFZ_PTR_BUF_SIZE; ++i) {
+      __gfz_ptr_buf[i] = 'A';
+    }
+  }
+
+  /* Attach __gfz_cov_map */
+
+  id_str = getenv(GFZ_COV_SHM_ENV_VAR);
+
+  if (id_str) {
+    u32 shm_id = atoi(id_str);
+    __gfz_cov_map = shmat(shm_id, NULL, 0);
+
+    // Whooooops.
+    if (__gfz_cov_map == (void *)-1) {
+      _exit(1);
+    }
+
+  } else {
+    __gfz_cov_map = calloc(GFZ_COV_MAP_SIZE, 1);
+  }
+
+}
+
+/*
+  Parses /proc/self/maps and calls mprotect on all the
+  memory regions in order to make everything writable.
+  (actually rwx)
+
+  This is to have less crashes when instrumenting pointers
+  and buffers.
+
+  Generators are short lived programs.
+  See above where free is overwritten.
+
+  Process memory map parsing library from:
+
+  https://github.com/ouadev/proc_maps_parser
+*/
+
+void __gfz_make_writable() {
+
+  procmaps_iterator* maps = pmparser_parse(-1);
+
+  if (maps == NULL){
+    WARNF("[map]: cannot parse the memory map");
+    return;
+  }
+
+  procmaps_struct* maps_tmp = NULL;
+  
+  while( (maps_tmp = pmparser_next(maps)) != NULL){
+    mprotect(maps_tmp->addr_start,
+             maps_tmp->addr_end - maps_tmp->addr_start,
+             PROT_READ|PROT_WRITE|PROT_EXEC);
+  }
+
+  pmparser_free(maps);
+
+}
+
 /* Fork server logic. */
 
-static void __afl_start_forkserver(void) {
+static void __gfz_start_forkserver(void) {
 
   static u8 tmp[4];
   s32 child_pid;
-
-  //char *cmdfmt = "./outputs/%lu_fuzztest_%lu";
-	//char *oldp = "/dev/shm/fuzztest";
-  //char cmd[500];
   u8 child_stopped = 0;
 
   /* Phone home and tell the parent that we're OK. If parent isn't there,
      assume we're not running in forkserver mode and just execute program. */
 
-  if (write(FORKSRV_FD + 1, tmp, 4) != 4) return;
+  if (write(FORKSRV_FD + 1, tmp, 4) != 4) {
+    
+    /*
 
-  int i = 0; // make a clean dry run with one sample
+      Code used for instrumentation testing.
+
+      It fills the maps area with custom map files, if present.
+      The custom maps are searched in files in the current folder called
+
+          "gfz_num" for the numeric locations map
+          "gfz_ptr" for the pointer locations map
+          "gfz_bnc" for the branch locations map
+
+    */
+
+    FILE *gfz_num_file = fopen("./gfz_num", "rb");
+
+    if (gfz_num_file) {
+    
+      ssize_t n_bytes = fread(__gfz_num_map, GFZ_NUM_MAP_SIZE, 1, gfz_num_file);
+    
+      if (n_bytes <= 0)
+        printf("[-] Error reading gfz_num. (%ld)\n", n_bytes);
+      else
+        printf("[+] gfz_num read.");
+
+      /* When a custom map is present, make the whole process
+         memory writable, just as if we were fuzzing. */
+
+      __gfz_make_writable();
+    
+    } else {
+    
+      /* If no custom map is present, just fill it with ones
+         to execute normal program behavior. */
+
+      int i = 0;
+
+      for (i = 0; i < (GFZ_NUM_MAP_SIZE / 2); ++i) {
+        __gfz_num_map[i] = 1;
+      }
+      
+      /* Don't change rwx of the process memory in this case
+         so that the instrumentation is fairly transparent
+         and the program can still be used normally when
+         NOT fuzzing, or testing with a custom map. */
+
+    }
+
+    FILE *gfz_ptr_file = fopen("./gfz_ptr", "rb");
+
+    if (gfz_ptr_file) {
+    
+      ssize_t n_bytes = fread(__gfz_ptr_map, GFZ_PTR_MAP_SIZE, 1, gfz_ptr_file);
+    
+      if (n_bytes <= 0)
+        printf("[-] Error reading gfz_ptr. (%ld)\n", n_bytes);
+      else
+        printf("[+] gfz_ptr read.");
+
+      /* When a custom map is present, make the whole process
+         memory writable, just as if we were fuzzing. */
+
+      if (!gfz_num_file)
+        __gfz_make_writable();
+    
+    } else {
+    
+      /* If no custom map is present, just fill it with ones
+         to execute normal program behavior. */
+
+      int i = 0;
+
+      for (i = 0; i < (GFZ_PTR_MAP_SIZE / 2); ++i) {
+        __gfz_ptr_map[i] = 1;
+      }
+      
+      /* Don't change rwx of the process memory in this case
+         so that the instrumentation is fairly transparent
+         and the program can still be used normally when
+         NOT fuzzing, or testing with a custom map. */
+
+    }
+
+    FILE *gfz_bnc_file = fopen("gfz_bnc", "rb");
+
+    if (gfz_bnc_file) {
+
+      ssize_t n_bytes = fread(__gfz_branch_map, GFZ_BNC_MAP_SIZE, 1, gfz_bnc_file);
+    
+      if (n_bytes <= 0)
+        printf("[-] Error reading gfz_bnc. (%ld)\n", n_bytes);
+      else
+        printf("[+] gfz_bnc read.");
+
+      /* When a custom map is present, make the whole process
+         memory writable, just as if we were fuzzing. */
+
+      if (!gfz_num_file && !gfz_ptr_file)
+        __gfz_make_writable();
+
+    } else {
+
+      int i = 0;
+
+      for (i = 0; i < GFZ_BNC_MAP_SIZE; ++i) {
+        __gfz_branch_map[i] = 1;
+      }
+
+      /* Don't change rwx of the process memory in this case
+         so that the instrumentation is fairly transparent
+         and the program can still be used normally when
+         NOT fuzzing, or testing with a custom map. */
+    
+    }
+
+    /* End code for instrumentation testing */
+    return;
+  }
+
+  __gfz_make_writable();
+
+  /* Send __gfz_data to the fuzzer. */
+
+  __gfz_data.gfz_num_locs = (u32) &__gfz_num_locs_defsym;
+  __gfz_data.gfz_ptr_locs = (u32) &__gfz_ptr_locs_defsym;
+  __gfz_data.gfz_branch_locs = (u32) &__gfz_branch_locs_defsym;
+  __gfz_data.gfz_total_bbs = (u32) &__gfz_total_bbs_defsym;
+
+  if (write(FORKSRV_FD + 1, &__gfz_data, sizeof(struct gfz_data)) != sizeof(struct gfz_data))
+    FATAL("Unable to write __gfz_data to the fuzzer! (did you activate gFuzz mode?)");
+
+  /* Forkserver loop. */
+
+  int i = 0;
+
   while(1) {
-    u8 *inststat = getenv("GFZ_STAT_VAL");
-    u8 insval = (inststat == NULL) ? 1 : atoi(inststat);
+
     u32 was_killed;
     int status;
-    //int a, b;
 
     /* Wait for parent by reading from the pipe. Abort if read fails. */
 
@@ -143,23 +444,15 @@ static void __afl_start_forkserver(void) {
        condition and afl-fuzz already issued SIGKILL, write off the old
        process. */
 
-    if ((child_stopped)) { //&& was_killed) {
+    if ( child_stopped ) {
       child_stopped = 0;
       if (waitpid(child_pid, &status, 0) < 0)
         _exit(1);
     }
 
-    if (!child_stopped) {
+    if ( !child_stopped ) {
 
       /* Once woken up, create a clone of our process. */
-      // a = (i+rand()) % maxi;
-      // b = (i+rand()) % maxi;
-
-    if (i > 0)
-      __gfz_map_area[i] = insval;
-
-      //__gfz_map_area[a] = insval;
-      //__gfz_map_area[b] = insval;
 
       child_pid = fork();
       if (child_pid < 0)
@@ -168,21 +461,12 @@ static void __afl_start_forkserver(void) {
       /* In child process: close fds, resume execution. */
 
       if (!child_pid) {
-
         close(FORKSRV_FD);
         close(FORKSRV_FD + 1);
         return;
       }
 
-      __gfz_map_area[i] = 0;
-
-      //sprintf(cmd, cmdfmt, (unsigned long)time(NULL), i);
-      //(void)system(cmd);
-      //rename(oldp, cmd);
-
       ++i;
-      //__gfz_map_area[a] = 0;
-      //__gfz_map_area[b] = 0;
 
     } else {
       /* Special handling for persistent mode: if the child is alive but
@@ -210,12 +494,15 @@ static void __afl_start_forkserver(void) {
 
     if (write(FORKSRV_FD + 1, &status, 4) != 4) _exit(1);
 
-  }
+  } // end while(1)
+
+  fclose(rfd);
+
 }
 
 /* A simplified persistent mode handler, used as explained in README.llvm. */
 
-int __afl_persistent_loop(unsigned int max_cnt) {
+int __gfz_persistent_loop(unsigned int max_cnt) {
 
   static u8 first_pass = 1;
   static u32 cycle_cnt;
@@ -263,47 +550,49 @@ int __afl_persistent_loop(unsigned int max_cnt) {
   return 0;
 }
 
-void fill_rand_area(void) {
-  FILE *rfd;
+/* 
+   This one can be called from user code when deferred forkserver mode
+   is enabled.
+*/
 
-  rfd = fopen("/dev/urandom", "r");
-
-  if (fread(__gfz_rand_area, RAND_POOL_SIZE, 1, rfd) != 1) {
-    FATAL("Unable to get enough rand bytes");
-  }
-  fclose(rfd);
-}
-
-/* This one can be called from user code when deferred forkserver mode
-    is enabled. */
-
-void __afl_manual_init(void) {
+void __gfz_manual_init(void) {
 
   static u8 init_done;
 
   if (!init_done) {
 
-    __gfz_map_area = calloc(__gfz_map_size, 1);
-    __gfz_rand_area = malloc(RAND_POOL_SIZE);
+    __gfz_map_shm();
+
+    rfd = fopen("/dev/urandom", "r");
+
+    __gfz_rand_area = malloc(GFZ_RAND_POOL_SIZE);
     __gfz_rand_idx = 0;
-    fill_rand_area();
+    
+    if (fread(__gfz_rand_area, GFZ_RAND_POOL_SIZE, 1, rfd) != 1) {
+      FATAL("Unable to get enough rand bytes");
+    }
 
     __afl_map_shm();
-    __afl_start_forkserver();
+    __gfz_start_forkserver();
     init_done = 1;
   }
+
 }
 
 /* Proper initialization routine. */
 
-__attribute__((constructor(CONST_PRIO))) void __afl_auto_init(void) {
+__attribute__((constructor(CONST_PRIO))) void __gfz_auto_init(int argc, char **argv) {
+
+  __gfz_argc = &argc;
+  __gfz_argv = &argv;
 
   is_persistent = !!getenv(PERSIST_ENV_VAR);
 
   if (getenv(DEFER_ENV_VAR))
     return;
 
-  __afl_manual_init();
+  __gfz_manual_init();
+
 }
 
 /* The following stuff deals with supporting -fsanitize-coverage=trace-pc-guard.

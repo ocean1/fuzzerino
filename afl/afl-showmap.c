@@ -171,8 +171,18 @@ static u32 write_results(void) {
 
   if (!strncmp(out_file, "/dev/", 5)) {
 
-    fd = open(out_file, O_WRONLY, 0600);
-    if (fd < 0) PFATAL("Unable to open '%s'", out_file);
+    if (!strncmp(out_file, "/dev/shm/", 9)) {
+
+      unlink(out_file); /* Ignore errors */
+      fd = open(out_file, O_WRONLY | O_CREAT | O_EXCL, 0600);
+      if (fd < 0) PFATAL("Unable to create '%s'", out_file);
+
+    } else {
+
+      fd = open(out_file, O_WRONLY, 0600);
+      if (fd < 0) PFATAL("Unable to open '%s'", out_file);
+
+    }
 
   } else if (!strcmp(out_file, "-")) {
 

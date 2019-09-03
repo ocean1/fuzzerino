@@ -83,4 +83,18 @@ typedef int64_t  s64;
 #define likely(_x)   __builtin_expect(!!(_x), 1)
 #define unlikely(_x)  __builtin_expect(!!(_x), 0)
 
+/* gFuzz data structures */
+
+struct gfz_data {
+  u32 gfz_num_locs;
+  u32 gfz_ptr_locs;
+  u32 gfz_branch_locs;
+  u32 gfz_total_bbs;
+};
+
+struct gen_cmdline {
+  u32 argc;
+  u8 **argv;
+};
+
 #endif /* ! _HAVE_TYPES_H */

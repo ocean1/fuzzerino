@@ -1,46 +1,42 @@
 # Makefile
-.PHONY: FORCE all clean emitllvm
-AFL_DONT_OPTIMIZE?=true
+.PHONY: FORCE all clean
 
 DEBUG ?= 0
+EMIT_LLVM ?= 0
 
 CC ?= gfz-clang-fast
 
 CFLAGS = -Wall
 CFLAGS += -I ../
-LLVMFLAGS=-emit-llvm -S
+LLVMFLAGS = -emit-llvm -S
 
 #LDFLAGS += ../ldscript.x
 ifeq ($(DEBUG), 1)
 	CFLAGS  += -g
 endif
 
-
 all: gtest ptest
 
 cleanids:
 	@rm -f /dev/shm/gfzidfile
 
-emitllvm: g.ll
-
-%.ll:
-	@rm -f /dev/shm/gfzidfile
-	$(CC) $(CFLAGS) $(LLVMFLAGS) $*.c -o $@
-
 gtest:
+	# Emit LLVM IR of test program with instrumentation
+	@rm -f /dev/shm/gfzidfile
+	$(CC) $(CFLAGS) $(LDFLAGS) -S -emit-llvm g.c -o $@.ll
+	
+	# Verify LLVM IR of test program with instrumentation
+	opt -verify $@.ll -o /dev/null
+
+	# Build test program with instrumentation
 	@rm -f /dev/shm/gfzidfile
 	$(CC) $(CFLAGS) $(LDFLAGS) g.c -o $@
-
+	
 ptest:
 	@rm -f /dev/shm/gfzidfile
 	gcc $(CFLAGS) $(LDFLAGS) p.c -o $@
 
-cleanll:
-	rm -f *.ll
-
 clean:
 	rm -f gtest ptest
 	rm -f *.o
-
-verify:
-	opt-6.0 -verify g.ll
+	rm -f *.ll
