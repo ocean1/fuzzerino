@@ -9,9 +9,9 @@ cd ..
 echo
 cd t1
 echo "(t1) no instrumentation:" `python -m timeit -s 'import os' 'os.system("./gtest > /dev/null 2>&1")' | awk '{print $6 " " $7}'`
-echo "(t2) instrumented, no mutations:" `python -m timeit -s 'import os' 'os.system("./gtest_gfz > /dev/null 2>&1")' | awk '{print $6 " " $7}'`
+echo "(t1) instrumented, no mutations:" `python -m timeit -s 'import os' 'os.system("./gtest_gfz > /dev/null 2>&1")' | awk '{print $6 " " $7}'`
 cp maps/num ./gfz_num
-echo "(t3) instrumented, mutations:" `python -m timeit -s 'import os' 'os.system("./gtest_gfz > /dev/null 2>&1")' | awk '{print $6 " " $7}'`
+echo "(t1) instrumented, mutations:" `python -m timeit -s 'import os' 'os.system("./gtest_gfz > /dev/null 2>&1")' | awk '{print $6 " " $7}'`
 rm -rf gfz*
 cd ..
 echo
@@ -20,7 +20,7 @@ echo "(t2) no instrumentation:" `python -m timeit -s 'import os' 'os.system("./g
 echo "(t2) instrumented, no mutations:" `python -m timeit -s 'import os' 'os.system("./gtest_gfz > /dev/null 2>&1")' | awk '{print $6 " " $7}'`
 cp maps/num ./gfz_num
 cp maps/ptr ./gfz_ptr
-echo "(t3) instrumented, mutations:" `python -m timeit -s 'import os' 'os.system("./gtest_gfz > /dev/null 2>&1")' | awk '{print $6 " " $7}'`
+echo "(t2) instrumented, mutations:" `python -m timeit -s 'import os' 'os.system("./gtest_gfz > /dev/null 2>&1")' | awk '{print $6 " " $7}'`
 rm -rf gfz*
 cd ..
 echo
