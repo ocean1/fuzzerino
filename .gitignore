@@ -2,7 +2,6 @@
 outputs/*
 aflout/*
 *_trace.yaml
-*_gfz
 *_xray
 
 # Created by https://www.gitignore.io/api/c

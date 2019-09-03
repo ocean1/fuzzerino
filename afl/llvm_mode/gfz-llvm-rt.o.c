@@ -110,6 +110,11 @@ u8* __gfz_ptr_buf;
 
 u8* __gfz_cov_map;
 
+/* Saved pointers to argc, argv */
+
+int *__gfz_argc;
+char ***__gfz_argv;
+
 /* Random file descriptor for populating __gfz_rand_area. */
 
 FILE* rfd;
@@ -576,7 +581,10 @@ void __gfz_manual_init(void) {
 
 /* Proper initialization routine. */
 
-__attribute__((constructor(CONST_PRIO))) void __gfz_auto_init(void) {
+__attribute__((constructor(CONST_PRIO))) void __gfz_auto_init(int argc, char **argv) {
+
+  __gfz_argc = &argc;
+  __gfz_argv = &argv;
 
   is_persistent = !!getenv(PERSIST_ENV_VAR);
 
