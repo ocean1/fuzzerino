@@ -110,10 +110,20 @@ u8* __gfz_ptr_buf;
 
 u8* __gfz_cov_map;
 
-/* Saved pointers to argc, argv */
+/* gfz argc, argv */
 
-int *__gfz_argc;
-char ***__gfz_argv;
+int __gfz_argc;
+char **__gfz_argv;
+
+int __original_argc;
+char **__original_argv;
+
+/* Multiple cmdlines stuff */
+
+u8 __gfz_num_cmdlines = 0,
+   __gfz_cur_cmdline = 0;
+
+struct gen_cmdline gen_cmdlines[GFZ_MAX_GEN_CMDLINES];
 
 /* Random file descriptor for populating __gfz_rand_area. */
 
@@ -125,6 +135,113 @@ FILE* rfd;
 
 u8* __gfz_rand_area = NULL;
 u32 __gfz_rand_idx;
+
+/* For debugging */
+
+void print_cmdline_at(u8 pos) {
+
+  if (pos >= GFZ_MAX_GEN_CMDLINES)
+    return;
+
+  u32 i = 0;
+
+  for (i = 0; i < gen_cmdlines[pos].argc; ++i)
+    printf("%s ", gen_cmdlines[pos].argv[i]);
+
+}
+
+/* read line from 'fp' allocate *buffer NCHAR in size
+ * realloc as necessary. Returns a pointer to *buffer
+ * on success, NULL otherwise.
+ */
+char *readline (FILE *fp, u8 **buffer) 
+{
+    int ch;
+    size_t buflen = 0, nchar = 64;
+
+    *buffer = malloc(nchar);    /* allocate buffer nchar in length */
+    if (!*buffer) {
+      fprintf(stderr, "readline() error: virtual memory exhausted.\n");
+      return NULL;
+    }
+
+    while ((ch = fgetc(fp)) != '\n' && ch != EOF) 
+    {
+      (*buffer)[buflen++] = ch;
+
+      if (buflen + 1 >= nchar) {  /* realloc */
+        u8 *tmp = realloc(*buffer, nchar * 2);
+        if (!tmp) {
+          fprintf(stderr, "error: realloc failed, "
+                          "returning partial buffer.\n");
+          (*buffer)[buflen] = 0;
+          return *buffer;
+        }
+        *buffer = tmp;
+        nchar *= 2;
+      }
+    }
+    (*buffer)[buflen] = 0;           /* nul-terminate */
+
+    if (buflen == 0 && ch == EOF) {  /* return NULL if nothing read */
+      free(*buffer);
+      *buffer = NULL;
+    }
+
+    return *buffer;
+}
+
+/* Read extra cmdlines from file */
+
+void read_gen_cmdlines(char *file) {
+
+  u32 arg = 0;
+  u32 nargs = 4;
+  u8 *tmp, *pch;
+
+  FILE *fp = fopen(file, "r");
+  if (!fp) return; //PFATAL("error: file open failed '%s'.\n", file);
+
+  while ( readline(fp, &tmp) ) {
+
+    arg = 0;
+    nargs = 4;
+    gen_cmdlines[__gfz_num_cmdlines].argv = malloc(nargs * sizeof(u8*));
+    
+    pch = strtok(tmp, " ");
+
+    while ( pch != NULL ) {
+
+      if (arg >= nargs) {  /* realloc */
+        u8 **re = realloc(gen_cmdlines[__gfz_num_cmdlines].argv, nargs * 2 * sizeof(u8*));
+        if (!re) {
+          fprintf(stderr, "error: realloc failed.\n");
+          free(tmp);
+          fclose(fp);
+          return;
+        }
+        gen_cmdlines[__gfz_num_cmdlines].argv = re;
+        nargs *= 2;
+      }
+
+      gen_cmdlines[__gfz_num_cmdlines].argv[arg] = malloc(strlen(pch) + 1);
+      strcpy(gen_cmdlines[__gfz_num_cmdlines].argv[arg], pch);
+
+      ++arg;
+
+      pch = strtok(NULL, " ");
+
+    }
+
+    gen_cmdlines[__gfz_num_cmdlines].argc = arg;
+    ++__gfz_num_cmdlines;
+    free(tmp);
+
+  }
+  
+  fclose(fp);
+
+}
 
 /* SHM setup. */
 
@@ -412,6 +529,10 @@ static void __gfz_start_forkserver(void) {
     }
 
     /* End code for instrumentation testing */
+    
+    __gfz_argc = __original_argc;
+    __gfz_argv = __original_argv;
+
     return;
   }
 
@@ -423,6 +544,7 @@ static void __gfz_start_forkserver(void) {
   __gfz_data.gfz_ptr_locs = (u32) &__gfz_ptr_locs_defsym;
   __gfz_data.gfz_branch_locs = (u32) &__gfz_branch_locs_defsym;
   __gfz_data.gfz_total_bbs = (u32) &__gfz_total_bbs_defsym;
+  __gfz_data.gfz_num_cmdlines = __gfz_num_cmdlines;
 
   if (write(FORKSRV_FD + 1, &__gfz_data, sizeof(struct gfz_data)) != sizeof(struct gfz_data))
     FATAL("Unable to write __gfz_data to the fuzzer! (did you activate gFuzz mode?)");
@@ -433,12 +555,15 @@ static void __gfz_start_forkserver(void) {
 
   while(1) {
 
-    u32 was_killed;
+    u32 change_cmdline;
     int status;
 
     /* Wait for parent by reading from the pipe. Abort if read fails. */
 
-    if (read(FORKSRV_FD, &was_killed, 4) != 4) _exit(1);
+    if (read(FORKSRV_FD, &change_cmdline, 4) != 4) _exit(1);
+
+    if (change_cmdline)
+      __gfz_cur_cmdline = (__gfz_cur_cmdline + 1) % __gfz_num_cmdlines;
 
     /* If we stopped the child in persistent mode, but there was a race
        condition and afl-fuzz already issued SIGKILL, write off the old
@@ -461,6 +586,9 @@ static void __gfz_start_forkserver(void) {
       /* In child process: close fds, resume execution. */
 
       if (!child_pid) {
+        __gfz_argc =          gen_cmdlines[__gfz_cur_cmdline].argc;
+        __gfz_argv = (char**) gen_cmdlines[__gfz_cur_cmdline].argv;
+
         close(FORKSRV_FD);
         close(FORKSRV_FD + 1);
         return;
@@ -573,6 +701,7 @@ void __gfz_manual_init(void) {
     }
 
     __afl_map_shm();
+    read_gen_cmdlines("cmdlines");
     __gfz_start_forkserver();
     init_done = 1;
   }
@@ -583,8 +712,8 @@ void __gfz_manual_init(void) {
 
 __attribute__((constructor(CONST_PRIO))) void __gfz_auto_init(int argc, char **argv) {
 
-  __gfz_argc = &argc;
-  __gfz_argv = &argv;
+  __original_argc = argc;
+  __original_argv = argv;
 
   is_persistent = !!getenv(PERSIST_ENV_VAR);
 

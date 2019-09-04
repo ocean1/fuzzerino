@@ -405,6 +405,7 @@
 #define GFZ_TMOUT_SEC           20     /* Time after which location is skipped (dry run) or mutations reset (havoc) */
 #define GFZ_MAX_DICT_ENTRIES    100    /* Maximum dictionary entries                                                */
 #define GFZ_HAVOC_BRANCH_EXECS  1000   /* Number of executions between every branch location flip (havoc)           */
+#define GFZ_HAVOC_CMDLINE_EXECS 100000 /* Number of executions between every cmdline change (havoc)                 */
 #define GFZ_MAX_CMIN_TARGETS    10     /* Maximum afl-cmin targets                                                  */
 #define GFZ_MAX_GEN_CMDLINES    10     /* Maximum generator cmdlines (TODO)                                         */
 

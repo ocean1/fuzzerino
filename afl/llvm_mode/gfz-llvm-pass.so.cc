@@ -916,6 +916,23 @@ bool AFLCoverage::runOnModule(Module &M) {
     fun_tot = 0;
     fun_sel = 0;
 
+    if (F.getName().equals(StringRef("main"))) {
+      GlobalVariable* GFZArgc
+        = new GlobalVariable(M, Int32Ty, false,
+                             GlobalValue::ExternalLinkage, 0, "__gfz_argc");
+
+      GlobalVariable* GFZArgv
+        = new GlobalVariable(M, PointerType::get(PointerType::get(Int8Ty, 0), 0), false,
+                             GlobalValue::ExternalLinkage, 0, "__gfz_argv");
+
+      BasicBlock::iterator IP = F.getEntryBlock().getFirstInsertionPt();
+      IRBuilder<> IRB(&(*IP));
+      
+      for(auto A = F.arg_begin(); A != F.arg_end(); ++A)
+        if (A->getArgNo() == 0)      A->replaceAllUsesWith(IRB.CreateLoad(GFZArgc));
+        else if (A->getArgNo() == 1) A->replaceAllUsesWith(IRB.CreateLoad(GFZArgv));
+    }
+
     if (WhitelistSet.find(F.getName()) == WhitelistSet.end())
       continue;
 

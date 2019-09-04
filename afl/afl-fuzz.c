@@ -110,10 +110,10 @@ u8*  __gfz_cov_map;                   /* Generator coverage bitmap SHM    */
 u32  __gfz_total_bbs = 0;             /* Total basic blocks               */
 u32  __gfz_covered = 0;               /* Covered basic blocks             */
 
-u16* __gfz_num_ban_map;               /* Numeric locations ban map        */
+u32* __gfz_num_ban_map;               /* Numeric locations ban map        */
 u32  __gfz_num_ban_locs = 0;          /* Number of numeric banned locs    */
 
-u16* __gfz_ptr_ban_map;               /* Pointer locations ban map        */
+u32* __gfz_ptr_ban_map;               /* Pointer locations ban map        */
 u32  __gfz_ptr_ban_locs = 0;          /* Number of pointer banned locs    */
 
 EXP_ST u8 *gen_file,                  /* Generated file                   */
@@ -123,19 +123,15 @@ EXP_ST u8 *gen_file,                  /* Generated file                   */
 
 EXP_ST u8  gfuzz_mode,                /* Running in gfuzz mode?           */
            gfz_is_havoc = 0,          /* Is gfuzz in havoc phase?         */
-           num_gen_cmdlines = 0,      /* Number of generator cmdlines     */
-           num_cmin_targets = 0;      /* Number of cmin target binaries   */
-           //cur_cmdline = 0;           /* Current cmdline                  */
+           num_cmin_targets = 0,      /* Number of cmin target binaries   */
+           __gfz_num_cmdlines = 0,    /* Number of cmdlines               */
+           __gfz_cur_cmdline = 0;     /* Current cmdline                  */
 
 EXP_ST u64 gen_total,                 /* Total number of generated seeds  */
            gen_after_cmin,            /* Generated seeds after afl-cmin   */
            gen_unique,                /* Number of unique seeds (afl-cmin)*/
            max_unique,                /* Max unique seeds (afl-cmin)      */
-           last_seed_time,            /* ms time for most recent uniq seed*/
-           time_spent_minimizing;     /* Total time spent in afl-cmin     */
-
-struct gen_cmdline gen_cmdlines       /* Generator cmdlines               */
-                       [GFZ_MAX_GEN_CMDLINES];
+           last_seed_time;            /* ms time for most recent uniq seed*/
 
 static s32 gfz_num_shm_id;            /* ID of num SHM region (gFuzz mode)*/
 static s32 gfz_ptr_shm_id;            /* ID of ptr SHM region (gFuzz mode)*/
@@ -2317,20 +2313,22 @@ EXP_ST void init_forkserver(char** argv) {
       rlen = read(fsrv_st_fd, &__gfz_data, sizeof(struct gfz_data));
 
       if (rlen == sizeof(struct gfz_data)) {
-        __gfz_num_locs    = __gfz_data.gfz_num_locs;
-        __gfz_ptr_locs    = __gfz_data.gfz_ptr_locs;
-        __gfz_branch_locs = __gfz_data.gfz_branch_locs;
-        __gfz_total_bbs   = __gfz_data.gfz_total_bbs;
+        __gfz_num_locs     = __gfz_data.gfz_num_locs - 1;
+        __gfz_ptr_locs     = __gfz_data.gfz_ptr_locs - 1;
+        __gfz_branch_locs  = __gfz_data.gfz_branch_locs - 1;
+        __gfz_total_bbs    = __gfz_data.gfz_total_bbs - 1;
+        __gfz_num_cmdlines = __gfz_data.gfz_num_cmdlines;
 
         OKF("Number of numeric locations: %d", __gfz_num_locs);
         OKF("Number of pointer locations: %d", __gfz_ptr_locs);
         OKF("Number of branch locations: %u", __gfz_branch_locs);
         OKF("Number of basic blocks: %u", __gfz_total_bbs);
+        OKF("Number of cmdlines: %u", __gfz_num_cmdlines);
 
         /* Allocate and zero-initialize the maps of banned locations. */
 
-        __gfz_num_ban_map = calloc(__gfz_num_locs, sizeof(u16));
-        __gfz_ptr_ban_map = calloc(__gfz_ptr_locs, sizeof(u16));
+        __gfz_num_ban_map = calloc(__gfz_num_locs, sizeof(u32));
+        __gfz_ptr_ban_map = calloc(__gfz_ptr_locs, sizeof(u32));
 
       } else {
         FATAL("Unable to read __gfz_data from the forkserver!");
@@ -2473,7 +2471,7 @@ EXP_ST void init_forkserver(char** argv) {
 /* Execute target application, monitoring for timeouts. Return status
    information. The called program will update trace_bits[]. */
 
-static u8 run_target(char** argv, u32 timeout) {
+static u8 run_target(char** argv, u32 timeout, u32 change_cmdline) {
 
   static struct itimerval it;
   static u32 prev_timed_out = 0;
@@ -2579,7 +2577,7 @@ static u8 run_target(char** argv, u32 timeout) {
     /* In non-dumb mode, we have the fork server up and running, so simply
        tell it to have at it, and then read back PID. */
 
-    if ((res = write(fsrv_ctl_fd, &prev_timed_out, 4)) != 4) {
+    if ((res = write(fsrv_ctl_fd, &change_cmdline, 4)) != 4) {
 
       if (stop_soon) return 0;
       RPFATAL(res, "Unable to request new process from fork server (OOM?)");
@@ -2789,7 +2787,7 @@ static u8 calibrate_case(char** argv, struct queue_entry* q, u8* use_mem,
 
     write_to_testcase(use_mem, q->len);
 
-    fault = run_target(argv, use_tmout);
+    fault = run_target(argv, use_tmout, 0);
 
     /* stop_soon is set by the handler for Ctrl+C. When it's pressed,
        we want to bail out quickly. */
@@ -3422,7 +3420,7 @@ static u8 save_if_interesting(char** argv, void* mem, u32 len, u8 fault) {
 
         u8 new_fault;
         write_to_testcase(mem, len);
-        new_fault = run_target(argv, hang_tmout);
+        new_fault = run_target(argv, hang_tmout, 0);
 
         /* A corner case that one user reported bumping into: increasing the
            timeout actually uncovers a crash. Make sure we don't discard it if
@@ -4167,11 +4165,8 @@ void __gfz_update() {
 
   /* Minimize */
 
-  if (num_cmin_targets) {
-    u64 time_before_cmin = get_cur_time();
+  if (num_cmin_targets)
     afl_cmin();
-    time_spent_minimizing += get_cur_time() - time_before_cmin;
-  }
 
   /* Update bb coverage */
 
@@ -4183,12 +4178,13 @@ void __gfz_update() {
   /* Write gfz plot data
 
      Fields in the file:
-     unix_time, generated, unique, coverage, execs, crashes, tmouts, execs_sec, havoc */
+     unix_time, generated, unique, coverage, execs, crashes, tmouts, execs_sec, cmdline, havoc */
 
   fprintf(__gfz_plot_file, 
-          "%llu, %llu, %llu, %u, %llu, %llu, %llu, %0.02f, %u\n",
+          "%llu, %llu, %llu, %u, %llu, %llu, %llu, %0.02f, %u, %u\n",
           get_cur_time() / 1000, gen_total, gen_unique, __gfz_covered,
-          total_execs, total_crashes, total_tmouts, local_avg_exec, gfz_is_havoc);
+          total_execs, total_crashes, total_tmouts, local_avg_exec,
+          __gfz_cur_cmdline, gfz_is_havoc);
 
   fflush(__gfz_plot_file);
 
@@ -4222,7 +4218,7 @@ static void show_stats(void) {
 
   if (!last_execs) {
 
-    avg_exec = ((double)total_execs) * 1000 / (cur_ms - time_spent_minimizing - start_time);
+    avg_exec = ((double)total_execs) * 1000 / (cur_ms - start_time);
 
   } else {
 
@@ -4317,7 +4313,7 @@ static void show_stats(void) {
   if (term_too_small) {
 
     SAYF(cBRI "Your terminal is too small to display the UI.\n"
-         "Please resize terminal window to at least 80x25.\n" cRST);
+         "Please resize terminal window to at least 80x24.\n" cRST);
 
     return;
 
@@ -4375,7 +4371,8 @@ static void show_stats(void) {
   sprintf(tmp, "%s/%s (%0.02f%%)", DI(__gfz_covered), DI(__gfz_total_bbs),
           (double)__gfz_covered * 100 / __gfz_total_bbs);
 
-  SAYF(bV bSTOP " bb coverage : " cRST "%-63s" bSTG bV "\n", tmp);
+  SAYF(bV bSTOP " bb coverage : " cRST "%-21s " bSTG " " bSTOP
+    "       cmdline : " cRST "%-2s/ %-18s " bSTG bV "\n", tmp, DI(__gfz_cur_cmdline + 1), DI(__gfz_num_cmdlines));
 
   /* Yeah... it's still going on... halp? */
 
@@ -4623,7 +4620,7 @@ static u8 trim_case(char** argv, struct queue_entry* q, u8* in_buf) {
 
       write_with_gap(in_buf, q->len, remove_pos, trim_avail);
 
-      fault = run_target(argv, exec_tmout);
+      fault = run_target(argv, exec_tmout, 0);
       trim_execs++;
 
       if (stop_soon || fault == FAULT_ERROR) goto abort_trimming;
@@ -4716,7 +4713,7 @@ EXP_ST u8 common_fuzz_stuff(char** argv, u8* out_buf, u32 len) {
 
   write_to_testcase(out_buf, len);
 
-  fault = run_target(argv, exec_tmout);
+  fault = run_target(argv, exec_tmout, 0);
 
   if (stop_soon) return 1;
 
@@ -6845,7 +6842,7 @@ static void sync_fuzzers(char** argv) {
 
         write_to_testcase(mem, st.st_size);
 
-        fault = run_target(argv, exec_tmout);
+        fault = run_target(argv, exec_tmout, 0);
 
         if (stop_soon) return;
 
@@ -7151,7 +7148,7 @@ static void check_term_size(void) {
 
   if (ioctl(1, TIOCGWINSZ, &ws)) return;
 
-  if (ws.ws_row < 25 || ws.ws_col < 80) term_too_small = 1;
+  if (ws.ws_row < 24 || ws.ws_col < 80) term_too_small = 1;
 
 }
 
@@ -7869,56 +7866,6 @@ void read_cmin_targets(char *file) {
 
 }
 
-void read_gen_cmdlines(char *file) {
-
-  u32 arg = 0;
-  u32 nargs = 4;
-  u8 *tmp, *pch;
-
-  FILE *fp = fopen(file, "r");
-  if (!fp) PFATAL("error: file open failed '%s'.\n", file);
-
-  while ( readline(fp, &tmp) ) {
-
-    arg = 0;
-    nargs = 4;
-    gen_cmdlines[num_gen_cmdlines].argv = malloc(nargs * sizeof(u8*));
-    
-    pch = strtok(tmp, " ");
-
-    while ( pch != NULL ) {
-
-      if (arg >= nargs) {  /* realloc */
-        u8 **re = realloc(gen_cmdlines[num_gen_cmdlines].argv, nargs * 2 * sizeof(u8*));
-        if (!re) {
-          fprintf(stderr, "error: realloc failed.\n");
-          free(tmp);
-          fclose(fp);
-          return;
-        }
-        gen_cmdlines[num_gen_cmdlines].argv = re;
-        nargs *= 2;
-      }
-
-      gen_cmdlines[num_gen_cmdlines].argv[arg] = malloc(strlen(pch) + 1);
-      strcpy(gen_cmdlines[num_gen_cmdlines].argv[arg], pch);
-
-      ++arg;
-
-      pch = strtok(NULL, " ");
-
-    }
-
-    gen_cmdlines[num_gen_cmdlines].argc = arg;
-    ++num_gen_cmdlines;
-    free(tmp);
-
-  }
-  
-  fclose(fp);
-
-}
-
 /* dirname - return directory part of PATH. */
 
 char *dirname (char *path)
@@ -8079,18 +8026,6 @@ u32 __gfz_load_dict(u8* fname) {
   fclose(f);
 
   return cur_entry;
-
-}
-
-void print_cmdline_at(u8 pos) {
-
-  if (pos >= GFZ_MAX_GEN_CMDLINES)
-    return;
-
-  u32 i = 0;
-
-  for (i = 0; i < gen_cmdlines[pos].argc; ++i)
-    printf("%s ", gen_cmdlines[pos].argv[i]);
 
 }
 
@@ -8309,19 +8244,13 @@ int main(int argc, char** argv) {
         read_cmin_targets(optarg);
         break;
 
-      case 'c': /* generator cmdline(s) */
-
-        if (num_gen_cmdlines) FATAL("Multiple -c options not supported");
-        read_gen_cmdlines(optarg);
-        break;
-
       default:
 
         usage(argv[0]);
 
     }
 
-  if (!in_dir || !out_dir) usage(argv[0]);
+  if (optind == argc || !in_dir || !out_dir) usage(argv[0]);
 
   setup_signal_handlers();
   check_asan_opts();
@@ -8362,7 +8291,7 @@ int main(int argc, char** argv) {
 
   save_cmdline(argc, argv);
 
-  fix_up_banner(gen_cmdlines[0].argv[0]);
+  fix_up_banner(argv[optind]);
 
   check_if_tty();
 
@@ -8395,17 +8324,14 @@ int main(int argc, char** argv) {
 
   if (!out_file) setup_stdio_file();
 
-  OKF("Default generator cmdline: ");
-  printf("    "); print_cmdline_at(0); printf("\n");
-
-  check_binary(gen_cmdlines[0].argv[0]);
+  check_binary(argv[optind]);
 
   start_time = get_cur_time();
 
   if (qemu_mode)
     use_argv = get_qemu_argv(argv[0], argv + optind, argc - optind);
   else
-    use_argv = (char**) gen_cmdlines[0].argv;
+    use_argv = argv + optind;
 
   perform_dry_run(use_argv);
 
@@ -8553,7 +8479,7 @@ gfuzz:
   if (!__gfz_plot_file) PFATAL("fopen() failed");
 
   fprintf(__gfz_plot_file, "# unix_time, generated, unique, coverage, "
-                           "execs, crashes, tmouts, execs_sec, havoc\n");
+                           "execs, crashes, tmouts, execs_sec, cmdline, havoc\n");
 
   if (num_cmin_targets) {
 
@@ -8586,7 +8512,7 @@ gfuzz:
        This could clog up RAM when using a ramdisk such as /dev/shm. */
     
     u8 *gen_path = dirname(strdup(gen_file));
-    u8 *bname = strrchr(gen_cmdlines[0].argv[0], '/');
+    u8 *bname = strrchr(argv[optind], '/');
 
     i = 0;
     gen_dir = alloc_printf("%s/%s_%d", gen_path, bname, i);
@@ -8618,7 +8544,7 @@ gfuzz:
     FILE *num_ban_fd = fopen("./gfz_num_ban", "rb");
 
     if (num_ban_fd) {
-      ssize_t n_bytes = fread(__gfz_num_ban_map, __gfz_num_locs * sizeof(u16), 1, num_ban_fd);
+      ssize_t n_bytes = fread(__gfz_num_ban_map, __gfz_num_locs * sizeof(u32), 1, num_ban_fd);
 
       if (n_bytes <= 0) {
         num_ban_read_error = 1;
@@ -8670,163 +8596,177 @@ gfuzz:
     u16 dry_numeric[] = { GFZ_DRY_NUMERIC };
     u16 dry_pointers[] = { GFZ_DRY_POINTERS };
 
+    u8 cmd = 0;
     u32 branch = 0;
     u32 loc = 0;
 
-    for ( branch = 0; branch <= __gfz_branch_locs; ++branch ) {
+    for ( cmd = 0; cmd < __gfz_num_cmdlines; ++cmd ) {
 
-      if (branch > 0)
-        __gfz_branch_map[branch - 1]++;
+      for ( branch = 0; branch <= __gfz_branch_locs; ++branch ) {
 
-      if ( num_ban_read_error ) {
+        if (branch > 0)
+          __gfz_branch_map[branch - 1]++;
 
-        /* Numeric phase */
+        if ( num_ban_read_error ) {
 
-        for ( loc = 0; loc < __gfz_num_locs; ++loc ) {
+          /* Numeric phase */
 
-          sprintf(tmp, "dry %s/%u (num)", branch ? DI(branch) : (u8*)"-", loc);
-          
-          for ( i = 0; i < GFZ_NUM_DRY_NUMERIC; ++i ) {
+          for ( loc = 0; loc < __gfz_num_locs; ++loc ) {
 
-            show_stats();
+            if ( __gfz_num_ban_map[loc] == 0xffffffff )
+              continue;
 
-            __gfz_num_map[loc] = dry_numeric[i];
+            sprintf(tmp, "dry %s/%u (num)", branch ? DI(branch) : (u8*)"-", loc);
+            
+            for ( i = 0; i < GFZ_NUM_DRY_NUMERIC; ++i ) {
 
-            fault = run_target(use_argv, exec_tmout);
-
-            if ( gen_file && fault == FAULT_NONE && !stat(gen_file, &st) && st.st_size != 0 ) {
-              // Save output in gen_dir
-              u8 *fn = alloc_printf("%s/dry_%s_%u_num%u", gen_dir, branch ? DI(branch) : (u8*)"no", loc, __gfz_num_map[loc]);
-              rename(gen_file, fn);
-              ck_free(fn);
-              ++gen_total;
-              ++gen_after_cmin;
-            }
-
-            switch (fault) {
-              case FAULT_TMOUT:
-                ++total_tmouts;
-                ++__gfz_num_ban_map[loc];
-                break;
-              case FAULT_CRASH:
-                ++total_crashes;
-                ++__gfz_num_ban_map[loc];
-                break;
-            }
-
-            if (gen_file)
-              remove(gen_file);
-
-            if ( avg_exec < 100 ) {
-              if (!slow_since) {
-                slow_since = get_cur_time();
-              } else if ( get_cur_time() > (slow_since + (GFZ_TMOUT_SEC * 1000)) ) {
-                __gfz_num_ban_map[loc] = 0xffff;
-                slow_since = 0;
-                break;
-              }
-            } else {
-              slow_since = 0;
-            }
-
-            if (stop_soon) {
-              __gfz_update();
               show_stats();
-              goto stop_fuzzing;
-            }
 
-          } // end mutation loop
+              __gfz_num_map[loc] = dry_numeric[i];
 
-          __gfz_num_map[loc] = GFZ_KEEP_ORIGINAL;
+              fault = run_target(use_argv, exec_tmout, 0);
 
-        } // end location loop (numeric phase)
-
-      } // if ( num_ban_read_error )
-
-      if ( ptr_ban_read_error ) {
-
-        /* Pointer phase */
-
-        for ( loc = 0; loc < __gfz_ptr_locs; ++loc ) {
-
-          sprintf(tmp, "dry %s/%u (ptr)", branch ? DI(branch) : (u8*)"-", loc);
-          
-          for ( i = 0; i < GFZ_NUM_DRY_POINTERS + __gfz_dict_len; ++i ) {
-
-            show_stats();
-
-            if (i < GFZ_NUM_DRY_POINTERS) {
-            
-              __gfz_ptr_map[loc] = dry_pointers[i];
-            
-            } else {
-              
-              memcpy(__gfz_ptr_buf, __gfz_dict_entries[i - GFZ_NUM_DRY_POINTERS], GFZ_PTR_BUF_SIZE);
-              __gfz_ptr_map[loc] = GFZ_CUSTOM_BUF;
-
-            }
-
-            fault = run_target(use_argv, exec_tmout);
-
-            if ( fault == FAULT_NONE ) {
-              if ( gen_file && !stat(gen_file, &st) && st.st_size != 0 ) {
+              if ( gen_file && fault == FAULT_NONE && !stat(gen_file, &st) && st.st_size != 0 ) {
                 // Save output in gen_dir
-                u8 *fn = alloc_printf("%s/dry_%s_%u_ptr%u", gen_dir, branch ? DI(branch) : (u8*)"no", loc, __gfz_ptr_map[loc]);
+                u8 *fn = alloc_printf("%s/dry_%u_%s_%u_num%u", gen_dir, cmd, branch ? DI(branch) : (u8*)"no", loc, __gfz_num_map[loc]);
                 rename(gen_file, fn);
                 ck_free(fn);
                 ++gen_total;
                 ++gen_after_cmin;
               }
-            }
 
-            switch (fault) {
-              case FAULT_TMOUT:
-                ++total_tmouts;
-                ++__gfz_ptr_ban_map[loc];
-                break;
-              case FAULT_CRASH:
-                ++total_crashes;
-                ++__gfz_ptr_ban_map[loc];
-                break;
-            }
-
-            if (gen_file)
-              remove(gen_file);
-
-            if ( avg_exec < 100 ) {
-              if (!slow_since) {
-                slow_since = get_cur_time();
-              } else if ( get_cur_time() > (slow_since + (GFZ_TMOUT_SEC * 1000)) ) {
-                __gfz_ptr_ban_map[loc] = 0xffff;
-                slow_since = 0;
-                break;
+              switch (fault) {
+                case FAULT_TMOUT:
+                  ++total_tmouts;
+                  ++__gfz_num_ban_map[loc];
+                  break;
+                case FAULT_CRASH:
+                  ++total_crashes;
+                  ++__gfz_num_ban_map[loc];
+                  break;
               }
-            } else {
-              slow_since = 0;
-            }
 
-            if (stop_soon) {
-              __gfz_update();
+              if (gen_file)
+                remove(gen_file);
+
+              if ( avg_exec < 100 ) {
+                if (!slow_since) {
+                  slow_since = get_cur_time();
+                } else if ( get_cur_time() > (slow_since + (GFZ_TMOUT_SEC * 1000)) ) {
+                  __gfz_num_ban_map[loc] = 0xffffffff;
+                  slow_since = 0;
+                  break;
+                }
+              } else {
+                slow_since = 0;
+              }
+
+              if (stop_soon) {
+                __gfz_update();
+                show_stats();
+                goto stop_fuzzing;
+              }
+
+            } // end mutation loop
+
+            __gfz_num_map[loc] = GFZ_KEEP_ORIGINAL;
+
+          } // end location loop (numeric phase)
+
+        } // if ( num_ban_read_error )
+
+        if ( ptr_ban_read_error ) {
+
+          /* Pointer phase */
+
+          for ( loc = 0; loc < __gfz_ptr_locs; ++loc ) {
+
+            if ( __gfz_ptr_ban_map[loc] == 0xffff )
+              continue;
+
+            sprintf(tmp, "dry %s/%u (ptr)", branch ? DI(branch) : (u8*)"-", loc);
+            
+            for ( i = 0; i < GFZ_NUM_DRY_POINTERS + __gfz_dict_len; ++i ) {
+
               show_stats();
-              goto stop_fuzzing;
-            }
 
-          } // end mutation loop
+              if (i < GFZ_NUM_DRY_POINTERS) {
+              
+                __gfz_ptr_map[loc] = dry_pointers[i];
+              
+              } else {
+                
+                memcpy(__gfz_ptr_buf, __gfz_dict_entries[i - GFZ_NUM_DRY_POINTERS], GFZ_PTR_BUF_SIZE);
+                __gfz_ptr_map[loc] = GFZ_CUSTOM_BUF;
 
-          __gfz_ptr_map[loc] = GFZ_KEEP_ORIGINAL;
+              }
 
-        } // end location loop (pointers phase)
+              fault = run_target(use_argv, exec_tmout, 0);
 
-      } // if ( ptr_ban_read_error )
+              if ( fault == FAULT_NONE ) {
+                if ( gen_file && !stat(gen_file, &st) && st.st_size != 0 ) {
+                  // Save output in gen_dir
+                  u8 *fn = alloc_printf("%s/dry_%u_%s_%u_ptr%u", gen_dir, cmd, branch ? DI(branch) : (u8*)"no", loc, __gfz_ptr_map[loc]);
+                  rename(gen_file, fn);
+                  ck_free(fn);
+                  ++gen_total;
+                  ++gen_after_cmin;
+                }
+              }
 
-      if (branch > 0)
-        __gfz_branch_map[branch - 1]--;
+              switch (fault) {
+                case FAULT_TMOUT:
+                  ++total_tmouts;
+                  ++__gfz_ptr_ban_map[loc];
+                  break;
+                case FAULT_CRASH:
+                  ++total_crashes;
+                  ++__gfz_ptr_ban_map[loc];
+                  break;
+              }
 
-    } // end branch loop
+              if (gen_file)
+                remove(gen_file);
+
+              if ( avg_exec < 100 ) {
+                if (!slow_since) {
+                  slow_since = get_cur_time();
+                } else if ( get_cur_time() > (slow_since + (GFZ_TMOUT_SEC * 1000)) ) {
+                  __gfz_ptr_ban_map[loc] = 0xffff;
+                  slow_since = 0;
+                  break;
+                }
+              } else {
+                slow_since = 0;
+              }
+
+              if (stop_soon) {
+                __gfz_update();
+                show_stats();
+                goto stop_fuzzing;
+              }
+
+            } // end mutation loop
+
+            __gfz_ptr_map[loc] = GFZ_KEEP_ORIGINAL;
+
+          } // end location loop (pointers phase)
+
+        } // if ( ptr_ban_read_error )
+
+        if (branch > 0)
+          __gfz_branch_map[branch - 1]--;
+
+      } // end branch loop
+
+      fault = run_target(use_argv, exec_tmout, 1);
+      __gfz_cur_cmdline = (__gfz_cur_cmdline + 1) % __gfz_num_cmdlines;
+
+    } // end cmdline loop
 
     for ( loc = 0; loc < __gfz_num_locs; ++loc ) {
-      // fprintf(log_file, "\n num loc %u: %u faults out of %u (%.2f)", loc, __gfz_num_ban_map[loc], (__gfz_branch_locs * GFZ_NUM_DRY_NUMERIC), (double)__gfz_num_ban_map[loc] / (__gfz_branch_locs * GFZ_NUM_DRY_NUMERIC));
-      if ( (double)__gfz_num_ban_map[loc] / (__gfz_branch_locs * GFZ_NUM_DRY_NUMERIC) > GFZ_BAN_RATIO ) {
+      fprintf(log_file, "\n num loc %u: %u faults out of %u (%.2f)", loc, __gfz_num_ban_map[loc], (__gfz_num_cmdlines * __gfz_branch_locs * GFZ_NUM_DRY_NUMERIC), (double)__gfz_num_ban_map[loc] / (__gfz_num_cmdlines * __gfz_branch_locs * GFZ_NUM_DRY_NUMERIC));
+      if ( (double)__gfz_num_ban_map[loc] / (__gfz_num_cmdlines * __gfz_branch_locs * GFZ_NUM_DRY_NUMERIC) > GFZ_BAN_RATIO ) {
         __gfz_num_ban_map[loc] = 1;
         __gfz_num_ban_locs++;
       } else {
@@ -8835,8 +8775,8 @@ gfuzz:
     }
 
     for ( loc = 0; loc < __gfz_ptr_locs; ++loc ) {
-      // fprintf(log_file, "\n ptr loc %u: %u faults out of %u (%.2f)", loc, __gfz_ptr_ban_map[loc], (__gfz_branch_locs * (GFZ_NUM_DRY_NUMERIC + __gfz_dict_len)), (double)__gfz_ptr_ban_map[loc] / (__gfz_branch_locs * (GFZ_NUM_DRY_NUMERIC + __gfz_dict_len)));
-      if ( (double)__gfz_ptr_ban_map[loc] / (__gfz_branch_locs * (GFZ_NUM_DRY_NUMERIC + __gfz_dict_len)) > GFZ_BAN_RATIO ) {
+      fprintf(log_file, "\n ptr loc %u: %u faults out of %u (%.2f)", loc, __gfz_ptr_ban_map[loc], (__gfz_num_cmdlines * __gfz_branch_locs * (GFZ_NUM_DRY_NUMERIC + __gfz_dict_len)), (double)__gfz_ptr_ban_map[loc] / (__gfz_num_cmdlines * __gfz_branch_locs * (GFZ_NUM_DRY_NUMERIC + __gfz_dict_len)));
+      if ( (double)__gfz_ptr_ban_map[loc] / (__gfz_num_cmdlines * __gfz_branch_locs * (GFZ_NUM_DRY_NUMERIC + __gfz_dict_len)) > GFZ_BAN_RATIO ) {
         __gfz_ptr_ban_map[loc] = 1;
         __gfz_ptr_ban_locs++;
       } else {
@@ -8847,11 +8787,11 @@ gfuzz:
     /* Dump ban maps */
 
     FILE *num_ban_file = fopen("./gfz_num_ban", "wb");
-    fwrite(__gfz_num_ban_map, __gfz_num_locs * sizeof(u16), 1, num_ban_file);
+    fwrite(__gfz_num_ban_map, __gfz_num_locs * sizeof(u32), 1, num_ban_file);
     fclose(num_ban_file);
 
     FILE *ptr_ban_file = fopen("./gfz_ptr_ban", "wb");
-    fwrite(__gfz_ptr_ban_map, __gfz_ptr_locs * sizeof(u16), 1, ptr_ban_file);
+    fwrite(__gfz_ptr_ban_map, __gfz_ptr_locs * sizeof(u32), 1, ptr_ban_file);
     fclose(ptr_ban_file);
 
   } // if (!skip_deterministic)
@@ -8866,6 +8806,7 @@ gfz_havoc:
 
   u32 branch = 0;
   u32 branch_execs = 0;
+  u32 cmdline_execs = 0;
   
   u32 loc = 0;
   u32 is_ptr_loc = 0;
@@ -8944,24 +8885,18 @@ gfz_havoc:
 
     }
 
-    /* 1/1000 chance of selecting next cmdline
-
-    TODO: can't change the behavior of the program easily
-          when we have the forkserver... the options are:
-
-          1) spawn a different forkserver for each cmdline (no)
-          2) send cmdlines to the forkserver and change argv
-             from there!
-
-          for now, we'll just run different generation campaigns
-          for each cmdline!
-
-    if (!UR(1000)) {
-      cur_cmdline = (cur_cmdline + 1) % num_gen_cmdlines;
-      use_argv = (char**) gen_cmdlines[cur_cmdline].argv;
-    } */
-
-    fault = run_target(use_argv, exec_tmout);
+    if (cmdline_execs > GFZ_HAVOC_CMDLINE_EXECS) {
+      
+      fault = run_target(use_argv, exec_tmout, 1);
+      __gfz_cur_cmdline = (__gfz_cur_cmdline + 1) % __gfz_num_cmdlines;
+      
+      cmdline_execs = 0;
+    
+    } else {
+      
+      fault = run_target(use_argv, exec_tmout, 0);
+    
+    }
 
     if ( gen_file && fault == FAULT_NONE && !stat(gen_file, &st) && st.st_size != 0 ) {
       // Save output in gen_dir
@@ -9020,6 +8955,7 @@ gfz_havoc:
     }
 
     ++branch_execs;
+    ++cmdline_execs;
     ++i;
 
   } // end while

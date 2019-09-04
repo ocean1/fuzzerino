@@ -90,6 +90,7 @@ struct gfz_data {
   u32 gfz_ptr_locs;
   u32 gfz_branch_locs;
   u32 gfz_total_bbs;
+  u8 gfz_num_cmdlines;
 };
 
 struct gen_cmdline {

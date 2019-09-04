@@ -746,7 +746,7 @@ int main(int argc, char** argv)
     }
     /* First GIF scan - end */
 
-    __AFL_INIT();
+    //__AFL_INIT();
 
     printf("%d frames.\n", frames);
 

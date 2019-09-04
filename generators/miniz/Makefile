@@ -8,7 +8,7 @@ all: cleangfz
 	$(CC) $(CFLAGS) -c miniz_tdef.c -o $(OBJDIR)/miniz_tdef_instr.o
 	$(CC) $(CFLAGS) -c miniz_tinfl.c -o $(OBJDIR)/miniz_tinfl_instr.o
 	$(CC) $(CFLAGS) -c miniz_zip.c -o $(OBJDIR)/miniz_zip_instr.o
-	clang-6.0 -g -c -I./amalgamation -I. -c example6.c -o $(OBJDIR)/ex6.o
+	$(CC) $(CFLAGS) -c example6.c -o $(OBJDIR)/ex6.o
 	$(CC) $(CFLAGS) $(OBJDIR)/miniz_instr.o $(OBJDIR)/miniz_tdef_instr.o $(OBJDIR)/miniz_zip_instr.o $(OBJDIR)/miniz_tinfl_instr.o $(OBJDIR)/ex6.o -o miniz -lm
 
 cleangfz:
