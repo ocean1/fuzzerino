@@ -1,4 +1,3 @@
-./gif2apng giftest
-./gif2apng gifblank
-./gif2apng giftinyblack
-./gif2apng gifloading
+./gif2apng -z0 giftest
+./gif2apng -z1 giftest
+./gif2apng -z2 giftest

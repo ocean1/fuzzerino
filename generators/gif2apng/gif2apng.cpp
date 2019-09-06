@@ -192,7 +192,7 @@ void DecodeLZW(unsigned char * img, FILE * f1)
   }
 }
 
-void write_chunk(FILE * f, const char * name, unsigned char * data, unsigned int length)
+__fuzz void write_chunk(FILE * f, const char * name, unsigned char * data, unsigned int length)
 {
   unsigned int crc = crc32(0, Z_NULL, 0);
   unsigned int len = swap32(length);
@@ -219,7 +219,7 @@ void write_chunk(FILE * f, const char * name, unsigned char * data, unsigned int
   fwrite(&crc, 1, 4, f);
 }
 
-void write_IDATs(FILE * f, int frame, unsigned char * data, unsigned int length, unsigned int idat_size)
+__fuzz void write_IDATs(FILE * f, int frame, unsigned char * data, unsigned int length, unsigned int idat_size)
 {
   unsigned int z_cmf = data[0];
   if ((z_cmf & 0x0f) == 8 && (z_cmf & 0xf0) <= 0x70)

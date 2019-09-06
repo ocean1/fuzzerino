@@ -67,9 +67,6 @@ dkms.conf
 # test file
 fuzztest
 
-gtest
-ptest
-
 #CLANG LLVM IR
 *.ll
 *.bc
@@ -85,6 +82,8 @@ gfz.log
 gfz_num
 gfz_ptr
 gfz_bnc
+gfz_num_fault
+gfz_ptr_fault
 gfz_num_ban
 gfz_ptr_ban
 gfz_plot_data

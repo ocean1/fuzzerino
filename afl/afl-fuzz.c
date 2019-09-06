@@ -8766,7 +8766,7 @@ gfuzz:
 
     for ( loc = 0; loc < __gfz_num_locs; ++loc ) {
       fprintf(log_file, "\n num loc %u: %u faults out of %u (%.2f)", loc, __gfz_num_ban_map[loc], (__gfz_num_cmdlines * __gfz_branch_locs * GFZ_NUM_DRY_NUMERIC), (double)__gfz_num_ban_map[loc] / (__gfz_num_cmdlines * __gfz_branch_locs * GFZ_NUM_DRY_NUMERIC));
-      if ( (double)__gfz_num_ban_map[loc] / (__gfz_num_cmdlines * __gfz_branch_locs * GFZ_NUM_DRY_NUMERIC) > GFZ_BAN_RATIO ) {
+      if ( (double)__gfz_num_ban_map[loc] / (__gfz_num_cmdlines * __gfz_branch_locs * GFZ_NUM_DRY_NUMERIC) > GFZ_FTE_BAN_RATIO ) {
         __gfz_num_ban_map[loc] = 1;
         __gfz_num_ban_locs++;
       } else {
@@ -8776,7 +8776,7 @@ gfuzz:
 
     for ( loc = 0; loc < __gfz_ptr_locs; ++loc ) {
       fprintf(log_file, "\n ptr loc %u: %u faults out of %u (%.2f)", loc, __gfz_ptr_ban_map[loc], (__gfz_num_cmdlines * __gfz_branch_locs * (GFZ_NUM_DRY_NUMERIC + __gfz_dict_len)), (double)__gfz_ptr_ban_map[loc] / (__gfz_num_cmdlines * __gfz_branch_locs * (GFZ_NUM_DRY_NUMERIC + __gfz_dict_len)));
-      if ( (double)__gfz_ptr_ban_map[loc] / (__gfz_num_cmdlines * __gfz_branch_locs * (GFZ_NUM_DRY_NUMERIC + __gfz_dict_len)) > GFZ_BAN_RATIO ) {
+      if ( (double)__gfz_ptr_ban_map[loc] / (__gfz_num_cmdlines * __gfz_branch_locs * (GFZ_NUM_DRY_NUMERIC + __gfz_dict_len)) > GFZ_FTE_BAN_RATIO ) {
         __gfz_ptr_ban_map[loc] = 1;
         __gfz_ptr_ban_locs++;
       } else {

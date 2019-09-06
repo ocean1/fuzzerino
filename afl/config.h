@@ -400,60 +400,57 @@
 
 /* Random stuff */
 
-#define GFZ_UPDATE_GEN          10000  /* Max number of generated files before __gfz_update                         */
-#define GFZ_UPDATE_SEC          15     /* Time interval between calls to __gfz_update                               */
-#define GFZ_TMOUT_SEC           20     /* Time after which location is skipped (dry run) or mutations reset (havoc) */
-#define GFZ_MAX_DICT_ENTRIES    100    /* Maximum dictionary entries                                                */
-#define GFZ_HAVOC_BRANCH_EXECS  1000   /* Number of executions between every branch location flip (havoc)           */
-#define GFZ_HAVOC_CMDLINE_EXECS 100000 /* Number of executions between every cmdline change (havoc)                 */
-#define GFZ_MAX_CMIN_TARGETS    10     /* Maximum afl-cmin targets                                                  */
-#define GFZ_MAX_GEN_CMDLINES    10     /* Maximum generator cmdlines (TODO)                                         */
+#define GFZ_FTE_BAN_RATIO       0.3         /* Fault to exec ratio for banning a location during dry run(s)              */
+#define GFZ_UPDATE_GEN          10000       /* Max number of generated files before __gfz_update                         */
+#define GFZ_UPDATE_SEC          15          /* Time interval between calls to __gfz_update                               */
+#define GFZ_TMOUT_SEC           20          /* Time after which location is skipped (dry run) or mutations reset (havoc) */
+#define GFZ_MAX_DICT_ENTRIES    100         /* Maximum dictionary entries                                                */
+#define GFZ_HAVOC_BRANCH_EXECS  1000        /* Number of executions between every branch location flip (havoc)           */
+#define GFZ_HAVOC_CMDLINE_EXECS 100000      /* Number of executions between every cmdline change (havoc)                 */
+#define GFZ_MAX_CMIN_TARGETS    10          /* Maximum afl-cmin targets                                                  */
+#define GFZ_MAX_GEN_CMDLINES    10          /* Maximum generator cmdlines (TODO)                                         */
 
 /* Mutations */
 
 #define GFZ_N_MUTATIONS         13
 
-#define GFZ_KEEP_ORIGINAL       1      // 0000 0000 0000 0001
+#define GFZ_KEEP_ORIGINAL       1           // 0000 0000 0000 0001
 
 /* Numeric mutations */
 
-#define GFZ_PLUS_ONE            2      // 0000 0000 0000 0010
-#define GFZ_MINUS_ONE           4      // 0000 0000 0000 0100
-#define GFZ_INTERESTING_1       8      // 0000 0000 0000 1000
-#define GFZ_INTERESTING_2       16     // 0000 0000 0001 0000
-#define GFZ_INTERESTING_3       32     // 0000 0000 0010 0000
-#define GFZ_INTERESTING_4       64     // 0000 0000 0100 0000
-#define GFZ_INTERESTING_5       128    // 0000 0000 1000 0000
-#define GFZ_INTERESTING_6       256    // 0000 0001 0000 0000
-#define GFZ_INTERESTING_7       512    // 0000 0010 0000 0000
-#define GFZ_INTERESTING_8       1024   // 0000 0100 0000 0000
-#define GFZ_PLUS_MAX            2048   // 0000 1000 0000 0000
-#define GFZ_PLUS_RAND           4096   // 0001 0000 0000 0000
-#define GFZ_RESERVED_1          8192   // 0010 0000 0000 0000
-#define GFZ_RESERVED_2          16384  // 0100 0000 0000 0000
-#define GFZ_RESERVED_3          32768  // 1000 0000 0000 0000
+#define GFZ_PLUS_ONE            2           // 0000 0000 0000 0010
+#define GFZ_MINUS_ONE           4           // 0000 0000 0000 0100
+#define GFZ_INTERESTING_1       8           // 0000 0000 0000 1000
+#define GFZ_INTERESTING_2       16          // 0000 0000 0001 0000
+#define GFZ_INTERESTING_3       32          // 0000 0000 0010 0000
+#define GFZ_INTERESTING_4       64          // 0000 0000 0100 0000
+#define GFZ_INTERESTING_5       128         // 0000 0000 1000 0000
+#define GFZ_INTERESTING_6       256         // 0000 0001 0000 0000
+#define GFZ_INTERESTING_7       512         // 0000 0010 0000 0000
+#define GFZ_INTERESTING_8       1024        // 0000 0100 0000 0000
+#define GFZ_PLUS_MAX            2048        // 0000 1000 0000 0000
+#define GFZ_PLUS_RAND           4096        // 0001 0000 0000 0000
+#define GFZ_RESERVED_1          8192        // 0010 0000 0000 0000
+#define GFZ_RESERVED_2          16384       // 0100 0000 0000 0000
+#define GFZ_RESERVED_3          32768       // 1000 0000 0000 0000
 
 /* Pointer mutations */
 
-#define GFZ_BITFLIP             2      // 0000 0000 0000 0010
-#define GFZ_BYTEFLIP            4      // 0000 0000 0000 0100
-#define GFZ_ARITH               8      // 0000 0000 0000 1000
-#define GFZ_INTERESTING         16     // 0000 0000 0001 0000
-#define GFZ_CUSTOM_BUF          32     // 0000 0000 0010 0000
-#define GFZ_LEN_1               64     // 0000 0000 0100 0000
-#define GFZ_LEN_2               128    // 0000 0000 1000 0000
-#define GFZ_LEN_3               256    // 0000 0001 0000 0000
-#define GFZ_STRIDE_LEN_1        512    // 0000 0010 0000 0000
-#define GFZ_STRIDE_LEN_2        1024   // 0000 0100 0000 0000
-#define GFZ_STRIDE_LEN_3        2048   // 0000 1000 0000 0000
-#define GFZ_STRIDE_LEN_4        4096   // 0001 0000 0000 0000
-#define GFZ_STRIDE_LEN_5        8192   // 0010 0000 0000 0000
-#define GFZ_STRIDE_LEN_6        16384  // 0100 0000 0000 0000
-#define GFZ_STRIDE_LEN_7        32768  // 1000 0000 0000 0000
-
-/* Dry run stuff - TODO: tune these values */
-
-#define GFZ_BAN_RATIO           0.3
+#define GFZ_BITFLIP             2           // 0000 0000 0000 0010
+#define GFZ_BYTEFLIP            4           // 0000 0000 0000 0100
+#define GFZ_ARITH               8           // 0000 0000 0000 1000
+#define GFZ_INTERESTING         16          // 0000 0000 0001 0000
+#define GFZ_CUSTOM_BUF          32          // 0000 0000 0010 0000
+#define GFZ_LEN_1               64          // 0000 0000 0100 0000
+#define GFZ_LEN_2               128         // 0000 0000 1000 0000
+#define GFZ_LEN_3               256         // 0000 0001 0000 0000
+#define GFZ_STRIDE_LEN_1        512         // 0000 0010 0000 0000
+#define GFZ_STRIDE_LEN_2        1024        // 0000 0100 0000 0000
+#define GFZ_STRIDE_LEN_3        2048        // 0000 1000 0000 0000
+#define GFZ_STRIDE_LEN_4        4096        // 0001 0000 0000 0000
+#define GFZ_STRIDE_LEN_5        8192        // 0010 0000 0000 0000
+#define GFZ_STRIDE_LEN_6        16384       // 0100 0000 0000 0000
+#define GFZ_STRIDE_LEN_7        32768       // 1000 0000 0000 0000
 
 /* Deterministic mutation combinations to use in dry run */
 

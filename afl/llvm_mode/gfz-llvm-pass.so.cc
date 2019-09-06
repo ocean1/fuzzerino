@@ -604,6 +604,12 @@ void AFLCoverage::instrumentOperands(Instruction *I) {
     Type *OT = Op->getType();
     bool is_pointer = OT->getTypeID() == Type::TypeID::PointerTyID;
 
+    std::string str;
+    raw_string_ostream rso(str);
+    OT->print(rso);
+    if ( StringRef(rso.str()).contains(StringRef("IO_FILE")) )
+      continue;
+
     // Don't instrument _pointer_ operands of GEP instructions,
     // at least until the point where the result is used
     if ( isGEP && OT->isPointerTy() )
@@ -680,6 +686,12 @@ void AFLCoverage::instrumentResult(Instruction *I) {
 
   // Don't instrument results of instructions that are not used anywhere...
   if ( I->getNumUses() == 0 )
+    return;
+
+  std::string str;
+  raw_string_ostream rso(str);
+  IT->print(rso);
+  if ( StringRef(rso.str()).contains(StringRef("IO_FILE")) )
     return;
 
   // If the pointer is not 'eligible' for instrumentation,

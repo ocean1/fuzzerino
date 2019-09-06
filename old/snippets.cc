@@ -1,3 +1,16 @@
+if ( avg_exec < 100 ) {
+  if (!slow_since) {
+    slow_since = get_cur_time() - time_spent_minimizing;
+  } else if ( (get_cur_time() - time_spent_minimizing) > (slow_since + (GFZ_TMOUT_SEC * 1000)) ) {
+    __gfz_num_ban_map[loc] = 1;
+    ++__gfz_num_ban_locs;
+    slow_since = 0;
+    break;
+  }
+} else {
+  slow_since = 0;
+}
+
 /* BEGIN debugging stuff */
 
 fprintf(map_key_fd, "\n%s %d:\t%s", is_pointer ? "(ptr)" : "(num)", (is_pointer ? ptr_locs : num_locs) - 1, I->getOpcodeName());
