@@ -13,5 +13,5 @@ for seedfolder in $1/*; do
     done
     lcov --directory . --capture --output-file cov-${seedfolder##*/}.info
     genhtml cov-${seedfolder##*/}.info -o cov-${seedfolder##*/}
-    firefox cov-${seedfolder##*/}/upng-cov/index.html
+    firefox cov-${seedfolder##*/}/index.html
 done
