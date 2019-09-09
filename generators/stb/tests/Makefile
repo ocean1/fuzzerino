@@ -13,6 +13,10 @@ cleangfz:
 
 clean:
 	rm -rf image_write_test
+	rm -rf *.log
 	rm -rf ../out
-	rm -rf ../gfz.log
+	rm -rf ../*.log	
 	rm -rf ../gfz_plot_data
+	rm -rf ../gfz_bnc_ban
+	rm -rf ../gfz_num_ban
+	rm -rf ../gfz_ptr_ban

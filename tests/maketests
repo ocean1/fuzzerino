@@ -40,3 +40,4 @@ clean:
 	rm -f gtest ptest
 	rm -f *.o
 	rm -f *.ll
+	rm -f *.log
