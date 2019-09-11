@@ -136,20 +136,6 @@ FILE* rfd;
 u8* __gfz_rand_area = NULL;
 u32 __gfz_rand_idx;
 
-/* For debugging */
-
-void print_cmdline_at(u8 pos) {
-
-  if (pos >= GFZ_MAX_GEN_CMDLINES)
-    return;
-
-  u32 i = 0;
-
-  for (i = 0; i < gen_cmdlines[pos].argc; ++i)
-    printf("%s ", gen_cmdlines[pos].argv[i]);
-
-}
-
 /* read line from 'fp' allocate *buffer NCHAR in size
  * realloc as necessary. Returns a pointer to *buffer
  * on success, NULL otherwise.

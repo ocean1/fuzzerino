@@ -1,1 +1,1 @@
-MALLOC_CHECK_=0 ../../afl/bin/afl-fuzz -i in -o out -m10000 -t2000 -g /dev/shm/miniz -p cmin_targets $@ -- ./miniz 16 16
+MALLOC_CHECK_=0 ../../afl/bin/afl-fuzz -i in -o out -m10000 -t2000 -g /dev/shm/miniz -p min_targets $@ -- ./miniz 16 16

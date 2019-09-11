@@ -1,0 +1,4 @@
+afl-clang-fast
+afl-clang-fast++
+*.o
+*.so

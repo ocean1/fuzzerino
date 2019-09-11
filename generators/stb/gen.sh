@@ -1,1 +1,1 @@
-MALLOC_CHECK_=0 ../../afl/bin/afl-fuzz -i in -o out -m10000 -t2000 -x png.dict -g /dev/shm/stb -p cmin_targets $@ -- ./tests/image_write_test
+MALLOC_CHECK_=0 ../../afl/bin/afl-fuzz -i in -o out -m10000 -t2000 -x png.dict -g /dev/shm/stb -p min_targets $@ -- ./tests/image_write_test

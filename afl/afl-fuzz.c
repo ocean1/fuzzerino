@@ -78,6 +78,12 @@
 #  define EXP_ST static
 #endif /* ^AFL_LIB */
 
+#ifndef SIMPLE_FILES
+#  define CASE_PREFIX "id:"
+#else
+#  define CASE_PREFIX "id_"
+#endif /* ^!SIMPLE_FILES */
+
 /* Lots of globals, but mostly for the status UI and other things where it
    really makes no sense to haul them around as function parameters. */
 
@@ -94,12 +100,15 @@ struct gfz_data __gfz_data;           /* gFuzz struct received from rt    */
 
 u16* __gfz_num_map;                   /* Numeric locations bitmap SHM     */
 u32  __gfz_num_locs = 0;              /* Number of numeric locations      */
+u32  __gfz_num_active = 0;            /* Number of active numeric locs    */
 
 u16* __gfz_ptr_map;                   /* Pointer locations bitmap SHM     */
-u32  __gfz_ptr_locs = 0;              /* Number of pointer locations      */ 
+u32  __gfz_ptr_locs = 0;              /* Number of pointer locations      */
+u32  __gfz_ptr_active = 0;            /* Number of active pointer locs    */ 
 
 u8*  __gfz_branch_map;                /* Branch locations bitmap SHM      */
 u32  __gfz_branch_locs = 0;           /* Number of branch locations       */
+u32  __gfz_branch_active = 0;         /* Number of active branch locs     */
 
 u8*  __gfz_ptr_buf;                   /* Buffer for ptr dict instrum. SHM */
 u8*  __gfz_dict_entries[
@@ -116,22 +125,29 @@ u32  __gfz_num_ban_locs = 0;          /* Number of numeric banned locs    */
 u32* __gfz_ptr_ban_map;               /* Pointer locations ban map        */
 u32  __gfz_ptr_ban_locs = 0;          /* Number of pointer banned locs    */
 
-EXP_ST u8 *gen_file,                  /* Generated file                   */
-          *gen_dir,                   /* Generated directory              */
-          *cmin_targets               /* afl-cmin target binary/ies       */
-              [GFZ_MAX_CMIN_TARGETS];
+u32* __gfz_bnc_ban_map;               /* Branch locations ban map         */
+u32  __gfz_bnc_ban_locs = 0;          /* Number of branch banned locs     */
 
-EXP_ST u8  gfuzz_mode,                /* Running in gfuzz mode?           */
-           gfz_is_havoc = 0,          /* Is gfuzz in havoc phase?         */
-           num_cmin_targets = 0,      /* Number of cmin target binaries   */
-           __gfz_num_cmdlines = 0,    /* Number of cmdlines               */
-           __gfz_cur_cmdline = 0;     /* Current cmdline                  */
+u32  __gfz_num_dry_execs = 0;         /* Number of numeric dry executions */
+u32  __gfz_ptr_dry_execs = 0;         /* Number of pointer dry executions */
+u32  __gfz_bnc_dry_execs = 0;         /* Number of branch dry executions  */
 
-EXP_ST u64 gen_total,                 /* Total number of generated seeds  */
-           gen_after_cmin,            /* Generated seeds after afl-cmin   */
-           gen_unique,                /* Number of unique seeds (afl-cmin)*/
-           max_unique,                /* Max unique seeds (afl-cmin)      */
-           last_seed_time;            /* ms time for most recent uniq seed*/
+int **min_fsrv_fds;                   /* Minimization forkservers fds     */
+int *min_cur_coverage;                /* Current min forkservers coverage */
+
+u8 *gen_file,                         /* Generated file                   */
+   *gen_dir,                          /* Generated directory              */
+   *min_targets                       /* minimization target binary/ies   */
+       [GFZ_MAX_MIN_TARGETS];
+
+u8  gfz_is_havoc = 0,                 /* Is gfuzz in havoc phase?         */
+    num_min_targets = 0,              /* Number of min target binaries    */
+    __gfz_num_cmdlines = 0,           /* Number of cmdlines               */
+    __gfz_cur_cmdline = 0;            /* Current cmdline                  */
+
+u64 gen_total,                        /* Total number of generated seeds  */
+    gen_unique,                       /* Number of unique seeds           */
+    last_seed_time;                   /* ms time for most recent uniq seed*/
 
 static s32 gfz_num_shm_id;            /* ID of num SHM region (gFuzz mode)*/
 static s32 gfz_ptr_shm_id;            /* ID of ptr SHM region (gFuzz mode)*/
@@ -149,7 +165,6 @@ EXP_ST u8 *in_dir,                    /* Input directory with test cases  */
           *sync_dir,                  /* Synchronization directory        */
           *sync_id,                   /* Fuzzer ID                        */
           *use_banner,                /* Display banner                   */
-          *in_bitmap,                 /* Input bitmap                     */
           *doc_path,                  /* Path to documentation dir        */
           *target_path,               /* Path to target binary            */
           *orig_cmdline;              /* Original command line            */
@@ -254,6 +269,7 @@ static u8 *stage_name = "init",       /* Name of the current fuzz stage   */
           *syncing_party;             /* Currently syncing with...        */
 
 static double avg_exec;
+static double avg_crash;
 
 static s32 stage_cur, stage_max;      /* Stage progression                */
 static s32 splicing_with = -1;        /* Splicing with which test case?   */
@@ -321,9 +337,6 @@ static struct queue_entry *queue,     /* Fuzzing queue (linked list)      */
                           *queue_cur, /* Current offset within the queue  */
                           *queue_top, /* Top of the list                  */
                           *q_prev100; /* Previous 100 marker              */
-
-static struct queue_entry*
-  top_rated[MAP_SIZE];                /* Top entries for bitmap bytes     */
 
 struct extra_data {
   u8* data;                           /* Dictionary token data            */
@@ -804,38 +817,6 @@ static void mark_as_variable(struct queue_entry* q) {
 }
 
 
-/* Mark / unmark as redundant (edge-only). This is not used for restoring state,
-   but may be useful for post-processing datasets. */
-
-static void mark_as_redundant(struct queue_entry* q, u8 state) {
-
-  u8* fn;
-  s32 fd;
-
-  if (state == q->fs_redundant) return;
-
-  q->fs_redundant = state;
-
-  fn = strrchr(q->fname, '/');
-  fn = alloc_printf("%s/queue/.state/redundant_edges/%s", out_dir, fn + 1);
-
-  if (state) {
-
-    fd = open(fn, O_WRONLY | O_CREAT | O_EXCL, 0600);
-    if (fd < 0) PFATAL("Unable to create '%s'", fn);
-    close(fd);
-
-  } else {
-
-    if (unlink(fn)) PFATAL("Unable to remove '%s'", fn);
-
-  }
-
-  ck_free(fn);
-
-}
-
-
 /* Append new test case to the queue. */
 
 static void add_to_queue(u8* fname, u32 len, u8 passed_det) {
@@ -869,65 +850,6 @@ static void add_to_queue(u8* fname, u32 len, u8 passed_det) {
   }
 
   last_path_time = get_cur_time();
-
-}
-
-
-/* Destroy the entire queue. */
-
-EXP_ST void destroy_queue(void) {
-
-  struct queue_entry *q = queue, *n;
-
-  while (q) {
-
-    n = q->next;
-    ck_free(q->fname);
-    ck_free(q->trace_mini);
-    ck_free(q);
-    q = n;
-
-  }
-
-}
-
-
-/* Write bitmap to file. The bitmap is useful mostly for the secret
-   -B option, to focus a separate fuzzing session on a particular
-   interesting input without rediscovering all the others. */
-
-EXP_ST void write_bitmap(void) {
-
-  u8* fname;
-  s32 fd;
-
-  if (!bitmap_changed) return;
-  bitmap_changed = 0;
-
-  fname = alloc_printf("%s/fuzz_bitmap", out_dir);
-  fd = open(fname, O_WRONLY | O_CREAT | O_TRUNC, 0600);
-
-  if (fd < 0) PFATAL("Unable to open '%s'", fname);
-
-  ck_write(fd, virgin_bits, MAP_SIZE, fname);
-
-  close(fd);
-  ck_free(fname);
-
-}
-
-
-/* Read bitmap from file. This is for the -B option again. */
-
-EXP_ST void read_bitmap(u8* fname) {
-
-  s32 fd = open(fname, O_RDONLY);
-
-  if (fd < 0) PFATAL("Unable to open '%s'", fname);
-
-  ck_read(fd, virgin_bits, MAP_SIZE, fname);
-
-  close(fd);
 
 }
 
@@ -1299,127 +1221,13 @@ static void minimize_bits(u8* dst, u8* src) {
 }
 
 
-/* When we bump into a new path, we call this to see if the path appears
-   more "favorable" than any of the existing ones. The purpose of the
-   "favorables" is to have a minimal set of paths that trigger all the bits
-   seen in the bitmap so far, and focus on fuzzing them at the expense of
-   the rest.
-
-   The first step of the process is to maintain a list of top_rated[] entries
-   for every byte in the bitmap. We win that slot if there is no previous
-   contender, or if the contender has a more favorable speed x size factor. */
-
-static void update_bitmap_score(struct queue_entry* q) {
-
-  u32 i;
-  u64 fav_factor = q->exec_us * q->len;
-
-  /* For every byte set in trace_bits[], see if there is a previous winner,
-     and how it compares to us. */
-
-  for (i = 0; i < MAP_SIZE; i++)
-
-    if (trace_bits[i]) {
-
-       if (top_rated[i]) {
-
-         /* Faster-executing or smaller test cases are favored. */
-
-         if (fav_factor > top_rated[i]->exec_us * top_rated[i]->len) continue;
-
-         /* Looks like we're going to win. Decrease ref count for the
-            previous winner, discard its trace_bits[] if necessary. */
-
-         if (!--top_rated[i]->tc_ref) {
-           ck_free(top_rated[i]->trace_mini);
-           top_rated[i]->trace_mini = 0;
-         }
-
-       }
-
-       /* Insert ourselves as the new winner. */
-
-       top_rated[i] = q;
-       q->tc_ref++;
-
-       if (!q->trace_mini) {
-         q->trace_mini = ck_alloc(MAP_SIZE >> 3);
-         minimize_bits(q->trace_mini, trace_bits);
-       }
-
-       score_changed = 1;
-
-     }
-
-}
-
-
-/* The second part of the mechanism discussed above is a routine that
-   goes over top_rated[] entries, and then sequentially grabs winners for
-   previously-unseen bytes (temp_v) and marks them as favored, at least
-   until the next run. The favored entries are given more air time during
-   all fuzzing steps. */
-
-static void cull_queue(void) {
-
-  struct queue_entry* q;
-  static u8 temp_v[MAP_SIZE >> 3];
-  u32 i;
-
-  if (dumb_mode || !score_changed) return;
-
-  score_changed = 0;
-
-  memset(temp_v, 255, MAP_SIZE >> 3);
-
-  queued_favored  = 0;
-  pending_favored = 0;
-
-  q = queue;
-
-  while (q) {
-    q->favored = 0;
-    q = q->next;
-  }
-
-  /* Let's see if anything in the bitmap isn't captured in temp_v.
-     If yes, and if it has a top_rated[] contender, let's use it. */
-
-  for (i = 0; i < MAP_SIZE; i++)
-    if (top_rated[i] && (temp_v[i >> 3] & (1 << (i & 7)))) {
-
-      u32 j = MAP_SIZE >> 3;
-
-      /* Remove all bits belonging to the current entry from temp_v. */
-
-      while (j--) 
-        if (top_rated[i]->trace_mini[j])
-          temp_v[j] &= ~top_rated[i]->trace_mini[j];
-
-      top_rated[i]->favored = 1;
-      queued_favored++;
-
-      if (!top_rated[i]->was_fuzzed) pending_favored++;
-
-    }
-
-  q = queue;
-
-  while (q) {
-    mark_as_redundant(q, !q->favored);
-    q = q->next;
-  }
-
-}
-
 /* Configure shared memory and virgin_bits. This is called at startup. */
 
 EXP_ST void setup_shm(void) {
 
   u8* shm_str;
 
-  if (!in_bitmap) memset(virgin_bits, 255, MAP_SIZE);
-
+  memset(virgin_bits, 255, MAP_SIZE);
   memset(virgin_tmout, 255, MAP_SIZE);
   memset(virgin_crash, 255, MAP_SIZE);
 
@@ -1553,32 +1361,6 @@ EXP_ST void gfz_setup_shm(void) {
 
 }
 
-/* Load postprocessor, if available. */
-
-static void setup_post(void) {
-
-  void* dh;
-  u8* fn = getenv("AFL_POST_LIBRARY");
-  u32 tlen = 6;
-
-  if (!fn) return;
-
-  ACTF("Loading postprocessor from '%s'...", fn);
-
-  dh = dlopen(fn, RTLD_NOW);
-  if (!dh) FATAL("%s", dlerror());
-
-  post_handler = dlsym(dh, "afl_postprocess");
-  if (!post_handler) FATAL("Symbol 'afl_postprocess' not found.");
-
-  /* Do a quick test. It's better to segfault now than later =) */
-
-  post_handler("hello", &tlen);
-
-  OKF("Postprocessor installed successfully.");
-
-}
-
 
 /* Read all testcases from the input directory, then queue them for testing.
    Called at startup. */
@@ -1701,245 +1483,6 @@ static int compare_extras_use_d(const void* p1, const void* p2) {
 }
 
 
-/* Read extras from a file, sort by size. */
-
-static void load_extras_file(u8* fname, u32* min_len, u32* max_len,
-                             u32 dict_level) {
-
-  FILE* f;
-  u8  buf[MAX_LINE];
-  u8  *lptr;
-  u32 cur_line = 0;
-
-  f = fopen(fname, "r");
-
-  if (!f) PFATAL("Unable to open '%s'", fname);
-
-  while ((lptr = fgets(buf, MAX_LINE, f))) {
-
-    u8 *rptr, *wptr;
-    u32 klen = 0;
-
-    cur_line++;
-
-    /* Trim on left and right. */
-
-    while (isspace(*lptr)) lptr++;
-
-    rptr = lptr + strlen(lptr) - 1;
-    while (rptr >= lptr && isspace(*rptr)) rptr--;
-    rptr++;
-    *rptr = 0;
-
-    /* Skip empty lines and comments. */
-
-    if (!*lptr || *lptr == '#') continue;
-
-    /* All other lines must end with '"', which we can consume. */
-
-    rptr--;
-
-    if (rptr < lptr || *rptr != '"')
-      FATAL("Malformed name=\"value\" pair in line %u.", cur_line);
-
-    *rptr = 0;
-
-    /* Skip alphanumerics and dashes (label). */
-
-    while (isalnum(*lptr) || *lptr == '_') lptr++;
-
-    /* If @number follows, parse that. */
-
-    if (*lptr == '@') {
-
-      lptr++;
-      if (atoi(lptr) > dict_level) continue;
-      while (isdigit(*lptr)) lptr++;
-
-    }
-
-    /* Skip whitespace and = signs. */
-
-    while (isspace(*lptr) || *lptr == '=') lptr++;
-
-    /* Consume opening '"'. */
-
-    if (*lptr != '"')
-      FATAL("Malformed name=\"keyword\" pair in line %u.", cur_line);
-
-    lptr++;
-
-    if (!*lptr) FATAL("Empty keyword in line %u.", cur_line);
-
-    /* Okay, let's allocate memory and copy data between "...", handling
-       \xNN escaping, \\, and \". */
-
-    extras = ck_realloc_block(extras, (extras_cnt + 1) *
-               sizeof(struct extra_data));
-
-    wptr = extras[extras_cnt].data = ck_alloc(rptr - lptr);
-
-    while (*lptr) {
-
-      char* hexdigits = "0123456789abcdef";
-
-      switch (*lptr) {
-
-        case 1 ... 31:
-        case 128 ... 255:
-          FATAL("Non-printable characters in line %u.", cur_line);
-
-        case '\\':
-
-          lptr++;
-
-          if (*lptr == '\\' || *lptr == '"') {
-            *(wptr++) = *(lptr++);
-            klen++;
-            break;
-          }
-
-          if (*lptr != 'x' || !isxdigit(lptr[1]) || !isxdigit(lptr[2]))
-            FATAL("Invalid escaping (not \\xNN) in line %u.", cur_line);
-
-          *(wptr++) =
-            ((strchr(hexdigits, tolower(lptr[1])) - hexdigits) << 4) |
-            (strchr(hexdigits, tolower(lptr[2])) - hexdigits);
-
-          lptr += 3;
-          klen++;
-
-          break;
-
-        default:
-
-          *(wptr++) = *(lptr++);
-          klen++;
-
-      }
-
-    }
-
-    extras[extras_cnt].len = klen;
-
-    if (extras[extras_cnt].len > MAX_DICT_FILE)
-      FATAL("Keyword too big in line %u (%s, limit is %s)", cur_line,
-            DMS(klen), DMS(MAX_DICT_FILE));
-
-    if (*min_len > klen) *min_len = klen;
-    if (*max_len < klen) *max_len = klen;
-
-    extras_cnt++;
-
-  }
-
-  fclose(f);
-
-}
-
-
-/* Read extras from the extras directory and sort them by size. */
-
-static void load_extras(u8* dir) {
-
-  DIR* d;
-  struct dirent* de;
-  u32 min_len = MAX_DICT_FILE, max_len = 0, dict_level = 0;
-  u8* x;
-
-  /* If the name ends with @, extract level and continue. */
-
-  if ((x = strchr(dir, '@'))) {
-
-    *x = 0;
-    dict_level = atoi(x + 1);
-
-  }
-
-  ACTF("Loading extra dictionary from '%s' (level %u)...", dir, dict_level);
-
-  d = opendir(dir);
-
-  if (!d) {
-
-    if (errno == ENOTDIR) {
-      load_extras_file(dir, &min_len, &max_len, dict_level);
-      goto check_and_sort;
-    }
-
-    PFATAL("Unable to open '%s'", dir);
-
-  }
-
-  if (x) FATAL("Dictionary levels not supported for directories.");
-
-  while ((de = readdir(d))) {
-
-    struct stat st;
-    u8* fn = alloc_printf("%s/%s", dir, de->d_name);
-    s32 fd;
-
-    if (lstat(fn, &st) || access(fn, R_OK))
-      PFATAL("Unable to access '%s'", fn);
-
-    /* This also takes care of . and .. */
-    if (!S_ISREG(st.st_mode) || !st.st_size) {
-
-      ck_free(fn);
-      continue;
-
-    }
-
-    if (st.st_size > MAX_DICT_FILE)
-      FATAL("Extra '%s' is too big (%s, limit is %s)", fn,
-            DMS(st.st_size), DMS(MAX_DICT_FILE));
-
-    if (min_len > st.st_size) min_len = st.st_size;
-    if (max_len < st.st_size) max_len = st.st_size;
-
-    extras = ck_realloc_block(extras, (extras_cnt + 1) *
-               sizeof(struct extra_data));
-
-    extras[extras_cnt].data = ck_alloc(st.st_size);
-    extras[extras_cnt].len  = st.st_size;
-
-    fd = open(fn, O_RDONLY);
-
-    if (fd < 0) PFATAL("Unable to open '%s'", fn);
-
-    ck_read(fd, extras[extras_cnt].data, st.st_size, fn);
-
-    close(fd);
-    ck_free(fn);
-
-    extras_cnt++;
-
-  }
-
-  closedir(d);
-
-check_and_sort:
-
-  if (!extras_cnt) FATAL("No usable files in '%s'", dir);
-
-  qsort(extras, extras_cnt, sizeof(struct extra_data), compare_extras_len);
-
-  OKF("Loaded %u extra tokens, size range %s to %s.", extras_cnt,
-      DMS(min_len), DMS(max_len));
-
-  if (max_len > 32)
-    WARNF("Some tokens are relatively large (%s) - consider trimming.",
-          DMS(max_len));
-
-  if (extras_cnt > MAX_DET_EXTRAS)
-    WARNF("More than %u tokens - will use them probabilistically.",
-          MAX_DET_EXTRAS);
-
-}
-
-
-
-
 /* Helper function for maybe_add_auto() */
 
 static inline u8 memcmp_nocase(u8* m1, u8* m2, u32 len) {
@@ -2056,96 +1599,6 @@ sort_a_extras:
 }
 
 
-/* Save automatically generated extras. */
-
-static void save_auto(void) {
-
-  u32 i;
-
-  if (!auto_changed) return;
-  auto_changed = 0;
-
-  for (i = 0; i < MIN(USE_AUTO_EXTRAS, a_extras_cnt); i++) {
-
-    u8* fn = alloc_printf("%s/queue/.state/auto_extras/auto_%06u", out_dir, i);
-    s32 fd;
-
-    fd = open(fn, O_WRONLY | O_CREAT | O_TRUNC, 0600);
-
-    if (fd < 0) PFATAL("Unable to create '%s'", fn);
-
-    ck_write(fd, a_extras[i].data, a_extras[i].len, fn);
-
-    close(fd);
-    ck_free(fn);
-
-  }
-
-}
-
-
-/* Load automatically generated extras. */
-
-static void load_auto(void) {
-
-  u32 i;
-
-  for (i = 0; i < USE_AUTO_EXTRAS; i++) {
-
-    u8  tmp[MAX_AUTO_EXTRA + 1];
-    u8* fn = alloc_printf("%s/.state/auto_extras/auto_%06u", in_dir, i);
-    s32 fd, len;
-
-    fd = open(fn, O_RDONLY, 0600);
-
-    if (fd < 0) {
-
-      if (errno != ENOENT) PFATAL("Unable to open '%s'", fn);
-      ck_free(fn);
-      break;
-
-    }
-
-    /* We read one byte more to cheaply detect tokens that are too
-       long (and skip them). */
-
-    len = read(fd, tmp, MAX_AUTO_EXTRA + 1);
-
-    if (len < 0) PFATAL("Unable to read from '%s'", fn);
-
-    if (len >= MIN_AUTO_EXTRA && len <= MAX_AUTO_EXTRA)
-      maybe_add_auto(tmp, len);
-
-    close(fd);
-    ck_free(fn);
-
-  }
-
-  if (i) OKF("Loaded %u auto-discovered dictionary tokens.", i);
-  else OKF("No auto-generated dictionary tokens to reuse.");
-
-}
-
-
-/* Destroy extras. */
-
-static void destroy_extras(void) {
-
-  u32 i;
-
-  for (i = 0; i < extras_cnt; i++) 
-    ck_free(extras[i].data);
-
-  ck_free(extras);
-
-  for (i = 0; i < a_extras_cnt; i++) 
-    ck_free(a_extras[i].data);
-
-  ck_free(a_extras);
-
-}
-
-
 /* Spin up fork server (instrumented mode only). The idea is explained here:
 
    http://lcamtuf.blogspot.com/2014/10/fuzzing-binaries-without-execve.html
@@ -2202,10 +1655,8 @@ EXP_ST void init_forkserver(char** argv) {
 #endif /* ^RLIMIT_AS */
 
       /* limit output file(s) size */
-      if (gfuzz_mode) {
-        r.rlim_max = r.rlim_cur = GFZ_OUTPUT_LIMIT;
-        setrlimit(RLIMIT_FSIZE, &r);
-      }
+      r.rlim_max = r.rlim_cur = GFZ_OUTPUT_LIMIT;
+      setrlimit(RLIMIT_FSIZE, &r);
 
     }
 
@@ -2309,30 +1760,38 @@ EXP_ST void init_forkserver(char** argv) {
   if (rlen == 4) {
     OKF("All right - fork server is up.");
 
-    if (gfuzz_mode) {
-      rlen = read(fsrv_st_fd, &__gfz_data, sizeof(struct gfz_data));
+    rlen = read(fsrv_st_fd, &__gfz_data, sizeof(struct gfz_data));
 
-      if (rlen == sizeof(struct gfz_data)) {
-        __gfz_num_locs     = __gfz_data.gfz_num_locs - 1;
-        __gfz_ptr_locs     = __gfz_data.gfz_ptr_locs - 1;
-        __gfz_branch_locs  = __gfz_data.gfz_branch_locs - 1;
-        __gfz_total_bbs    = __gfz_data.gfz_total_bbs - 1;
-        __gfz_num_cmdlines = __gfz_data.gfz_num_cmdlines;
+    if (rlen == sizeof(struct gfz_data)) {
+      __gfz_num_locs     = __gfz_data.gfz_num_locs - 1;
+      __gfz_ptr_locs     = __gfz_data.gfz_ptr_locs - 1;
+      __gfz_branch_locs  = __gfz_data.gfz_branch_locs - 1;
+      __gfz_total_bbs    = __gfz_data.gfz_total_bbs - 1;
+      __gfz_num_cmdlines = __gfz_data.gfz_num_cmdlines;
 
-        OKF("Number of numeric locations: %d", __gfz_num_locs);
-        OKF("Number of pointer locations: %d", __gfz_ptr_locs);
-        OKF("Number of branch locations: %u", __gfz_branch_locs);
-        OKF("Number of basic blocks: %u", __gfz_total_bbs);
-        OKF("Number of cmdlines: %u", __gfz_num_cmdlines);
+      OKF("Number of numeric locations: %d", __gfz_num_locs);
+      OKF("Number of pointer locations: %d", __gfz_ptr_locs);
+      OKF("Number of branch locations: %u", __gfz_branch_locs);
+      OKF("Number of basic blocks: %u", __gfz_total_bbs);
+      OKF("Number of cmdlines: %u", __gfz_num_cmdlines);
 
-        /* Allocate and zero-initialize the maps of banned locations. */
+      /* Allocate and zero-initialize the maps of banned locations. */
 
-        __gfz_num_ban_map = calloc(__gfz_num_locs, sizeof(u32));
-        __gfz_ptr_ban_map = calloc(__gfz_ptr_locs, sizeof(u32));
+      __gfz_num_ban_map = calloc(__gfz_num_locs, sizeof(u32));
+      __gfz_ptr_ban_map = calloc(__gfz_ptr_locs, sizeof(u32));
+      __gfz_bnc_ban_map = calloc(__gfz_branch_locs, sizeof(u32));
 
-      } else {
-        FATAL("Unable to read __gfz_data from the forkserver!");
-      }
+      /* Calculate the number of dry execs for branch, num and ptr locations. */
+
+      u32 num_dry_standard = __gfz_num_locs * GFZ_NUM_DRY_NUMERIC;
+      u32 ptr_dry_standard = __gfz_ptr_locs * (GFZ_NUM_DRY_NUMERIC + __gfz_dict_len);
+
+      __gfz_num_dry_execs = __gfz_num_cmdlines * __gfz_branch_locs * num_dry_standard;
+      __gfz_ptr_dry_execs = __gfz_num_cmdlines * __gfz_branch_locs * ptr_dry_standard;
+      __gfz_bnc_dry_execs = __gfz_num_cmdlines * (num_dry_standard + ptr_dry_standard);
+      
+    } else {
+      FATAL("Unable to read __gfz_data from the forkserver!");
     }
 
     return;
@@ -2681,6 +2140,8 @@ static u8 run_target(char** argv, u32 timeout, u32 change_cmdline) {
 
 static void write_to_testcase(void* mem, u32 len) {
 
+  return;
+
   s32 fd = out_fd;
 
   if (out_file) {
@@ -2794,13 +2255,8 @@ static u8 calibrate_case(char** argv, struct queue_entry* q, u8* use_mem,
 
     if (stop_soon || fault != crash_mode) goto abort_calibration;
 
-    if (!dumb_mode && !stage_cur && !count_bytes(trace_bits)) {
-      if (!gfuzz_mode){
-        fault = FAULT_NOINST;
-      }
-
+    if (!dumb_mode && !stage_cur && !count_bytes(trace_bits))
       goto abort_calibration;
-    }
 
     cksum = hash32(trace_bits, MAP_SIZE, HASH_CONST);
 
@@ -2852,8 +2308,6 @@ static u8 calibrate_case(char** argv, struct queue_entry* q, u8* use_mem,
 
   total_bitmap_size += q->bitmap_size;
   total_bitmap_entries++;
-
-  update_bitmap_score(q);
 
   /* If this case didn't result in new output from the instrumentation, tell
      parent. This is a non-critical problem, but something to warn the user
@@ -3079,10 +2533,6 @@ static void perform_dry_run(char** argv) {
       case FAULT_NOBITS: 
 
         useless_at_start++;
-
-        if (!in_bitmap && !shuffle_queue)
-          WARNF("No new instrumentation output, test case may be useless.");
-
         break;
 
     }
@@ -3109,129 +2559,6 @@ static void perform_dry_run(char** argv) {
   }
 
   OKF("All test cases processed.");
-
-}
-
-
-/* Helper function: link() if possible, copy otherwise. */
-
-static void link_or_copy(u8* old_path, u8* new_path) {
-
-  s32 i = link(old_path, new_path);
-  s32 sfd, dfd;
-  u8* tmp;
-
-  if (!i) return;
-
-  sfd = open(old_path, O_RDONLY);
-  if (sfd < 0) PFATAL("Unable to open '%s'", old_path);
-
-  dfd = open(new_path, O_WRONLY | O_CREAT | O_EXCL, 0600);
-  if (dfd < 0) PFATAL("Unable to create '%s'", new_path);
-
-  tmp = ck_alloc(64 * 1024);
-
-  while ((i = read(sfd, tmp, 64 * 1024)) > 0) 
-    ck_write(dfd, tmp, i, new_path);
-
-  if (i < 0) PFATAL("read() failed");
-
-  ck_free(tmp);
-  close(sfd);
-  close(dfd);
-
-}
-
-
-static void nuke_resume_dir(void);
-
-/* Create hard links for input test cases in the output directory, choosing
-   good names and pivoting accordingly. */
-
-static void pivot_inputs(void) {
-
-  struct queue_entry* q = queue;
-  u32 id = 0;
-
-  ACTF("Creating hard links for all input files...");
-
-  while (q) {
-
-    u8  *nfn, *rsl = strrchr(q->fname, '/');
-    u32 orig_id;
-
-    if (!rsl) rsl = q->fname; else rsl++;
-
-    /* If the original file name conforms to the syntax and the recorded
-       ID matches the one we'd assign, just use the original file name.
-       This is valuable for resuming fuzzing runs. */
-
-#ifndef SIMPLE_FILES
-#  define CASE_PREFIX "id:"
-#else
-#  define CASE_PREFIX "id_"
-#endif /* ^!SIMPLE_FILES */
-
-    if (!strncmp(rsl, CASE_PREFIX, 3) &&
-        sscanf(rsl + 3, "%06u", &orig_id) == 1 && orig_id == id) {
-
-      u8* src_str;
-      u32 src_id;
-
-      resuming_fuzz = 1;
-      nfn = alloc_printf("%s/queue/%s", out_dir, rsl);
-
-      /* Since we're at it, let's also try to find parent and figure out the
-         appropriate depth for this entry. */
-
-      src_str = strchr(rsl + 3, ':');
-
-      if (src_str && sscanf(src_str + 1, "%06u", &src_id) == 1) {
-
-        struct queue_entry* s = queue;
-        while (src_id-- && s) s = s->next;
-        if (s) q->depth = s->depth + 1;
-
-        if (max_depth < q->depth) max_depth = q->depth;
-
-      }
-
-    } else {
-
-      /* No dice - invent a new name, capturing the original one as a
-         substring. */
-
-#ifndef SIMPLE_FILES
-
-      u8* use_name = strstr(rsl, ",orig:");
-
-      if (use_name) use_name += 6; else use_name = rsl;
-      nfn = alloc_printf("%s/queue/id:%06u,orig:%s", out_dir, id, use_name);
-
-#else
-
-      nfn = alloc_printf("%s/queue/id_%06u", out_dir, id);
-
-#endif /* ^!SIMPLE_FILES */
-
-    }
-
-    /* Pivot to the new queue entry. */
-
-    link_or_copy(q->fname, nfn);
-    ck_free(q->fname);
-    q->fname = nfn;
-
-    /* Make sure that the passed_det value carries over, too. */
-
-    if (q->passed_det) mark_as_det_done(q);
-
-    q = q->next;
-    id++;
-
-  }
-
-  if (in_place_resume) nuke_resume_dir();
 
 }
 
@@ -3367,9 +2694,6 @@ static u8 save_if_interesting(char** argv, void* mem, u32 len, u8 fault) {
     }
 
     queue_top->exec_cksum = hash32(trace_bits, MAP_SIZE, HASH_CONST);
-
-    /* Try to calibrate inline; this also calls update_bitmap_score() when
-       successful. */
 
     res = calibrate_case(argv, queue_top, mem, queue_cycle - 1, 0);
 
@@ -3512,77 +2836,6 @@ keep_as_crash:
   ck_free(fn);
 
   return keeping;
-
-}
-
-
-/* When resuming, try to find the queue position to start from. This makes sense
-   only when resuming, and when we can find the original fuzzer_stats. */
-
-static u32 find_start_position(void) {
-
-  static u8 tmp[4096]; /* Ought to be enough for anybody. */
-
-  u8  *fn, *off;
-  s32 fd, i;
-  u32 ret;
-
-  if (!resuming_fuzz) return 0;
-
-  if (in_place_resume) fn = alloc_printf("%s/fuzzer_stats", out_dir);
-  else fn = alloc_printf("%s/../fuzzer_stats", in_dir);
-
-  fd = open(fn, O_RDONLY);
-  ck_free(fn);
-
-  if (fd < 0) return 0;
-
-  i = read(fd, tmp, sizeof(tmp) - 1); (void)i; /* Ignore errors */
-  close(fd);
-
-  off = strstr(tmp, "cur_path          : ");
-  if (!off) return 0;
-
-  ret = atoi(off + 20);
-  if (ret >= queued_paths) ret = 0;
-  return ret;
-
-}
-
-
-/* The same, but for timeouts. The idea is that when resuming sessions without
-   -t given, we don't want to keep auto-scaling the timeout over and over
-   again to prevent it from growing due to random flukes. */
-
-static void find_timeout(void) {
-
-  static u8 tmp[4096]; /* Ought to be enough for anybody. */
-
-  u8  *fn, *off;
-  s32 fd, i;
-  u32 ret;
-
-  if (!resuming_fuzz) return;
-
-  if (in_place_resume) fn = alloc_printf("%s/fuzzer_stats", out_dir);
-  else fn = alloc_printf("%s/../fuzzer_stats", in_dir);
-
-  fd = open(fn, O_RDONLY);
-  ck_free(fn);
-
-  if (fd < 0) return;
-
-  i = read(fd, tmp, sizeof(tmp) - 1); (void)i; /* Ignore errors */
-  close(fd);
-
-  off = strstr(tmp, "exec_timeout   : ");
-  if (!off) return;
-
-  ret = atoi(off + 17);
-  if (ret <= 4) return;
-
-  exec_tmout = ret;
-  timeout_given = 3;
 
 }
 
@@ -3789,45 +3042,6 @@ static double get_runnable_processes(void) {
 #endif /* ^(__APPLE__ || __FreeBSD__ || __OpenBSD__) */
 
   return res;
-
-}
-
-
-/* Delete the temporary directory used for in-place session resume. */
-
-static void nuke_resume_dir(void) {
-
-  u8* fn;
-
-  fn = alloc_printf("%s/_resume/.state/deterministic_done", out_dir);
-  if (delete_files(fn, CASE_PREFIX)) goto dir_cleanup_failed;
-  ck_free(fn);
-
-  fn = alloc_printf("%s/_resume/.state/auto_extras", out_dir);
-  if (delete_files(fn, "auto_")) goto dir_cleanup_failed;
-  ck_free(fn);
-
-  fn = alloc_printf("%s/_resume/.state/redundant_edges", out_dir);
-  if (delete_files(fn, CASE_PREFIX)) goto dir_cleanup_failed;
-  ck_free(fn);
-
-  fn = alloc_printf("%s/_resume/.state/variable_behavior", out_dir);
-  if (delete_files(fn, CASE_PREFIX)) goto dir_cleanup_failed;
-  ck_free(fn);
-
-  fn = alloc_printf("%s/_resume/.state", out_dir);
-  if (rmdir(fn) && errno != ENOENT) goto dir_cleanup_failed;
-  ck_free(fn);
-
-  fn = alloc_printf("%s/_resume", out_dir);
-  if (delete_files(fn, CASE_PREFIX)) goto dir_cleanup_failed;
-  ck_free(fn);
-
-  return;
-
-dir_cleanup_failed:
-
-  FATAL("_resume directory cleanup failed");
 
 }
 
@@ -4080,93 +3294,9 @@ dir_cleanup_failed:
 
 static void check_term_size(void);
 
-/* More hacks! */
-
-void afl_cmin() {
-
-  int i = 0;
-  u8 *cmd;
-  u8 *min_dirs[GFZ_MAX_CMIN_TARGETS];
-
-  for (i = 0; i < num_cmin_targets; ++i) {
-
-    min_dirs[i] = alloc_printf("%s_min_%d", gen_dir, i);
-
-    /* Execute afl-cmin */
-
-    cmd = alloc_printf("env -i AFL_PATH=%s %s/afl-cmin -i %s -o %s -- %s >> /dev/null 2>> /dev/null",
-                       getenv("AFL_PATH"), getenv("AFL_PATH"), gen_dir, min_dirs[i], cmin_targets[i]);
-    system(cmd);
-    ck_free(cmd);
-
-  }
-
-  /* Delete generated dir */
-
-  cmd = alloc_printf("rm -rf %s", gen_dir);
-  system(cmd);
-  ck_free(cmd);
-
-  /* Rename first min dir to generated dir */
-
-  rename(min_dirs[0], gen_dir);
-  
-  if (num_cmin_targets > 1) {
-
-    /* Merge minimized folders */
-
-    for (i = 1; i < num_cmin_targets; ++i) {
-
-      cmd = alloc_printf("rsync -a %s/ %s/", min_dirs[i], gen_dir);
-      system(cmd);
-      ck_free(cmd);
-
-    }
-
-  }
-
-  /* Cleanup */
-
-  ck_free(min_dirs[0]);
-
-  for (i = 1; i < num_cmin_targets; ++i) {
-
-    cmd = alloc_printf("rm -rf %s", min_dirs[i]);
-    system(cmd);
-    ck_free(cmd);
-    ck_free(min_dirs[i]);
-
-  }
-
-  /* Count number of unique seeds */
-
-  struct dirent *dp;
-  DIR *dfd = opendir(gen_dir);
-
-  u64 count = 0;
-  
-  while (( dp = readdir(dfd) ))
-    if ( dp->d_type != DT_DIR )
-      ++count;
-
-  closedir(dfd);
-
-  if (count > gen_unique)
-    last_seed_time = get_cur_time();
-
-  gen_unique = count;
-  gen_after_cmin = 0;
-
-}
-
 void __gfz_update() {
 
   double local_avg_exec = avg_exec;
-
-  /* Minimize */
-
-  if (num_cmin_targets)
-    afl_cmin();
 
   /* Update bb coverage */
 
@@ -4195,19 +3325,19 @@ void __gfz_update() {
 
 static void show_stats(void) {
 
-  static u64 last_stats_ms, last_plot_ms, last_gfz_ms, last_ms, last_execs;
+  static u64 last_stats_ms, last_plot_ms, last_gfz_ms, last_ms, last_execs, last_crashes;
   double t_byte_ratio, stab_ratio;
 
   u64 cur_ms;
   u32 t_bytes, t_bits;
 
   u32 banner_len, banner_pad;
-  u8  tmp[256];
+  u8  tmp [256];
+  u8  tmp2[256];
 
   cur_ms = get_cur_time();
 
   /* If not enough time has passed since last UI update, bail out. */
-
   if (cur_ms - last_ms < 1000 / UI_TARGET_HZ) return;
 
   /* Check if we're past the 10 minute mark. */
@@ -4236,17 +3366,40 @@ static void show_stats(void) {
 
   }
 
+  /* Calculate smoothed crash stats. */
+
+  if (!last_crashes) {
+
+    avg_crash = ((double)(total_crashes + total_tmouts)) * 1000 / (cur_ms - start_time);
+
+  } else {
+
+    double cur_avg = ((double)(total_crashes + total_tmouts - last_crashes)) * 1000 /
+                     (cur_ms - last_ms);
+
+    /* If there is a dramatic (5x+) jump in speed, reset the indicator
+       more quickly. */
+
+    if (cur_avg * 5 < avg_crash || cur_avg / 5 > avg_crash)
+      avg_crash = cur_avg;
+
+    avg_crash = avg_crash * (1.0 - 1.0 / AVG_SMOOTHING) +
+                cur_avg * (1.0 / AVG_SMOOTHING);
+
+  }
+
   /* Every now and then, minimize, update bb coverage and write plot data. */
 
-  if ( (cur_ms - last_gfz_ms > GFZ_UPDATE_SEC * 1000) || (gen_after_cmin > GFZ_UPDATE_GEN) ) {
+  if ( cur_ms - last_gfz_ms > GFZ_UPDATE_SEC * 1000 ) {
 
-    __gfz_update();
     last_gfz_ms = cur_ms;
+    __gfz_update();
 
   }
 
   last_ms = cur_ms;
   last_execs = total_execs;
+  last_crashes = total_crashes + total_tmouts;
 
   /* Tell the callers when to contact us (as measured in execs). */
 
@@ -4269,8 +3422,6 @@ static void show_stats(void) {
 
     last_stats_ms = cur_ms;
     write_stats_file(t_byte_ratio, stab_ratio, avg_exec);
-    save_auto();
-    write_bitmap();
 
   }
 
@@ -4349,11 +3500,10 @@ static void show_stats(void) {
 
   SAYF(bV bSTOP "        run time : " cRST "%-59s" bSTG bV "\n", DTD(cur_ms, start_time));
 
-  if (!dumb_mode && (last_seed_time || resuming_fuzz || queue_cycle == 1 ||
-      in_bitmap || crash_mode))
+  if (!dumb_mode && (last_seed_time || resuming_fuzz || queue_cycle == 1 || crash_mode))
     SAYF(bV bSTOP "   last new seed : " cRST "%-59s" bSTG bV "\n", DTD(cur_ms, last_seed_time));
   else
-    SAYF(bV bSTOP "   last new seed : " cRST "none yet " cLRD "%-49s" bSTG bV "\n", "");
+    SAYF(bV bSTOP "   last new seed : " cRST "none yet " cLRD "%-49s " bSTG bV "\n", "");
 
   SAYF(bVR bH bSTOP cCYA " stats " bSTG bH30 bH30 bH10 bVL "\n");
 
@@ -4361,12 +3511,20 @@ static void show_stats(void) {
      together, but then cram them into a fixed-width field - so we need to
      put them in a temporary buffer first. */
 
-  sprintf(tmp, "%u (num), %u (ptr)", __gfz_num_locs, __gfz_ptr_locs);
+  sprintf(tmp,  "%u (num), %u (ptr)", __gfz_num_locs, __gfz_ptr_locs);
+  sprintf(tmp2, "%u (num), %u (ptr)", __gfz_num_active, __gfz_ptr_active);
 
-  SAYF(bV bSTOP "   locations : " cRST "%-23s", tmp);
-  SAYF("%-39s " bSTG bV "\n", "");
-  SAYF(bV bSTOP "    branches : " cRST "%-23s", DI(__gfz_branch_locs));
-  SAYF("%-39s " bSTG bV "\n", "");
+  SAYF(bV bSTOP "   locations : " cRST "%-23s" bSTG " " bSTOP
+    "       active : " cRST "%-23s" bSTG bV "\n", tmp, tmp2);
+  
+  sprintf(tmp, "%u, %u active", __gfz_branch_locs, __gfz_branch_active);
+  sprintf(tmp2, "%s/%s %s/%s %s/%s",
+    DI(__gfz_bnc_ban_locs), DI(__gfz_branch_locs),
+    DI(__gfz_num_ban_locs), DI(__gfz_num_locs),
+    DI(__gfz_ptr_ban_locs), DI(__gfz_ptr_locs));
+
+  SAYF(bV bSTOP "    branches : " cRST "%-23s" bSTG " " bSTOP
+    "  banned locs : " cRST "%-23s" bSTG bV "\n", tmp, tmp2);
 
   sprintf(tmp, "%s/%s (%0.02f%%)", DI(__gfz_covered), DI(__gfz_total_bbs),
           (double)__gfz_covered * 100 / __gfz_total_bbs);
@@ -4376,11 +3534,12 @@ static void show_stats(void) {
 
   /* Yeah... it's still going on... halp? */
 
-  sprintf(tmp, "%s (%0.02f%%)", DI(__gfz_num_ban_locs + __gfz_ptr_ban_locs),
-          (double)(__gfz_num_ban_locs + __gfz_ptr_ban_locs) * 100 / (__gfz_num_locs + __gfz_ptr_locs));
+  SAYF(bV bSTOP "  now trying : " cRST "%-21s " bSTG " " bSTOP, stage_name);
 
-  SAYF(bV bSTOP "  now trying : " cRST "%-21s " bSTG " " bSTOP 
-       "   banned locs : " cRST "%-22s " bSTG bV "\n", stage_name, tmp);
+  if (num_min_targets)
+    SAYF("  unique seeds : " cRST "%-22s " bSTG bV "\n", DI(gen_unique));
+  else
+    SAYF("%-40s" bSTG bV "\n", "");
 
   sprintf(tmp, "%s", DI(total_crashes));
 
@@ -4390,16 +3549,11 @@ static void show_stats(void) {
   sprintf(tmp, "%s/sec", DF(avg_exec));
   SAYF(bV bSTOP "  exec speed : " cRST "%-21s ", tmp);
 
-  sprintf(tmp, "%s", DI(total_tmouts));
-  SAYF(bSTG " " bSTOP "  total tmouts : " cRST "%-22s " bSTG bV "\n", tmp);
+  sprintf(tmp, "%s/sec", DF(avg_crash));
+  SAYF(bSTG " " bSTOP "   crash speed : " cRST "%-22s " bSTG bV "\n", tmp);
 
   SAYF(bV bSTOP "   generated : " cRST "%-21s " bSTG " " bSTOP, DI(gen_total));
-
-  if (num_cmin_targets) {
-    SAYF("  unique seeds : %s%-22s " bSTG bV "\n", cRST, DI(gen_unique));    
-  } else {
-    SAYF("%-40s" bSTG bV "\n", "");
-  }
+  SAYF("  total tmouts : %s%-22s " bSTG bV "\n", cRST, DI(total_tmouts));
 
   SAYF(bLB bH30 bH30 bH10 bH5 bH2 bH bRB bSTOP cRST RESET_G1 "\n%-56s", "");
 
@@ -4500,9 +3654,6 @@ static void show_init_stats(void) {
     else if (max_len > 10 * 1024)
       WARNF("Some test cases are big (%s) - see %s/perf_tips.txt.",
             DMS(max_len), doc_path);
-
-    if (useless_at_start && !in_bitmap)
-      WARNF(cLRD "Some test cases look useless. Consider using a smaller set.");
 
     if (queued_paths > 100)
       WARNF(cLRD "You probably have far too many input files! Consider trimming down.");
@@ -4644,9 +3795,6 @@ static u8 trim_case(char** argv, struct queue_entry* q, u8* in_buf) {
         memmove(in_buf + remove_pos, in_buf + remove_pos + trim_avail, 
                 move_tail);
 
-        /* Let's save a clean trace, which will be needed by
-           update_bitmap_score once we're done with the trimming stuff. */
-
         if (!needs_write) {
 
           needs_write = 1;
@@ -4684,7 +3832,6 @@ static u8 trim_case(char** argv, struct queue_entry* q, u8* in_buf) {
     close(fd);
 
     memcpy(trace_bits, clean_trace, MAP_SIZE);
-    update_bitmap_score(q);
 
   }
 
@@ -7315,23 +6462,6 @@ EXP_ST void setup_dirs_fds(void) {
 }
 
 
-/* Setup the output file for fuzzed data, if not using -f. */
-
-EXP_ST void setup_stdio_file(void) {
-
-  u8* fn = alloc_printf("%s/.cur_input", out_dir);
-
-  unlink(fn); /* Ignore errors */
-
-  out_fd = open(fn, O_RDWR | O_CREAT | O_EXCL, 0600);
-
-  if (out_fd < 0) PFATAL("Unable to create '%s'", fn);
-
-  ck_free(fn);
-
-}
-
-
 /* Make sure that core dumps don't go to a program. */
 
 static void check_crash_handling(void) {
@@ -7620,54 +6750,6 @@ static void check_asan_opts(void) {
 } 
 
 
-/* Detect @@ in args. */
-
-EXP_ST void detect_file_args(char** argv) {
-
-  u32 i = 0;
-  u8* cwd = getcwd(NULL, 0);
-
-  if (!cwd) PFATAL("getcwd() failed");
-
-  while (argv[i]) {
-
-    u8* aa_loc = strstr(argv[i], "@@");
-
-    if (aa_loc) {
-
-      u8 *aa_subst, *n_arg;
-
-      /* If we don't have a file name chosen yet, use a safe default. */
-
-      if (!out_file)
-        out_file = alloc_printf("%s/.cur_input", out_dir);
-
-
-      /* Be sure that we're always using fully-qualified paths. */
-
-      if (out_file[0] == '/') aa_subst = out_file;
-      else aa_subst = alloc_printf("%s/%s", cwd, out_file);
-
-      /* Construct a replacement argv value. */
-
-      *aa_loc = 0;
-      n_arg = alloc_printf("%s%s%s", argv[i], aa_subst, aa_loc + 2);
-      argv[i] = n_arg;
-      *aa_loc = '@';
-
-      if (out_file[0] != '/') ck_free(aa_subst);
-
-    }
-
-    i++;
-
-  }
-
-  free(cwd); /* not tracked */
-
-}
-
-
 /* Set up signal handlers. More complicated that needs to be, because libc on
    Solaris doesn't resume interrupted reads(), sets SA_RESETHAND when you call
    siginterrupt(), and does other stupid things. */
@@ -7854,13 +6936,13 @@ char *readline (FILE *fp, u8 **buffer)
     return *buffer;
 }
 
-void read_cmin_targets(char *file) {
+void read_min_targets(char *file) {
 
     FILE *fp = fopen(file, "r");
     if (!fp) PFATAL("error: file open failed '%s'.\n", file);
 
-    while ( readline(fp, &cmin_targets[num_cmin_targets]) )
-      ++num_cmin_targets;
+    while ( readline(fp, &min_targets[num_min_targets]) )
+      ++num_min_targets;
     
     fclose(fp);
 
@@ -8029,6 +7111,267 @@ u32 __gfz_load_dict(u8* fname) {
 
 }
 
+/* Try to read ban maps file(s) */
+
+void read_ban_maps() {
+
+  /* Numeric */
+
+  int num_ban_read_error = 0;
+
+  FILE *num_ban_fd = fopen("./gfz_num_ban", "rb");
+
+  if (num_ban_fd) {
+    ssize_t n_bytes = fread(__gfz_num_ban_map, __gfz_num_locs * sizeof(u32), 1, num_ban_fd);
+
+    if (n_bytes <= 0) {
+      num_ban_read_error = 1;
+    } else {
+      int i = 0;
+      for (i = 0; i < __gfz_num_locs; ++i)
+        if (__gfz_num_ban_map[i])
+          __gfz_num_ban_locs++;
+    }
+
+    fclose(num_ban_fd);
+  
+  } else {
+    num_ban_read_error = 1;
+  }
+
+  /* Pointer */
+
+  int ptr_ban_read_error = 0;
+
+  FILE *ptr_ban_fd = fopen("./gfz_ptr_ban", "rb");
+
+  if (ptr_ban_fd) {
+    ssize_t n_bytes = fread(__gfz_ptr_ban_map, __gfz_ptr_locs * sizeof(u32), 1, ptr_ban_fd);
+
+    if (n_bytes <= 0) {
+      ptr_ban_read_error = 1;
+    } else {
+      int i = 0;
+      for (i = 0; i < __gfz_ptr_locs; ++i)
+        if (__gfz_ptr_ban_map[i])
+          __gfz_ptr_ban_locs++;
+    }
+    
+    fclose(ptr_ban_fd);
+
+  } else {
+    ptr_ban_read_error = 1;
+  }
+
+  /* Branch */
+
+  int bnc_ban_read_error = 0;
+
+  FILE *bnc_ban_fd = fopen("./gfz_bnc_ban", "rb");
+
+  if (bnc_ban_fd) {
+    ssize_t n_bytes = fread(__gfz_bnc_ban_map, __gfz_branch_locs * sizeof(u32), 1, bnc_ban_fd);
+
+    if (n_bytes <= 0) {
+      bnc_ban_read_error = 1;
+    } else {
+      int i = 0;
+      for (i = 0; i < __gfz_branch_locs; ++i)
+        if (__gfz_bnc_ban_map[i])
+          __gfz_bnc_ban_locs++;
+    }
+    
+    fclose(bnc_ban_fd);
+
+  } else {
+    bnc_ban_read_error = 1;
+  }
+
+  if (!skip_deterministic &&
+    (num_ban_read_error + ptr_ban_read_error + bnc_ban_read_error) < 3) {
+    WARNF("Loaded ban map(s) but not skipping dry run! Are you sure?");
+  }
+
+}
+
+/* Ban all the locations! */
+
+void ban_hammer() {
+
+  u32 loc = 0;
+  double fault_to_exec_ratio;
+
+  for ( loc = 0; loc < __gfz_num_locs; ++loc ) {
+    fault_to_exec_ratio = (double)__gfz_num_ban_map[loc] / __gfz_num_dry_execs;
+
+    fprintf(log_file, "\n(num location %u):\t%u faults out of %u (%.2f).", loc,
+      __gfz_num_ban_map[loc], __gfz_num_dry_execs, fault_to_exec_ratio);
+    
+    if ( fault_to_exec_ratio > GFZ_FTE_BAN_RATIO ) {
+      __gfz_num_ban_map[loc] = 1;
+      __gfz_num_ban_locs++;
+    } else {
+      __gfz_num_ban_map[loc] = 0;
+    }
+  }
+
+  for ( loc = 0; loc < __gfz_ptr_locs; ++loc ) {
+    fault_to_exec_ratio = (double)__gfz_ptr_ban_map[loc] / __gfz_ptr_dry_execs;
+
+    fprintf(log_file, "\n(ptr location %u):\t%u faults out of %u (%.2f).", loc,
+      __gfz_ptr_ban_map[loc], __gfz_ptr_dry_execs, fault_to_exec_ratio);
+    
+    if ( fault_to_exec_ratio > GFZ_FTE_BAN_RATIO ) {
+      __gfz_ptr_ban_map[loc] = 1;
+      __gfz_ptr_ban_locs++;
+    } else {
+      __gfz_ptr_ban_map[loc] = 0;
+    }
+  }
+
+  for ( loc = 0; loc < __gfz_branch_locs; ++loc ) {
+    fault_to_exec_ratio = (double)__gfz_bnc_ban_map[loc] / __gfz_bnc_dry_execs;
+
+    fprintf(log_file, "\n(bnc location %u):\t%u faults out of %u (%.2f).", loc,
+      __gfz_bnc_ban_map[loc], __gfz_bnc_dry_execs, fault_to_exec_ratio);
+    
+    if ( fault_to_exec_ratio > GFZ_FTE_BAN_RATIO ) {
+      __gfz_bnc_ban_map[loc] = 1;
+      __gfz_bnc_ban_locs++;
+    } else {
+      __gfz_bnc_ban_map[loc] = 0;
+    }
+  }
+
+}
+
+/* Dump ban maps to files. */
+
+void dump_ban_maps() {
+
+  FILE *num_ban_file = fopen("./gfz_num_ban", "wb");
+  fwrite(__gfz_num_ban_map, __gfz_num_locs * sizeof(u32), 1, num_ban_file);
+  fclose(num_ban_file);
+
+  FILE *ptr_ban_file = fopen("./gfz_ptr_ban", "wb");
+  fwrite(__gfz_ptr_ban_map, __gfz_ptr_locs * sizeof(u32), 1, ptr_ban_file);
+  fclose(ptr_ban_file);
+
+  FILE *bnc_ban_file = fopen("./gfz_bnc_ban", "wb");
+  fwrite(__gfz_bnc_ban_map, __gfz_branch_locs * sizeof(u32), 1, bnc_ban_file);
+  fclose(bnc_ban_file);
+
+}
+
+/* Reset all mutation maps */
+
+void __gfz_reset_maps() {
+
+  int idx = 0;
+
+  for (idx = 0; idx < __gfz_num_locs; ++idx)
+    __gfz_num_map[idx] = GFZ_KEEP_ORIGINAL;
+
+  for (idx = 0; idx < __gfz_ptr_locs; ++idx)
+    __gfz_ptr_map[idx] = GFZ_KEEP_ORIGINAL;
+
+  for (idx = 0; idx < __gfz_branch_locs; ++idx)
+    __gfz_branch_map[idx] = GFZ_KEEP_ORIGINAL;
+
+  __gfz_num_active = 0;
+  __gfz_ptr_active = 0;
+  __gfz_branch_active = 0;
+
+}
+
+void init_min_fsrv(int i) {
+
+  u8  tmp[4];
+  u32 pid;
+  u8* min_target = min_targets[i];
+  u8* arguments[] = { min_target, gen_file, NULL };
+  u32 bytes = 0;
+
+  int st_pipe[2], ctl_pipe[2];
+  
+  if (pipe(st_pipe) || pipe(ctl_pipe)) PFATAL("pipe() failed");
+
+  pid = fork();
+
+  if (pid < 0) PFATAL("fork() failed");
+
+  if (!pid) {
+
+      struct rlimit r;
+
+      if (!getrlimit(RLIMIT_NOFILE, &r) && r.rlim_cur < FORKSRV_FD + 2) {
+
+          r.rlim_cur = FORKSRV_FD + 2;
+          setrlimit(RLIMIT_NOFILE, &r); /* Ignore errors */
+
+      }
+
+      if (dup2(ctl_pipe[0], FORKSRV_FD) < 0) PFATAL("dup2() failed");
+      if (dup2(st_pipe[1], FORKSRV_FD + 1) < 0) PFATAL("dup2() failed");
+
+      close(ctl_pipe[0]);
+      close(ctl_pipe[1]);
+      close(st_pipe[0]);
+      close(st_pipe[1]);
+
+      close(out_dir_fd);
+      close(dev_null_fd);
+      close(dev_urandom_fd);
+      close(fileno(plot_file));
+
+      /* This should improve performance a bit, since it stops the linker from
+       doing extra work post-fork(). */
+
+      if (!getenv("LD_BIND_LAZY")) setenv("LD_BIND_NOW", "1", 0);
+
+      /* Set sane defaults for ASAN if nothing else specified. */
+
+      setenv("ASAN_OPTIONS", "abort_on_error=1:"
+                             "detect_leaks=0:"
+                             "symbolize=0:"
+                             "allocator_may_return_null=1", 0);
+
+      /* MSAN is tricky, because it doesn't support abort_on_error=1 at this
+         point. So, we do this in a very hacky way. */
+
+      setenv("MSAN_OPTIONS", "exit_code=" STRINGIFY(MSAN_ERROR) ":"
+                             "symbolize=0:"
+                             "abort_on_error=1:"
+                             "allocator_may_return_null=1:"
+                             "msan_track_origins=0", 0);
+
+      execv(min_target, (char**) arguments);
+
+  } else {
+
+      close(ctl_pipe[0]);
+      close(st_pipe[1]);
+
+      min_fsrv_fds[i][0] = st_pipe[0];
+      min_fsrv_fds[i][1] = ctl_pipe[1];
+
+      // Ping forkserver
+
+      if (read(st_pipe[0], &tmp, 4) != 4) PFATAL("read() failed");
+      
+      // Ask for initial coverage
+
+      if (write(ctl_pipe[1], &tmp, 4) != 4) PFATAL("write() failed");
+      if (read(st_pipe[0], &bytes, 4) != 4) PFATAL("read() failed");
+
+      min_cur_coverage[i] = bytes;
+
+      OKF("%s coverage forkserver is up. Initial coverage: %u", min_target, min_cur_coverage[i]);
+
+  }
+
+}
+
 #ifndef AFL_LIB
 
 /* Main entry point */
@@ -8050,12 +7393,12 @@ int main(int argc, char** argv) {
 
   doc_path = access(DOC_PATH, F_OK) ? "docs" : DOC_PATH;
 
-  log_file = fopen("./gfz.log", "a");
+  log_file = fopen("./gfz.log", "w");
 
   gettimeofday(&tv, &tz);
   srandom(tv.tv_sec ^ tv.tv_usec ^ getpid());
 
-  while ((opt = getopt(argc, argv, "+i:o:f:m:t:T:dnCB:S:M:x:Q:Gg:p:c:")) > 0)
+  while ((opt = getopt(argc, argv, "+i:o:f:m:t:T:dnC:S:M:x:Q:g:p:c:")) > 0)
 
     switch (opt) {
 
@@ -8176,25 +7519,6 @@ int main(int argc, char** argv) {
         use_splicing = 1;
         break;
 
-      case 'B': /* load bitmap */
-
-        /* This is a secret undocumented option! It is useful if you find
-           an interesting test case during a normal fuzzing process, and want
-           to mutate it without rediscovering any of the test cases already
-           found during an earlier run.
-
-           To use this mode, you need to point -B to the fuzz_bitmap produced
-           by an earlier run for the exact same binary... and that's it.
-
-           I only used this once or twice to get variants of a particular
-           file, so I'm not making this an official setting. */
-
-        if (in_bitmap) FATAL("Multiple -B options not supported");
-
-        in_bitmap = optarg;
-        read_bitmap(in_bitmap);
-        break;
-
       case 'C': /* crash mode */
 
         if (crash_mode) FATAL("Multiple -C options not supported");
@@ -8223,25 +7547,16 @@ int main(int argc, char** argv) {
 
         break;
 
-      case 'G': /* gFuzz mode */
-
-        if (gfuzz_mode) FATAL("Multiple -G options not supported");
-        gfuzz_mode = 1;
-
-        if (!mem_limit_given) mem_limit = MEM_LIMIT;
-
-        break;
-
       case 'g': /* generated file (gFuzz mode) */
 
         if (gen_file) FATAL("Multiple -g options not supported");
         gen_file = optarg;
         break;
 
-      case 'p': /* afl-cmin target binary(ies) */
+      case 'p': /* minimization target binary(ies) */
 
-        if (num_cmin_targets) FATAL("Multiple -p options not supported");
-        read_cmin_targets(optarg);
+        if (num_min_targets) FATAL("Multiple -p options not supported");
+        read_min_targets(optarg);
         break;
 
       default:
@@ -8249,6 +7564,8 @@ int main(int argc, char** argv) {
         usage(argv[0]);
 
     }
+
+  if (!mem_limit_given) mem_limit = MEM_LIMIT;
 
   if (optind == argc || !in_dir || !out_dir) usage(argv[0]);
 
@@ -8304,7 +7621,6 @@ int main(int argc, char** argv) {
   check_crash_handling();
   check_cpu_governor();
 
-  setup_post();
   setup_shm();  
   gfz_setup_shm();
 
@@ -8312,17 +7628,11 @@ int main(int argc, char** argv) {
 
   setup_dirs_fds();
   read_testcases();
-  load_auto();
 
-  pivot_inputs();
-
-  if (extras_dir) load_extras(extras_dir);
-
-  if (!timeout_given) find_timeout();
-
-  detect_file_args(argv + optind + 1);
-
-  if (!out_file) setup_stdio_file();
+  if (extras_dir) {
+    __gfz_dict_len = __gfz_load_dict(extras_dir);
+    OKF("Read %u dictionary entries.", __gfz_dict_len);
+  }
 
   check_binary(argv[optind]);
 
@@ -8335,19 +7645,26 @@ int main(int argc, char** argv) {
 
   perform_dry_run(use_argv);
 
-  cull_queue();
-  
-  if (extras_dir) {
-    __gfz_dict_len = __gfz_load_dict(extras_dir);
-    OKF("Read %u dictionary entries.", __gfz_dict_len);
+  read_ban_maps();
+
+  if (num_min_targets) {
+    
+    int i = 0;
+
+    min_fsrv_fds = (int **)malloc(num_min_targets * sizeof(int*));
+    for(i = 0; i < num_min_targets; i++)
+      min_fsrv_fds[i] = (int *)malloc(2 * sizeof(int));
+
+    min_cur_coverage = (int *)malloc(num_min_targets * sizeof(int));
+
+    for (i = 0; i < num_min_targets; ++i)
+      init_min_fsrv(i);
+
   }
 
-  show_init_stats();
-  
-  seek_to = find_start_position();
-  
+  show_init_stats(); // All set and ready to roll!
+
   write_stats_file(0, 0, 0);
-  save_auto();
 
   if (stop_soon) goto stop_fuzzing;
 
@@ -8359,14 +7676,11 @@ int main(int argc, char** argv) {
     if (stop_soon) goto stop_fuzzing;
   }
 
-  if (gfuzz_mode)
-    goto gfuzz;
+  goto gfuzz;
 
   while (1) {
 
     u8 skipped_fuzz;
-
-    cull_queue();
 
     if (!queue_cur) {
 
@@ -8424,9 +7738,7 @@ int main(int argc, char** argv) {
 
   if (queue_cur) show_stats();
 
-  write_bitmap();
   write_stats_file(0, 0, 0);
-  save_auto();
 
 stop_fuzzing:
 
@@ -8446,11 +7758,6 @@ stop_fuzzing:
   fclose(plot_file);
   fclose(__gfz_plot_file);
   
-  if (!gfuzz_mode) {
-    destroy_queue();
-    destroy_extras();
-  }
-
   ck_free(target_path);
   ck_free(sync_id);
 
@@ -8464,46 +7771,21 @@ gfuzz:
 
   queue_cur = queue;
   
+  u8  tmp[4];
+
   u32 i = 0;
-  u8 fault;
-  u64 slow_since = 0;
+  u8  fault;
 
   struct stat st;
 
   gen_total = 0;
-  gen_after_cmin = 0;
   gen_unique = 0;
-  max_unique = 0;
 
   __gfz_plot_file = fopen("./gfz_plot_data", "w");
   if (!__gfz_plot_file) PFATAL("fopen() failed");
 
   fprintf(__gfz_plot_file, "# unix_time, generated, unique, coverage, "
                            "execs, crashes, tmouts, execs_sec, cmdline, havoc\n");
-
-  if (num_cmin_targets) {
-
-    /* 
-       If AFL_PATH is not set, try setting it to ../../afl/bin
-       since most generator scripts are ran from
-       <repository_root>/generators/<generator_name>
-    */
-
-    if(!getenv("AFL_PATH"))
-      setenv("AFL_PATH", "../../afl/bin", 1);
-
-    /* Check that afl-cmin and afl-showmap are found in AFL_PATH. */
-
-    u8 *cmin = alloc_printf("%s/afl-cmin", getenv("AFL_PATH"));
-    u8 *showmap = alloc_printf("%s/afl-showmap", getenv("AFL_PATH"));
-
-    if (access(cmin, X_OK) || access(showmap, X_OK))
-      FATAL("Unable to find 'afl-cmin' or 'afl-showmap'. Please set AFL_PATH.");
-
-    ck_free(cmin);
-    ck_free(showmap);
-
-  }
 
   if (gen_file) {
     /* Make generated dirs in the same file system where
@@ -8537,225 +7819,207 @@ gfuzz:
 
   if (!skip_deterministic) {
 
-    /* Try to read given ban maps file, if any */
-
-    int num_ban_read_error = 0;
-
-    FILE *num_ban_fd = fopen("./gfz_num_ban", "rb");
-
-    if (num_ban_fd) {
-      ssize_t n_bytes = fread(__gfz_num_ban_map, __gfz_num_locs * sizeof(u32), 1, num_ban_fd);
-
-      if (n_bytes <= 0) {
-        num_ban_read_error = 1;
-      } else {
-        int bb = 0;
-        for (bb = 0; bb < __gfz_num_locs; ++bb)
-          if (__gfz_num_ban_map[bb])
-            __gfz_num_ban_locs++;
-      }
-
-      fclose(num_ban_fd);
-    
-    } else {
-      num_ban_read_error = 1;
-    }
-
-    int ptr_ban_read_error = 0;
-
-    FILE *ptr_ban_fd = fopen("./gfz_ptr_ban", "rb");
-
-    if (ptr_ban_fd) {
-      ssize_t n_bytes = fread(__gfz_ptr_ban_map, __gfz_ptr_locs * sizeof(u16), 1, ptr_ban_fd);
-
-      if (n_bytes <= 0) {
-        ptr_ban_read_error = 1;
-      } else {
-        int bb = 0;
-        for (bb = 0; bb < __gfz_ptr_locs; ++bb)
-          if (__gfz_ptr_ban_map[bb])
-            __gfz_ptr_ban_locs++;
-      }
-      
-      fclose(ptr_ban_fd);
-
-    } else {
-      ptr_ban_read_error = 1;
-    }
-
-    if ( !num_ban_read_error && !ptr_ban_read_error )
-      goto gfz_havoc;
-
     //
     //   === Dry run actual start ===
     //
 
-    u8 tmp[21];
-    stage_name = tmp;
+    u8 stage_buf[21];
+    stage_name = stage_buf;
 
     u16 dry_numeric[] = { GFZ_DRY_NUMERIC };
     u16 dry_pointers[] = { GFZ_DRY_POINTERS };
 
-    u8 cmd = 0;
-    u32 branch = 0;
+    u8  cmd = 0;
+    s32 branch = 0;
     u32 loc = 0;
+    u8  min = 0;
+
+    u8  new_coverage = 0;
 
     for ( cmd = 0; cmd < __gfz_num_cmdlines; ++cmd ) {
 
-      for ( branch = 0; branch <= __gfz_branch_locs; ++branch ) {
+      for ( branch = -1; branch < (s32)__gfz_branch_locs; ++branch ) {
 
-        if (branch > 0)
-          __gfz_branch_map[branch - 1]++;
+        if (branch > -1) {
+          __gfz_branch_map[branch]++;
+          __gfz_branch_active++;
+        }
 
-        if ( num_ban_read_error ) {
+        /* Numeric phase */
 
-          /* Numeric phase */
+        for ( loc = 0; loc < __gfz_num_locs; ++loc ) {
 
-          for ( loc = 0; loc < __gfz_num_locs; ++loc ) {
+          sprintf(stage_buf, "dry %s/%u (num)", branch > -1 ? DI(branch) : (u8*)"-", loc);
+          
+          __gfz_num_active++;
 
-            if ( __gfz_num_ban_map[loc] == 0xffffffff )
-              continue;
+          for ( i = 0; i < GFZ_NUM_DRY_NUMERIC; ++i ) {
 
-            sprintf(tmp, "dry %s/%u (num)", branch ? DI(branch) : (u8*)"-", loc);
-            
-            for ( i = 0; i < GFZ_NUM_DRY_NUMERIC; ++i ) {
+            show_stats();
 
-              show_stats();
+            __gfz_num_map[loc] = dry_numeric[i];
 
-              __gfz_num_map[loc] = dry_numeric[i];
+            fault = run_target(use_argv, exec_tmout, 0);
 
-              fault = run_target(use_argv, exec_tmout, 0);
+            // Ask min forkservers for coverage
 
-              if ( gen_file && fault == FAULT_NONE && !stat(gen_file, &st) && st.st_size != 0 ) {
+            for (min = 0; min < num_min_targets; ++min) {
+              
+              u32 bytes = 0;
+
+              if (write(min_fsrv_fds[min][1], &tmp, 4) != 4) PFATAL("write() failed");
+              if (read(min_fsrv_fds[min][0], &bytes, 4) != 4) PFATAL("read() failed");
+
+              if (bytes > min_cur_coverage[min]) {
+                min_cur_coverage[min] = bytes;
+                new_coverage = 1;
+              }
+
+            }
+
+            if (    gen_file
+                 && fault == FAULT_NONE
+                 && !stat(gen_file, &st)
+                 && st.st_size != 0 ) {
+              
+              ++gen_total;
+
+              if (new_coverage) {
                 // Save output in gen_dir
-                u8 *fn = alloc_printf("%s/dry_%u_%s_%u_num%u", gen_dir, cmd, branch ? DI(branch) : (u8*)"no", loc, __gfz_num_map[loc]);
-                rename(gen_file, fn);
+                u8 *fn = alloc_printf("%s/dry_%u_%s_num%u_%u", gen_dir, cmd, branch > -1 ? DI(branch) : (u8*)"_", loc, __gfz_num_map[loc]);
+                if(rename(gen_file, fn))
+                  fprintf(log_file, "\nrename from %s to %s failed with error %s", gen_file, fn, strerror(errno));
                 ck_free(fn);
-                ++gen_total;
-                ++gen_after_cmin;
+                ++gen_unique;
+                last_seed_time = get_cur_time();
               }
+              
+            }
 
-              switch (fault) {
-                case FAULT_TMOUT:
-                  ++total_tmouts;
-                  ++__gfz_num_ban_map[loc];
-                  break;
-                case FAULT_CRASH:
-                  ++total_crashes;
-                  ++__gfz_num_ban_map[loc];
-                  break;
-              }
+            new_coverage = 0;
 
-              if (gen_file)
-                remove(gen_file);
+            switch (fault) {
+              case FAULT_TMOUT:
+                ++total_tmouts;
+                ++__gfz_num_ban_map[loc];
+                ++__gfz_bnc_ban_map[branch];
+                break;
+              case FAULT_CRASH:
+                ++total_crashes;
+                ++__gfz_num_ban_map[loc];
+                ++__gfz_bnc_ban_map[branch];
+                break;
+            }
 
-              if ( avg_exec < 100 ) {
-                if (!slow_since) {
-                  slow_since = get_cur_time();
-                } else if ( get_cur_time() > (slow_since + (GFZ_TMOUT_SEC * 1000)) ) {
-                  __gfz_num_ban_map[loc] = 0xffffffff;
-                  slow_since = 0;
-                  break;
-                }
-              } else {
-                slow_since = 0;
-              }
+            if (gen_file)
+              remove(gen_file);
 
-              if (stop_soon) {
-                __gfz_update();
-                show_stats();
-                goto stop_fuzzing;
-              }
-
-            } // end mutation loop
-
-            __gfz_num_map[loc] = GFZ_KEEP_ORIGINAL;
-
-          } // end location loop (numeric phase)
-
-        } // if ( num_ban_read_error )
-
-        if ( ptr_ban_read_error ) {
-
-          /* Pointer phase */
-
-          for ( loc = 0; loc < __gfz_ptr_locs; ++loc ) {
-
-            if ( __gfz_ptr_ban_map[loc] == 0xffff )
-              continue;
-
-            sprintf(tmp, "dry %s/%u (ptr)", branch ? DI(branch) : (u8*)"-", loc);
-            
-            for ( i = 0; i < GFZ_NUM_DRY_POINTERS + __gfz_dict_len; ++i ) {
-
+            if (stop_soon) {
+              __gfz_update();
               show_stats();
+              goto stop_fuzzing;
+            }
 
-              if (i < GFZ_NUM_DRY_POINTERS) {
+          } // end mutation loop
+
+          __gfz_num_map[loc] = GFZ_KEEP_ORIGINAL;
+          __gfz_num_active--;
+
+        } // end location loop (numeric phase)
+
+        /* Pointer phase */
+
+        for ( loc = 0; loc < __gfz_ptr_locs; ++loc ) {
+
+          sprintf(stage_buf, "dry %s/%u (ptr)", branch > -1 ? DI(branch) : (u8*)"-", loc);
+          
+          __gfz_ptr_active++;
+
+          for ( i = 0; i < GFZ_NUM_DRY_POINTERS + __gfz_dict_len; ++i ) {
+
+            show_stats();
+
+            if (i < GFZ_NUM_DRY_POINTERS) {
+            
+              __gfz_ptr_map[loc] = dry_pointers[i];
+            
+            } else {
               
-                __gfz_ptr_map[loc] = dry_pointers[i];
+              memcpy(__gfz_ptr_buf, __gfz_dict_entries[i - GFZ_NUM_DRY_POINTERS], GFZ_PTR_BUF_SIZE);
+              __gfz_ptr_map[loc] = GFZ_CUSTOM_BUF;
+
+            }
+
+            fault = run_target(use_argv, exec_tmout, 0);
+
+            // Ask min forkservers for coverage
+
+            for (min = 0; min < num_min_targets; ++min) {
               
-              } else {
-                
-                memcpy(__gfz_ptr_buf, __gfz_dict_entries[i - GFZ_NUM_DRY_POINTERS], GFZ_PTR_BUF_SIZE);
-                __gfz_ptr_map[loc] = GFZ_CUSTOM_BUF;
+              u32 bytes = 0;
 
+              if (write(min_fsrv_fds[min][1], &tmp, 4) != 4) PFATAL("write() failed");
+              if (read(min_fsrv_fds[min][0], &bytes, 4) != 4) PFATAL("read() failed");
+
+              if (bytes > min_cur_coverage[min]) {
+                min_cur_coverage[min] = bytes;
+                new_coverage = 1;
               }
 
-              fault = run_target(use_argv, exec_tmout, 0);
+            }
 
-              if ( fault == FAULT_NONE ) {
-                if ( gen_file && !stat(gen_file, &st) && st.st_size != 0 ) {
-                  // Save output in gen_dir
-                  u8 *fn = alloc_printf("%s/dry_%u_%s_%u_ptr%u", gen_dir, cmd, branch ? DI(branch) : (u8*)"no", loc, __gfz_ptr_map[loc]);
-                  rename(gen_file, fn);
-                  ck_free(fn);
-                  ++gen_total;
-                  ++gen_after_cmin;
-                }
+            if (    gen_file
+                 && fault == FAULT_NONE
+                 && !stat(gen_file, &st)
+                 && st.st_size != 0 ) {
+              
+              ++gen_total;
+
+              if (new_coverage) {
+                // Save output in gen_dir
+                u8 *fn = alloc_printf("%s/dry_%u_%s_ptr%u_%u", gen_dir, cmd, branch > -1 ? DI(branch) : (u8*)"_", loc, __gfz_ptr_map[loc]);
+                if(rename(gen_file, fn))
+                  fprintf(log_file, "\nrename from %s to %s failed with error %s", gen_file, fn, strerror(errno));
+                ck_free(fn);
+                ++gen_unique;
+                last_seed_time = get_cur_time();
               }
+              
+            }
 
-              switch (fault) {
-                case FAULT_TMOUT:
-                  ++total_tmouts;
-                  ++__gfz_ptr_ban_map[loc];
-                  break;
-                case FAULT_CRASH:
-                  ++total_crashes;
-                  ++__gfz_ptr_ban_map[loc];
-                  break;
-              }
+            switch (fault) {
+              case FAULT_TMOUT:
+                ++total_tmouts;
+                ++__gfz_ptr_ban_map[loc];
+                ++__gfz_bnc_ban_map[branch];
+                break;
+              case FAULT_CRASH:
+                ++total_crashes;
+                ++__gfz_ptr_ban_map[loc];
+                ++__gfz_bnc_ban_map[branch];
+                break;
+            }
 
-              if (gen_file)
-                remove(gen_file);
+            if (gen_file)
+              remove(gen_file);
 
-              if ( avg_exec < 100 ) {
-                if (!slow_since) {
-                  slow_since = get_cur_time();
-                } else if ( get_cur_time() > (slow_since + (GFZ_TMOUT_SEC * 1000)) ) {
-                  __gfz_ptr_ban_map[loc] = 0xffff;
-                  slow_since = 0;
-                  break;
-                }
-              } else {
-                slow_since = 0;
-              }
+            if (stop_soon) {
+              __gfz_update();
+              show_stats();
+              goto stop_fuzzing;
+            }
 
-              if (stop_soon) {
-                __gfz_update();
-                show_stats();
-                goto stop_fuzzing;
-              }
+          } // end mutation loop
 
-            } // end mutation loop
+          __gfz_ptr_map[loc] = GFZ_KEEP_ORIGINAL;
+          __gfz_ptr_active--;
 
-            __gfz_ptr_map[loc] = GFZ_KEEP_ORIGINAL;
+        } // end location loop (pointers phase)
 
-          } // end location loop (pointers phase)
-
-        } // if ( ptr_ban_read_error )
-
-        if (branch > 0)
-          __gfz_branch_map[branch - 1]--;
+        if (branch > -1) {
+          __gfz_branch_map[branch]--;
+          __gfz_branch_active--;
+        }
 
       } // end branch loop
 
@@ -8764,55 +8028,38 @@ gfuzz:
 
     } // end cmdline loop
 
-    for ( loc = 0; loc < __gfz_num_locs; ++loc ) {
-      fprintf(log_file, "\n num loc %u: %u faults out of %u (%.2f)", loc, __gfz_num_ban_map[loc], (__gfz_num_cmdlines * __gfz_branch_locs * GFZ_NUM_DRY_NUMERIC), (double)__gfz_num_ban_map[loc] / (__gfz_num_cmdlines * __gfz_branch_locs * GFZ_NUM_DRY_NUMERIC));
-      if ( (double)__gfz_num_ban_map[loc] / (__gfz_num_cmdlines * __gfz_branch_locs * GFZ_NUM_DRY_NUMERIC) > GFZ_FTE_BAN_RATIO ) {
-        __gfz_num_ban_map[loc] = 1;
-        __gfz_num_ban_locs++;
-      } else {
-        __gfz_num_ban_map[loc] = 0;
-      }
-    }
-
-    for ( loc = 0; loc < __gfz_ptr_locs; ++loc ) {
-      fprintf(log_file, "\n ptr loc %u: %u faults out of %u (%.2f)", loc, __gfz_ptr_ban_map[loc], (__gfz_num_cmdlines * __gfz_branch_locs * (GFZ_NUM_DRY_NUMERIC + __gfz_dict_len)), (double)__gfz_ptr_ban_map[loc] / (__gfz_num_cmdlines * __gfz_branch_locs * (GFZ_NUM_DRY_NUMERIC + __gfz_dict_len)));
-      if ( (double)__gfz_ptr_ban_map[loc] / (__gfz_num_cmdlines * __gfz_branch_locs * (GFZ_NUM_DRY_NUMERIC + __gfz_dict_len)) > GFZ_FTE_BAN_RATIO ) {
-        __gfz_ptr_ban_map[loc] = 1;
-        __gfz_ptr_ban_locs++;
-      } else {
-        __gfz_ptr_ban_map[loc] = 0;
-      }
-    }
-
-    /* Dump ban maps */
-
-    FILE *num_ban_file = fopen("./gfz_num_ban", "wb");
-    fwrite(__gfz_num_ban_map, __gfz_num_locs * sizeof(u32), 1, num_ban_file);
-    fclose(num_ban_file);
-
-    FILE *ptr_ban_file = fopen("./gfz_ptr_ban", "wb");
-    fwrite(__gfz_ptr_ban_map, __gfz_ptr_locs * sizeof(u32), 1, ptr_ban_file);
-    fclose(ptr_ban_file);
+    ban_hammer();
+    dump_ban_maps();
 
   } // if (!skip_deterministic)
+
+  if (__gfz_num_ban_locs >= __gfz_num_locs || __gfz_ptr_ban_locs >= __gfz_ptr_locs)
+    FATAL("Every numeric or pointer location is banned! Skipping havoc.\n"
+          "Please consider tweaking GFZ_FTE_BAN_RATIO.\n"
+          "(current value: %.2f)", GFZ_FTE_BAN_RATIO);
 
   //
   //   === HAVOC ===
   //
 
-gfz_havoc:
-
   i = 0;
-
+  
   u32 branch = 0;
+  u32 loc = 0;
+  u8  min = 0;
+  u8  new_coverage = 0;
+
+  u32 is_ptr_loc = 0;
+
   u32 branch_execs = 0;
   u32 cmdline_execs = 0;
   
-  u32 loc = 0;
-  u32 is_ptr_loc = 0;
-  
   stage_name = "havoc";
   gfz_is_havoc = 1;
+
+  u64 slow_since = 0;
+
+  __gfz_reset_maps();
 
   while ( 1 ) {
 
@@ -8842,15 +8089,26 @@ gfz_havoc:
 
     if (branch_execs > GFZ_HAVOC_BRANCH_EXECS) {
       
-      // Flip random branch location
+      // Flip random unbanned branch location
 
       branch = UR(__gfz_branch_locs);
+
+      while (__gfz_bnc_ban_map[branch])
+        branch = UR(__gfz_branch_locs);
       
-      if (__gfz_branch_map[branch] == 1)
+      // If it was disabled, enable it
+
+      if (__gfz_branch_map[branch] == 1) {
         __gfz_branch_map[branch] = 2;
+        __gfz_branch_active++;
+      }
+
+      // If it was enabled, disable it
       
-      else if (__gfz_branch_map[branch] == 2)
+      else if (__gfz_branch_map[branch] == 2) {
         __gfz_branch_map[branch] = 1;
+        __gfz_branch_active--;
+      }
 
       branch_execs = 0;
 
@@ -8865,11 +8123,17 @@ gfz_havoc:
 
       loc = UR(__gfz_num_locs);
 
-      if (!skip_deterministic)
-        while (__gfz_num_ban_map[loc])
-          loc = UR(__gfz_num_locs);
+      while (__gfz_num_ban_map[loc])
+        loc = UR(__gfz_num_locs);
+
+      u16 prev_loc = __gfz_num_map[loc];
 
       __gfz_num_map[loc] = UR(65536);
+
+      if ( prev_loc == GFZ_KEEP_ORIGINAL && __gfz_num_map[loc] != GFZ_KEEP_ORIGINAL )
+        __gfz_num_active++;
+      else if ( prev_loc != GFZ_KEEP_ORIGINAL && __gfz_num_map[loc] == GFZ_KEEP_ORIGINAL )
+        __gfz_num_active--;
 
     } else {
 
@@ -8877,11 +8141,17 @@ gfz_havoc:
 
       loc = UR(__gfz_ptr_locs);
 
-      if (!skip_deterministic)
-        while (__gfz_ptr_ban_map[loc])
-          loc = UR(__gfz_ptr_locs);
-      
+      while (__gfz_ptr_ban_map[loc])
+        loc = UR(__gfz_ptr_locs);
+    
+      u16 prev_loc = __gfz_ptr_map[loc];
+
       __gfz_ptr_map[loc] = UR(65536);
+
+      if ( prev_loc == GFZ_KEEP_ORIGINAL && __gfz_ptr_map[loc] != GFZ_KEEP_ORIGINAL )
+        __gfz_ptr_active++;
+      else if ( prev_loc != GFZ_KEEP_ORIGINAL && __gfz_ptr_map[loc] == GFZ_KEEP_ORIGINAL )
+        __gfz_ptr_active--;
 
     }
 
@@ -8898,19 +8168,49 @@ gfz_havoc:
     
     }
 
-    if ( gen_file && fault == FAULT_NONE && !stat(gen_file, &st) && st.st_size != 0 ) {
-      // Save output in gen_dir
-      u8 *fn = alloc_printf("%s/%d", gen_dir, i);
-      rename(gen_file, fn);
-      ck_free(fn);
+    // Ask min forkservers for coverage
+
+    for (min = 0; min < num_min_targets; ++min) {
+      
+      u32 bytes = 0;
+
+      if (write(min_fsrv_fds[min][1], &tmp, 4) != 4) PFATAL("write() failed");
+      if (read(min_fsrv_fds[min][0], &bytes, 4) != 4) PFATAL("read() failed");
+
+      if (bytes > min_cur_coverage[min]) {
+        min_cur_coverage[min] = bytes;
+        new_coverage = 1;
+      }
+
+    }
+
+    if (    gen_file
+         && fault == FAULT_NONE
+         && !stat(gen_file, &st)
+         && st.st_size != 0 ) {
+      
       ++gen_total;
-      ++gen_after_cmin;
+
+      if (new_coverage) {
+        // Save output in gen_dir
+        u8 *fn = alloc_printf("%s/%d", gen_dir, i);
+        rename(gen_file, fn);
+        ck_free(fn);
+        ++gen_unique;
+        last_seed_time = get_cur_time();
+      }
+          
     } else {
-      // Reset location      
-      if (is_ptr_loc)
+      
+      // Reset location
+      if ( is_ptr_loc && __gfz_ptr_map[loc] != GFZ_KEEP_ORIGINAL ) {
         __gfz_ptr_map[loc] = GFZ_KEEP_ORIGINAL;
-      else
+        __gfz_ptr_active--;
+      } else if ( __gfz_num_map[loc] != GFZ_KEEP_ORIGINAL ) {
         __gfz_num_map[loc] = GFZ_KEEP_ORIGINAL;
+        __gfz_num_active--;
+      }
+    
     }
 
     switch (fault) {
@@ -8928,20 +8228,8 @@ gfz_havoc:
     if ( avg_exec < 100 ) {
       if (!slow_since) {
         slow_since = get_cur_time();
-      } else if ( get_cur_time() > (slow_since + (GFZ_TMOUT_SEC * 1000)) ) {
-        // Reset all mutations
-
-        int idx = 0;
-
-        for (idx = 0; idx < __gfz_num_locs; ++idx)
-          __gfz_num_map[idx] = GFZ_KEEP_ORIGINAL;
-
-        for (idx = 0; idx < __gfz_ptr_locs; ++idx)
-          __gfz_ptr_map[idx] = GFZ_KEEP_ORIGINAL;
-
-        for (idx = 0; idx < __gfz_branch_locs; ++idx)
-          __gfz_branch_map[idx] = GFZ_KEEP_ORIGINAL;
-
+      } else if ( get_cur_time() > (slow_since + (GFZ_HAVOC_TMOUT_SEC * 1000)) ) {
+        __gfz_reset_maps();
         slow_since = 0;
       }
     } else {

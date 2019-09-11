@@ -71,19 +71,19 @@ fuzztest
 *.ll
 *.bc
 
+*.o
+*.log
+
 scratch
 
 xray-log.*
 
-*.o
-
-gfz.log
-
 gfz_num
 gfz_ptr
 gfz_bnc
-gfz_num_fault
-gfz_ptr_fault
+
 gfz_num_ban
 gfz_ptr_ban
+gfz_bnc_ban
+
 gfz_plot_data

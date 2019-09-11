@@ -49,6 +49,8 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/DataLayout.h"
+#include "llvm/IR/DebugLoc.h"
+#include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_os_ostream.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
@@ -79,6 +81,8 @@ public:
   // }
 
 private:
+  FILE *log_fd;
+
   /* Instrumented location ID and basic block ID.
      
      These are important and will be embedded in the final instrumented binary
@@ -664,6 +668,28 @@ void AFLCoverage::instrumentOperands(Instruction *I) {
 
     is_pointer ? ptr_locs++ : num_locs++;
 
+    /* BEGIN debugging stuff */
+
+    std::string strr;
+    raw_string_ostream rsoo(strr);
+    I->print(rsoo);
+
+    const llvm::DebugLoc &debugInfo = I->getDebugLoc();
+    DILocation *DI = debugInfo.get();
+    
+    fprintf(log_fd, "\n(%s location %d):", is_pointer ? "ptr" : "num", (is_pointer ? ptr_locs : num_locs) - 1);
+
+    if (DI != NULL) {
+      std::string filePath = debugInfo->getFilename();
+      int line = debugInfo->getLine();
+      int column = debugInfo->getColumn();
+      fprintf(log_fd, "\t%s, %d:%d, operand %d (%s)", filePath.c_str(), line, column, op_idx + 1, rsoo.str().c_str());
+    } else {
+      fprintf(log_fd, "\t??, operand %d (%s)", op_idx + 1, rsoo.str().c_str());
+    }
+
+    /* END debugging stuff */
+
   } // end op loop
 } // end instrumentOperands
 
@@ -743,6 +769,28 @@ void AFLCoverage::instrumentResult(Instruction *I) {
 
   is_pointer ? ptr_locs++ : num_locs++;
 
+  /* BEGIN debugging stuff */
+
+  std::string strr;
+  raw_string_ostream rsoo(strr);
+  I->print(rsoo);
+
+  const llvm::DebugLoc &debugInfo = I->getDebugLoc();
+  DILocation *DI = debugInfo.get();
+  
+  fprintf(log_fd, "\n(%s location %d):", is_pointer ? "ptr" : "num", (is_pointer ? ptr_locs : num_locs) - 1);
+
+  if (DI != NULL) {
+    std::string filePath = debugInfo->getFilename();
+    int line = debugInfo->getLine();
+    int column = debugInfo->getColumn();
+    fprintf(log_fd, "\t%s, %d:%d, result (%s)", filePath.c_str(), line, column, rsoo.str().c_str());
+  } else {
+    fprintf(log_fd, "\t??, result (%s)", rsoo.str().c_str());
+  }
+
+  /* END debugging stuff */
+
 } // end instrumentResult
 
 void AFLCoverage::instrumentBranch(Instruction *I) {
@@ -804,11 +852,31 @@ void AFLCoverage::instrumentBranch(Instruction *I) {
 
   branch_locs++;
 
+  /* BEGIN debugging stuff */
+
+  const llvm::DebugLoc &debugInfo = BI->getDebugLoc();
+  DILocation *DI = debugInfo.get();
+  
+  fprintf(log_fd, "\n(bnc location %d):", branch_locs - 1);
+
+  if (DI != NULL) {
+    std::string filePath = debugInfo->getFilename();
+    int line = debugInfo->getLine();
+    int column = debugInfo->getColumn();
+    fprintf(log_fd, "\t%s, %d:%d", filePath.c_str(), line, column);
+  } else {
+    fprintf(log_fd, "\t??");
+  }
+
+  /* END debugging stuff */
+
 } // end instrumentBranch
 
 
 
 bool AFLCoverage::runOnModule(Module &M) {
+
+  log_fd = fopen("locations.log", "a");
 
   LLVMContext &C = M.getContext();
 
@@ -867,6 +935,41 @@ bool AFLCoverage::runOnModule(Module &M) {
   for (auto &F : M)
     if (F.getSection() == ".fuzzables")
       WhitelistSet.insert(F.getName());
+
+  WhitelistSet.insert(StringRef("png_set_packing"));
+  WhitelistSet.insert(StringRef("png_set_bKGD"));
+  WhitelistSet.insert(StringRef("png_set_compression_level"));
+  WhitelistSet.insert(StringRef("png_init_io"));
+  WhitelistSet.insert(StringRef("png_set_IHDR"));
+  WhitelistSet.insert(StringRef("png_set_tIME"));
+  WhitelistSet.insert(StringRef("png_write_info"));
+  WhitelistSet.insert(StringRef("png_set_gAMA"));
+  WhitelistSet.insert(StringRef("png_set_text"));
+  WhitelistSet.insert(StringRef("png_set_text_2"));
+  WhitelistSet.insert(StringRef("png_set_gAMA_fixed"));
+  WhitelistSet.insert(StringRef("png_write_sCAL_s"));
+  WhitelistSet.insert(StringRef("png_write_info_before_PLTE"));
+  WhitelistSet.insert(StringRef("png_write_tRNS"));
+  WhitelistSet.insert(StringRef("png_write_eXIf"));
+  WhitelistSet.insert(StringRef("png_write_sPLT"));
+  WhitelistSet.insert(StringRef("png_write_iTXt"));
+  WhitelistSet.insert(StringRef("png_write_zTXt"));
+  WhitelistSet.insert(StringRef("png_write_tEXt"));
+  WhitelistSet.insert(StringRef("png_write_PLTE"));
+  WhitelistSet.insert(StringRef("png_write_bKGD"));
+  WhitelistSet.insert(StringRef("png_write_hIST"));
+  WhitelistSet.insert(StringRef("png_write_IHDR"));
+  WhitelistSet.insert(StringRef("png_write_pCAL"));
+  WhitelistSet.insert(StringRef("png_write_oFFs"));
+  WhitelistSet.insert(StringRef("png_write_pHYs"));
+  WhitelistSet.insert(StringRef("png_write_sig"));
+  WhitelistSet.insert(StringRef("write_unknown_chunks"));
+  WhitelistSet.insert(StringRef("png_chunk_report"));
+  WhitelistSet.insert(StringRef("png_colorspace_sync_info"));
+  WhitelistSet.insert(StringRef("png_get_libpng_ver"));
+  WhitelistSet.insert(StringRef("png_get_header_ver"));
+  WhitelistSet.insert(StringRef("png_fixed"));
+  WhitelistSet.insert(StringRef("writepng_init"));
 
   char *whitelist = getenv("GFZ_WHITE_LIST");
 
@@ -1109,6 +1212,8 @@ bool AFLCoverage::runOnModule(Module &M) {
 
   lock.l_type = F_UNLCK;
   fcntl(idfd, F_SETLKW, &lock);
+
+  fclose(log_fd);
 
   return true;
 

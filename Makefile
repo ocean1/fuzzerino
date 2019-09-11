@@ -1,9 +1,6 @@
-.PHONY: FORCE all clean generators
+.PHONY: FORCE all clean generators parsers
 
-all: afl gfz dogen generators
-
-afl:
-	CC=clang-6.0 make -C afl
+all: gfz dogen generators cov parsers
 
 gfz: afl
 	cd afl && ./mk.sh
@@ -16,8 +13,13 @@ generators:
 	make -C generators/miniz
 	make -C generators/stb/tests
 
-emit:
-	cd tests && ./emitall.sh
+cov:
+	cd afl-cov && ./mk.sh
+
+parsers:
+	cd parsers/libpng && CC=../../afl-cov/afl-clang-fast ./configure --disable-shared && make
+	cd parsers/libpng/contrib/libtests && ../../../../afl-cov/afl-clang-fast ./readpng.c -lm -lz ../../.libs/libpng16.a -o readpng
+	make -C parsers/picopng
 
 clean:
 	make -C afl clean
@@ -25,6 +27,12 @@ clean:
 	make -C generators/gif2apng clean
 	make -C generators/miniz clean
 	make -C generators/stb/tests clean
+	make -C afl-cov clean
+	make -C parsers/libpng clean
+	make -C parsers/picopng clean
+
+emit:
+	cd tests && ./emitall.sh
 
 cleanll: clean
 	make -C tests cleanll

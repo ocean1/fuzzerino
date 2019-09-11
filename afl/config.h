@@ -41,7 +41,7 @@
 /* Default timeout for fuzzed code (milliseconds). This is the upper bound,
    also used for detecting hangs; the actual value is auto-scaled: */
 
-#define EXEC_TIMEOUT        1000
+#define EXEC_TIMEOUT        2000
 
 /* Timeout rounding factor when auto-scaling (milliseconds): */
 
@@ -393,22 +393,21 @@
 
 #define GFZ_IDFILE              "/dev/shm/gfzidfile"
 
-/* Output file size limit (1GB) */
+/* Output file size limit (134MB) */
 
-#define GFZ_OUTPUT_LIMIT_POW2   30
+#define GFZ_OUTPUT_LIMIT_POW2   27
 #define GFZ_OUTPUT_LIMIT        (1 << GFZ_OUTPUT_LIMIT_POW2)
 
 /* Random stuff */
 
-#define GFZ_FTE_BAN_RATIO       0.3         /* Fault to exec ratio for banning a location during dry run(s)              */
-#define GFZ_UPDATE_GEN          10000       /* Max number of generated files before __gfz_update                         */
-#define GFZ_UPDATE_SEC          15          /* Time interval between calls to __gfz_update                               */
-#define GFZ_TMOUT_SEC           20          /* Time after which location is skipped (dry run) or mutations reset (havoc) */
-#define GFZ_MAX_DICT_ENTRIES    100         /* Maximum dictionary entries                                                */
+#define GFZ_FTE_BAN_RATIO       0.5         /* Fault to exec ratio for banning a location during dry run(s)              */
+#define GFZ_UPDATE_SEC          5           /* Time interval between coverage and plot file update                       */
+#define GFZ_HAVOC_TMOUT_SEC     40          /* Time after which, if consistently slow, maps are reset (havoc)            */
 #define GFZ_HAVOC_BRANCH_EXECS  1000        /* Number of executions between every branch location flip (havoc)           */
 #define GFZ_HAVOC_CMDLINE_EXECS 100000      /* Number of executions between every cmdline change (havoc)                 */
-#define GFZ_MAX_CMIN_TARGETS    10          /* Maximum afl-cmin targets                                                  */
-#define GFZ_MAX_GEN_CMDLINES    10          /* Maximum generator cmdlines (TODO)                                         */
+#define GFZ_MAX_DICT_ENTRIES    100         /* Maximum dictionary entries                                                */
+#define GFZ_MAX_MIN_TARGETS     10          /* Maximum minimization targets                                              */
+#define GFZ_MAX_GEN_CMDLINES    10          /* Maximum generator cmdlines                                                */
 
 /* Mutations */
 

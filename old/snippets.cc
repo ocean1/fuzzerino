@@ -1,11 +1,97 @@
+/* afl-cmin attempt: sucks */
+
+void afl_cmin() {
+
+  int i = 0;
+  u8 *cmd;
+  u8 *min_dirs[GFZ_MAX_MIN_TARGETS];
+
+  for (i = 0; i < num_min_targets; ++i) {
+
+    min_dirs[i] = alloc_printf("%s_min_%d", gen_dir, i);
+
+    // Execute afl-cmin
+
+    cmd = alloc_printf("env -i AFL_PATH=%s %s/afl-cmin -i %s -o %s -- %s >> /dev/null 2>> /dev/null",
+                       getenv("AFL_PATH"), getenv("AFL_PATH"), gen_dir, min_dirs[i], min_targets[i]);
+    system(cmd);
+    ck_free(cmd);
+
+  }
+
+  // Delete generated dir
+
+  cmd = alloc_printf("rm -rf %s", gen_dir);
+  system(cmd);
+  ck_free(cmd);
+
+  // Rename first min dir to generated dir
+
+  rename(min_dirs[0], gen_dir);
+  
+  if (num_min_targets > 1) {
+
+    // Merge minimized folders
+
+    for (i = 1; i < num_min_targets; ++i) {
+
+      cmd = alloc_printf("rsync -a %s/ %s/", min_dirs[i], gen_dir);
+      system(cmd);
+      ck_free(cmd);
+
+    }
+
+  }
+
+  // Cleanup
+
+  ck_free(min_dirs[0]);
+
+  for (i = 1; i < num_min_targets; ++i) {
+
+    cmd = alloc_printf("rm -rf %s", min_dirs[i]);
+    system(cmd);
+    ck_free(cmd);
+    ck_free(min_dirs[i]);
+
+  }
+
+  // Count number of unique seeds
+
+  struct dirent *dp;
+  DIR *dfd = opendir(gen_dir);
+
+  u64 count = 0;
+  
+  while (( dp = readdir(dfd) ))
+    if ( dp->d_type != DT_DIR )
+      ++count;
+
+  closedir(dfd);
+
+  if (count > gen_unique)
+    last_seed_time = get_cur_time();
+
+  gen_unique = count;
+  gen_after_cmin = 0;
+
+}
+
+/* Dry run ban attempt: sucks */
+
 if ( avg_exec < 100 ) {
   if (!slow_since) {
-    slow_since = get_cur_time() - time_spent_minimizing;
-  } else if ( (get_cur_time() - time_spent_minimizing) > (slow_since + (GFZ_TMOUT_SEC * 1000)) ) {
-    __gfz_num_ban_map[loc] = 1;
-    ++__gfz_num_ban_locs;
+    slow_since = get_cur_time();
+  } else if ( get_cur_time() > (slow_since + (GFZ_TMOUT_SEC * 1000)) ) {
+    //fprintf(log_file, "\nbanning branch %d. slow_since = %llu, cur time adjusted = %llu", branch, (u64)slow_since/1000, (u64)get_cur_time()/1000);
     slow_since = 0;
-    break;
+    if (branch > -1) {
+      __gfz_bnc_ban_map[branch] = 1;
+      __gfz_bnc_ban_locs++;
+    }
+    __gfz_num_map[loc] = GFZ_KEEP_ORIGINAL;
+    __gfz_num_active--;
+    goto skip_branch;
   }
 } else {
   slow_since = 0;
