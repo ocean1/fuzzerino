@@ -9,9 +9,9 @@ rm -rf cov*
 for seedfolder in $1/*; do
     lcov --directory . --zerocounters
     for seed in $seedfolder/*; do
-        ./pngdetail $seed > /dev/null 2> /dev/null
+        ./pngdetail -z -c -f -b -B -7 -r --mode=hex -l -i -p -h $seed > /dev/null 2> /dev/null
     done
     lcov --directory . --capture --output-file cov-${seedfolder##*/}.info
     genhtml cov-${seedfolder##*/}.info -o cov-${seedfolder##*/}
-    firefox cov-${seedfolder##*/}/index.html
+    firefox cov-${seedfolder##*/}/index.html&
 done
