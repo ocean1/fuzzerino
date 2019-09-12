@@ -2351,8 +2351,7 @@ unsigned lodepng_chunk_check_crc(const unsigned char* chunk) {
   unsigned CRC = lodepng_read32bitInt(&chunk[length + 8]);
   /*the CRC is taken of the data and the 4 chunk type letters, not the length*/
   unsigned checksum = lodepng_crc32(&chunk[4], length + 4);
-  if(CRC != checksum) return 1;
-  else return 0;
+  return 0;
 }
 
 void lodepng_chunk_generate_crc(unsigned char* chunk) {
@@ -3817,9 +3816,6 @@ unsigned lodepng_inspect(unsigned* w, unsigned* h, LodePNGState* state,
   if(!state->decoder.ignore_crc) {
     unsigned CRC = lodepng_read32bitInt(&in[29]);
     unsigned checksum = lodepng_crc32(&in[12], 17);
-    if(CRC != checksum) {
-      CERROR_RETURN_ERROR(state->error, 57); /*invalid CRC*/
-    }
   }
 
   return state->error;
