@@ -20,6 +20,7 @@ parsers:
 	cd parsers/libpng && CC=../../afl-cov/afl-clang-fast ./configure --disable-shared && make
 	cd parsers/libpng/contrib/libtests && ../../../../afl-cov/afl-clang-fast ./readpng.c -lm -lz ../../.libs/libpng16.a -o readpng
 	make -C parsers/picopng
+	make -C parsers/lodepng
 
 clean:
 	make -C afl clean
@@ -31,6 +32,7 @@ clean:
 	make -C parsers/libpng clean
 	rm -rf parsers/libpng/contrib/libtests/readpng
 	make -C parsers/picopng clean
+	make -C parsers/lodepng clean
 
 emit:
 	cd tests && ./emitall.sh

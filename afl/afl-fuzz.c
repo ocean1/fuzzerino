@@ -4823,6 +4823,8 @@ int main(int argc, char** argv) {
     u32 loc = 0;
     u8  min = 0;
 
+    u8 skipped_loc = 0;
+
     u8  new_coverage = 0;
 
     for ( cmd = 0; cmd < __gfz_num_cmdlines; ++cmd ) {
@@ -4921,6 +4923,7 @@ int main(int argc, char** argv) {
 
                 if (skipped_loc_streak < GFZ_SKIP_LOC_STREAK) {
                   skipped_loc_streak++;
+                  skipped_loc = 1;
                   break; // skip location
                 } else {
                   skipped_loc_streak = 0;
@@ -4939,6 +4942,9 @@ int main(int argc, char** argv) {
 
           __gfz_num_map[loc] = GFZ_KEEP_ORIGINAL;
           __gfz_num_active--;
+
+          if (!skipped_loc) skipped_loc_streak = 0;
+          skipped_loc = 0;
 
         } // end location loop (numeric phase)
 
@@ -5039,6 +5045,7 @@ int main(int argc, char** argv) {
 
                 if (skipped_loc_streak < GFZ_SKIP_LOC_STREAK) {
                   skipped_loc_streak++;
+                  skipped_loc = 1;
                   break; // skip location
                 } else {
                   skipped_loc_streak = 0;
@@ -5057,6 +5064,9 @@ int main(int argc, char** argv) {
 
           __gfz_ptr_map[loc] = GFZ_KEEP_ORIGINAL;
           __gfz_ptr_active--;
+
+          if (!skipped_loc) skipped_loc_streak = 0;
+          skipped_loc = 0;
 
         } // end location loop (pointers phase)
 
