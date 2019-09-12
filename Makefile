@@ -29,6 +29,7 @@ clean:
 	make -C generators/stb/tests clean
 	make -C afl-cov clean
 	make -C parsers/libpng clean
+	rm -rf parsers/libpng/contrib/libtests/readpng
 	make -C parsers/picopng clean
 
 emit:

@@ -315,8 +315,8 @@ static void edit_params(u32 argc, char** argv) {
     cc_params[cc_par_cnt++] = alloc_printf("%s/pmparser.o", obj_path);
 
     /* Add obj_path to search path for binaries and object files used implicitly. 
-       This replaces the linker with gfz-ld wrapper for injecting the number of
-       instrumented locations. */
+     This replaces the linker with gfz-ld wrapper for injecting the number of
+     instrumented locations. */
 
     cc_params[cc_par_cnt++] = "-B";
     cc_params[cc_par_cnt++] = obj_path;
