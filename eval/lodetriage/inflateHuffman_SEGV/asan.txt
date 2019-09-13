@@ -1,0 +1,24 @@
+This error is unrecoverable
+ASAN:DEADLYSIGNAL
+=================================================================
+==28750==ERROR: AddressSanitizer: SEGV on unknown address 0x000000000000 (pc 0x56232e367381 bp 0x7fff1287bb10 sp 0x7fff1287baf0 T0)
+==28750==The signal is caused by a READ memory access.
+==28750==Hint: address points to the zero page.
+    #0 0x56232e367380 in __gnu_cxx::new_allocator<unsigned char>::construct(unsigned char*, unsigned char const&) /usr/include/c++/7/ext/new_allocator.h:146
+    #1 0x56232e360746 in void __gnu_cxx::__alloc_traits<std::allocator<unsigned char> >::construct<unsigned char>(std::allocator<unsigned char>&, unsigned char*, unsigned char const&) /usr/include/c++/7/ext/alloc_traits.h:137
+    #2 0x56232e3608c6 in std::vector<unsigned char, std::allocator<unsigned char> >::_M_realloc_insert(__gnu_cxx::__normal_iterator<unsigned char*, std::vector<unsigned char, std::allocator<unsigned char> > >, unsigned char const&) /usr/include/c++/7/bits/vector.tcc:415
+    #3 0x56232e35d922 in std::vector<unsigned char, std::allocator<unsigned char> >::push_back(unsigned char const&) (/home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail+0x5e922)
+    #4 0x56232e35abf6 in lodepng::ExtractZlib::inflateHuffmanBlock(std::vector<unsigned char, std::allocator<unsigned char> >&, unsigned char const*, unsigned long&, unsigned long&, unsigned long, unsigned long) (/home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail+0x5bbf6)
+    #5 0x56232e357b9f in lodepng::ExtractZlib::inflate(std::vector<unsigned char, std::allocator<unsigned char> >&, std::vector<unsigned char, std::allocator<unsigned char> > const&, unsigned long) (/home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail+0x58b9f)
+    #6 0x56232e35b6aa in lodepng::ExtractZlib::decompress(std::vector<unsigned char, std::allocator<unsigned char> >&, std::vector<unsigned char, std::allocator<unsigned char> > const&) (/home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail+0x5c6aa)
+    #7 0x56232e35bed0 in lodepng::ExtractPNG::decode(unsigned char const*, unsigned long) (/home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail+0x5ced0)
+    #8 0x56232e355aba in lodepng::extractZlibInfo(std::vector<lodepng::ZlibBlockInfo, std::allocator<lodepng::ZlibBlockInfo> >&, std::vector<unsigned char, std::allocator<unsigned char> > const&) /home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/lodepng_util.cpp:1702
+    #9 0x56232e37278f in printZlibInfo(Data&, Options const&) /home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail.cpp:665
+    #10 0x56232e37e828 in showInfos(Data&, Options const&) /home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail.cpp:1292
+    #11 0x56232e37ffa8 in main /home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail.cpp:1407
+    #12 0x7fa40f607b96 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x21b96)
+    #13 0x56232e309409 in _start (/home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail+0xa409)
+
+AddressSanitizer can not provide additional info.
+SUMMARY: AddressSanitizer: SEGV /usr/include/c++/7/ext/new_allocator.h:146 in __gnu_cxx::new_allocator<unsigned char>::construct(unsigned char*, unsigned char const&)
+==28750==ABORTING
