@@ -93,7 +93,7 @@ struct gfz_data {
   u8 gfz_num_cmdlines;
 };
 
-struct gen_cmdline {
+struct cmdline {
   u32 argc;
   u8 **argv;
 };

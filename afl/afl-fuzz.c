@@ -145,9 +145,11 @@ u32 cov_status[2],                    /* Coverage and status of the last  */
     parser_tmouts;                    /* Total number of parser timeouts  */
 
 u8 *gen_file,                         /* Generated file                   */
-   *gen_dir,                          /* Generated directory              */
-   *min_targets                       /* minimization target binary/ies   */
-       [GFZ_MAX_MIN_TARGETS];
+   *min_file,                         /* Minimization targets file        */
+   *gen_dir;                          /* Generated directory              */
+
+struct cmdline min_cmdlines[GFZ_MAX_MIN_TARGETS];
+                                      /* minimization cmdlines            */
 
 u8  gfz_is_havoc = 0,                 /* Is gfuzz in havoc phase?         */
     num_min_targets = 0,              /* Number of min target binaries    */
@@ -4042,18 +4044,6 @@ char *readline (FILE *fp, u8 **buffer)
     return *buffer;
 }
 
-void read_min_targets(char *file) {
-
-    FILE *fp = fopen(file, "r");
-    if (!fp) PFATAL("error: file open failed '%s'.\n", file);
-
-    while ( readline(fp, &min_targets[num_min_targets]) )
-      ++num_min_targets;
-    
-    fclose(fp);
-
-}
-
 /* dirname - return directory part of PATH. */
 
 char *dirname (char *path)
@@ -4390,13 +4380,83 @@ void __gfz_reset_maps() {
 
 }
 
+/* Read extra cmdlines from file */
+
+void read_min_targets() {
+
+  u32 arg = 0;
+  u32 nargs = 4;
+  u8 *tmp, *pch;
+
+  FILE *fp = fopen(min_file, "r");
+  if (!fp) PFATAL("error: file open failed '%s'.\n", min_file);
+
+  while ( readline(fp, &tmp) ) {
+
+    arg = 0;
+    nargs = 4;
+    min_cmdlines[num_min_targets].argv = malloc(nargs * sizeof(u8*));
+    
+    pch = strtok(tmp, " ");
+
+    while ( pch != NULL ) {
+
+      if (arg >= nargs) {  /* realloc */
+        u8 **re = realloc(min_cmdlines[num_min_targets].argv, nargs * 2 * sizeof(u8*));
+        if (!re) {
+          fprintf(stderr, "error: realloc failed.\n");
+          free(tmp);
+          fclose(fp);
+          return;
+        }
+        min_cmdlines[num_min_targets].argv = re;
+        nargs *= 2;
+      }
+
+      min_cmdlines[num_min_targets].argv[arg] = malloc(strlen(pch) + 1);
+      strcpy(min_cmdlines[num_min_targets].argv[arg], pch);
+
+      ++arg;
+
+      pch = strtok(NULL, " ");
+
+    }
+
+    pch = gen_file; /* append gen_file to the end of the min cmdline */
+
+    if (arg >= nargs) {  /* realloc */
+      u8 **re = realloc(min_cmdlines[num_min_targets].argv, nargs * 2 * sizeof(u8*));
+      if (!re) {
+        fprintf(stderr, "error: realloc failed.\n");
+        free(tmp);
+        fclose(fp);
+        return;
+      }
+      min_cmdlines[num_min_targets].argv = re;
+      nargs *= 2;
+    }
+
+    min_cmdlines[num_min_targets].argv[arg] = malloc(strlen(pch) + 1);
+    strcpy(min_cmdlines[num_min_targets].argv[arg], pch);
+
+    ++arg;
+
+    min_cmdlines[num_min_targets].argc = arg;
+    ++num_min_targets;
+    free(tmp);
+
+  }
+  
+  fclose(fp);
+
+}
+
 void init_min_fsrv(int i) {
 
-  u8  tmp[4];
-  s32 pid;
-  s32 cpid;
-  u8* min_target = min_targets[i];
-  u8* arguments[] = { min_target, gen_file, NULL };
+  u8   tmp[4];
+  s32  pid;
+  s32  cpid;
+  u8** arguments = min_cmdlines[i].argv;
 
   int st_pipe[2], ctl_pipe[2];
   
@@ -4451,7 +4511,7 @@ void init_min_fsrv(int i) {
                              "allocator_may_return_null=1:"
                              "msan_track_origins=0", 0);
 
-      execv(min_target, (char**) arguments);
+      execv(arguments[0], (char**) arguments);
 
   } else {
 
@@ -4475,7 +4535,7 @@ void init_min_fsrv(int i) {
 
       cur_coverage[i] = cov_status[0];
 
-      OKF(       "%s coverage forkserver is up.", min_target);
+      OKF(       "%s coverage forkserver is up.", arguments[0]);
       printf("    Initial coverage: %u, pid: %d, cpid: %d, status: %d\n", cur_coverage[i], pid, cpid, cov_status[1]);
 
   }
@@ -4715,8 +4775,8 @@ int main(int argc, char** argv) {
 
       case 'p': /* minimization target binary(ies) */
 
-        if (num_min_targets) FATAL("Multiple -p options not supported");
-        read_min_targets(optarg);
+        if (min_file) FATAL("Multiple -p options not supported");
+        min_file = optarg;
         break;
 
       case 's': /* avg exec/s slow threshold */
@@ -4736,6 +4796,8 @@ int main(int argc, char** argv) {
   if (!slow_threshold) slow_threshold = 100;
 
   if (optind == argc || !in_dir || !out_dir) usage(argv[0]);
+
+  if (gen_file && min_file) read_min_targets();
 
   setup_signal_handlers();
   check_asan_opts();
