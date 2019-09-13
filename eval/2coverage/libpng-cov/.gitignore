@@ -6,6 +6,8 @@
 .libs/pngunknown
 .libs/pngvalid
 .libs/timepng
+.libs/libpng16.so.16
+.libs/libpng16.so.16.38.0
 config.log
 contrib/libtests/readpng
 png-fix-itxt

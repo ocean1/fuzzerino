@@ -24,6 +24,7 @@ parsers:
 	cd parsers/libpng/contrib/libtests && ../../../../afl-cov/afl-clang-fast ./readpng.c -lm -lz ../../.libs/libpng16.a -o readpng
 	make -C parsers/picopng
 	make -C parsers/lodepng
+	make -C parsers/pngquant
 
 clean:
 	make -C afl clean
@@ -38,6 +39,7 @@ clean:
 	rm -rf parsers/libpng/contrib/libtests/readpng
 	make -C parsers/picopng clean
 	make -C parsers/lodepng clean
+	make -C parsers/pngquant clean
 
 emit:
 	cd tests && ./emitall.sh
