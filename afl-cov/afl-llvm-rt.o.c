@@ -124,7 +124,7 @@ static void __afl_start_forkserver(void) {
   s32 child_pid;
   
   u8  tmp[4];
-  u32 bytes = 0;
+  u32 cov_status[2];
 
   /* Phone home and tell the parent that we're OK. If parent isn't there,
      assume we're not running in forkserver mode and just execute program. */
@@ -156,15 +156,18 @@ static void __afl_start_forkserver(void) {
 
     }
 
-    /* In parent process: wait for child. */
+    /* In parent process: write PID to pipe, then wait for child. */
+
+    if (write(FORKSRV_FD + 1, &child_pid, 4) != 4) _exit(1);
 
     if (waitpid(child_pid, &status, 0) < 0) _exit(1);
 
-    /* Count bytes in map, write them to pipe, then loop back. */
+    /* Count cov bytes in map. Write cov and status to pipe, then loop back. */
 
-    bytes = count_bytes(__afl_area_ptr);
+    cov_status[0] = count_bytes(__afl_area_ptr);
+    cov_status[1] = status;
 
-    if (write(FORKSRV_FD + 1, &bytes, 4) != 4) _exit(1);
+    if (write(FORKSRV_FD + 1, &cov_status[0], 8) != 8) _exit(1);
 
   }
 

@@ -10,6 +10,9 @@ dogen:
 
 generators:
 	make -C generators/gif2apng
+	rm -rf /dev/shm/gfzidfile
+	make -C generators/libpng-wpng
+	make -C generators/libpng-wpng/contrib/gregbook
 	make -C generators/miniz
 	make -C generators/stb/tests
 
@@ -26,6 +29,8 @@ clean:
 	make -C afl clean
 	make -C tests clean
 	make -C generators/gif2apng clean
+	make -C generators/libpng-wpng clean
+	make -C generators/libpng-wpng/contrib/gregbook clean
 	make -C generators/miniz clean
 	make -C generators/stb/tests clean
 	make -C afl-cov clean

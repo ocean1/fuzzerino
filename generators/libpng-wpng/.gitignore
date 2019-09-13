@@ -1,0 +1,17 @@
+png-fix-itxt
+pngcp
+pngfix
+pngimage
+pngstest
+pngtest
+pngunknown
+pngvalid
+timepng
+.libs/
+libpng.vers
+libpng16-config
+libpng16.pc
+pnglibconf.c
+pnglibconf.h
+pngprefix.h
+wpng-static

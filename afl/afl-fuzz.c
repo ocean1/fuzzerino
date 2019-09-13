@@ -128,12 +128,21 @@ u32  __gfz_ptr_ban_locs = 0;          /* Number of pointer banned locs    */
 u32* __gfz_bnc_ban_map;               /* Branch locations ban map         */
 u32  __gfz_bnc_ban_locs = 0;          /* Number of branch banned locs     */
 
-u32* __gfz_num_dry_execs;         /* Number of numeric dry executions */
-u32* __gfz_ptr_dry_execs;         /* Number of pointer dry executions */
-u32* __gfz_bnc_dry_execs;         /* Number of branch dry executions  */
+u32 *__gfz_num_dry_execs,             /* Number of numeric dry executions */
+    *__gfz_ptr_dry_execs,             /* Number of pointer dry executions */
+    *__gfz_bnc_dry_execs;             /* Number of branch dry executions  */
+
+u32 __gfz_num_skipped = 0,            /* Number of numeric skipped locs   */
+    __gfz_ptr_skipped = 0,            /* Number of pointer skipped locs   */
+    __gfz_bnc_skipped = 0;            /* Number of branch skipped locs    */
 
 int **min_fsrv_fds;                   /* Minimization forkservers fds     */
-int *min_cur_coverage;                /* Current min forkservers coverage */
+int *cur_coverage;                    /* Current min forkservers coverage */
+
+u32 cov_status[2],                    /* Coverage and status of the last  */
+                                      /*   get_cov_status() call          */
+    parser_crashes,                   /* Total number of parser crashes   */
+    parser_tmouts;                    /* Total number of parser timeouts  */
 
 u8 *gen_file,                         /* Generated file                   */
    *gen_dir,                          /* Generated directory              */
@@ -143,8 +152,9 @@ u8 *gen_file,                         /* Generated file                   */
 u8  gfz_is_havoc = 0,                 /* Is gfuzz in havoc phase?         */
     num_min_targets = 0,              /* Number of min target binaries    */
     __gfz_num_cmdlines = 0,           /* Number of cmdlines               */
-    __gfz_cur_cmdline = 0,            /* Current cmdline                  */
-    skipped_loc_streak = 0;           /* Number of skipped locs in a row  */
+    __gfz_cur_cmdline = 0;            /* Current cmdline                  */
+
+u32 slow_threshold = 0;               /* avg exec/s slow threshold        */
 
 u64 gen_total,                        /* Total number of generated seeds  */
     gen_unique,                       /* Number of unique seeds           */
@@ -2698,10 +2708,18 @@ void __gfz_update() {
      unix_time, generated, unique, coverage, execs, crashes, tmouts, execs_sec, cmdline, havoc */
 
   fprintf(__gfz_plot_file, 
-          "%llu, %llu, %llu, %u, %llu, %llu, %llu, %0.02f, %u, %u\n",
+          "%llu, %llu, %llu, %u, %llu, %llu, %llu, %0.02f, %u, %u",
           get_cur_time() / 1000, gen_total, gen_unique, __gfz_covered,
           total_execs, total_crashes, total_tmouts, local_avg_exec,
           __gfz_cur_cmdline, gfz_is_havoc);
+
+  if (num_min_targets) {
+    int i = 0;
+    for (i = 0; i < num_min_targets; ++i)
+      fprintf(__gfz_plot_file, ", %d", cur_coverage[i]);
+  }
+
+  fprintf(__gfz_plot_file, "\n");
 
   fflush(__gfz_plot_file);
 
@@ -2892,9 +2910,7 @@ static void show_stats(void) {
   else
     SAYF(bV bSTOP "   last new seed : " cRST "none yet " cLRD "%-49s " bSTG bV "\n", "");
 
-  sprintf(tmp, "%s (%u skipped in a row)", slow_since ? DTD(cur_ms, slow_since) : (u8*)"n/a",
-    skipped_loc_streak);
-  
+  sprintf(tmp, "%s", slow_since ? DTD(cur_ms, slow_since) : (u8*)"n/a");
   SAYF(bV bSTOP "      slow since : " cRST "%-59s" bSTG bV "\n", tmp);
 
   SAYF(bVR bH bSTOP cCYA " stats " bSTG bH30 bH30 bH10 bVL "\n");
@@ -2902,18 +2918,22 @@ static void show_stats(void) {
   /* This gets funny because we want to print several variable-length variables
      together, but then cram them into a fixed-width field - so we need to
      put them in a temporary buffer first. */
+  
+  sprintf(tmp,  "%u (num), %u (ptr)", __gfz_num_active, __gfz_ptr_active);
+  sprintf(tmp2, "%s (num), %s (ptr)", DI(__gfz_num_skipped), DI(__gfz_ptr_skipped));
+  SAYF(bV bSTOP "      active : " cRST "%-23s" bSTG " " bSTOP
+    "        skips : " cRST "%-23s" bSTG bV "\n", tmp, tmp2);
 
   sprintf(tmp,  "%u (num), %u (ptr)", __gfz_num_locs, __gfz_ptr_locs);
-  sprintf(tmp2, "%u (num), %u (ptr)", __gfz_num_active, __gfz_ptr_active);
-
+  sprintf(tmp2, "%s (branch)", DI(__gfz_bnc_skipped));
   SAYF(bV bSTOP "   locations : " cRST "%-23s" bSTG " " bSTOP
-    "       active : " cRST "%-23s" bSTG bV "\n", tmp, tmp2);
+    "                " cRST "%-23s" bSTG bV "\n", tmp, tmp2);
   
   sprintf(tmp, "%u, %u active", __gfz_branch_locs, __gfz_branch_active);
-  sprintf(tmp2, "%s/%s %s/%s %s/%s",
-    DI(__gfz_bnc_ban_locs), DI(__gfz_branch_locs),
-    DI(__gfz_num_ban_locs), DI(__gfz_num_locs),
-    DI(__gfz_ptr_ban_locs), DI(__gfz_ptr_locs));
+  sprintf(tmp2, "%u/%u %u/%u %u/%u",
+    __gfz_num_ban_locs, __gfz_num_locs,
+    __gfz_ptr_ban_locs, __gfz_ptr_locs,
+    __gfz_bnc_ban_locs, __gfz_branch_locs);
 
   SAYF(bV bSTOP "    branches : " cRST "%-23s" bSTG " " bSTOP
     "  banned locs : " cRST "%-23s" bSTG bV "\n", tmp, tmp2);
@@ -2926,26 +2946,31 @@ static void show_stats(void) {
 
   /* Yeah... it's still going on... halp? */
 
-  SAYF(bV bSTOP "  now trying : " cRST "%-21s " bSTG " " bSTOP, stage_name);
+  SAYF(bV bSTOP "  now trying : " cRST "%-21s " bSTG " " bSTOP
+       "%-40s" bSTG bV "\n", stage_name, "");
 
-  if (num_min_targets)
-    SAYF("  unique seeds : " cRST "%-22s " bSTG bV "\n", DI(gen_unique));
-  else
-    SAYF("%-40s" bSTG bV "\n", "");
-
-  sprintf(tmp, "%s", DI(total_crashes));
-
-  SAYF(bV bSTOP " total execs : " cRST "%-21s " bSTG " " bSTOP
-       " total crashes : %s%-22s " bSTG bV "\n", DI(total_execs), cRST, tmp);
+  SAYF(bV bH30 bH30 bH10 bH5 bH2 bH bV "\n");
 
   sprintf(tmp, "%s/sec", DF(avg_exec));
-  SAYF(bV bSTOP "  exec speed : " cRST "%-21s ", tmp);
+  SAYF(bV bSTOP "   gen execs : " cRST "%-21s " bSTG " " bSTOP
+       "    exec speed : " cRST "%-22s " bSTG bV "\n", DI(total_execs), tmp);
+  
+  sprintf(tmp2, "%s/sec", DF(avg_crash));  
+  SAYF(bV bSTOP "   gen crash : " cRST "%-21s " bSTG " " bSTOP
+       "   crash speed : " cRST "%-22s " bSTG bV "\n", DI(total_crashes), tmp2);
 
-  sprintf(tmp, "%s/sec", DF(avg_crash));
-  SAYF(bSTG " " bSTOP "   crash speed : " cRST "%-22s " bSTG bV "\n", tmp);
+  SAYF(bV bSTOP "   gen tmout : " cRST "%-21s " bSTG " " bSTOP
+       "%-39s " bSTG bV "\n", DI(total_tmouts), "");
 
-  SAYF(bV bSTOP "   generated : " cRST "%-21s " bSTG " " bSTOP, DI(gen_total));
-  SAYF("  total tmouts : %s%-22s " bSTG bV "\n", cRST, DI(total_tmouts));
+  SAYF(bV bSTOP "parser crash : " cRST "%-21s " bSTG " " bSTOP
+       "     generated : " cRST "%-22s " bSTG bV "\n", DI(parser_crashes), DI(gen_total));
+
+  SAYF(bV bSTOP "parser tmout : " cRST "%-22s " bSTG " " bSTOP, DI(parser_tmouts));
+
+  if (num_min_targets)
+    SAYF("       unique : " cRST "%-21s  " bSTG bV "\n", DI(gen_unique));
+  else
+    SAYF("%-39s" bSTG bV "\n", "");
 
   SAYF(bLB bH30 bH30 bH10 bH5 bH2 bH bRB bSTOP cRST RESET_G1 "\n%-56s", "");
 
@@ -4368,10 +4393,10 @@ void __gfz_reset_maps() {
 void init_min_fsrv(int i) {
 
   u8  tmp[4];
-  u32 pid;
+  s32 pid;
+  s32 cpid;
   u8* min_target = min_targets[i];
   u8* arguments[] = { min_target, gen_file, NULL };
-  u32 bytes = 0;
 
   int st_pipe[2], ctl_pipe[2];
   
@@ -4440,16 +4465,73 @@ void init_min_fsrv(int i) {
 
       if (read(st_pipe[0], &tmp, 4) != 4) PFATAL("read() failed");
       
-      // Ask for initial coverage
+      // Ask for initial coverage.
+      // (no timeout or crash checks: the user is supposed to check that
+      // the generation process starts with a well-formed generated file!)
 
       if (write(ctl_pipe[1], &tmp, 4) != 4) PFATAL("write() failed");
-      if (read(st_pipe[0], &bytes, 4) != 4) PFATAL("read() failed");
+      if (read(st_pipe[0], &cpid, 4) != 4) PFATAL("read() failed");
+      if (read(st_pipe[0], &cov_status[0], 8) != 8) PFATAL("read() failed");
 
-      min_cur_coverage[i] = bytes;
+      cur_coverage[i] = cov_status[0];
 
-      OKF("%s coverage forkserver is up. Initial coverage: %u", min_target, min_cur_coverage[i]);
+      OKF(       "%s coverage forkserver is up.", min_target);
+      printf("    Initial coverage: %u, pid: %d, cpid: %d, status: %d\n", cur_coverage[i], pid, cpid, cov_status[1]);
 
   }
+
+}
+
+/* min: index of the coverage forkserver in min_fsrv_fds. */
+
+u8 get_cov_status(u32 min, u32 timeout) {
+
+  static struct itimerval it;
+  u8  tmp[4];
+
+  child_timed_out = 0;
+
+  /* Tell coverage forkserver to have at it. */
+
+  if (write(min_fsrv_fds[min][1], &tmp, 4) != 4) PFATAL("write() failed");
+  
+  /* Read back child PID from forkserver. */
+
+  if (read(min_fsrv_fds[min][0], &child_pid, 4) != 4) PFATAL("read() failed");
+
+  /* Configure timeout, as requested by user, then wait for child to terminate. */
+
+  it.it_value.tv_sec = (timeout / 1000);
+  it.it_value.tv_usec = (timeout % 1000) * 1000;
+
+  setitimer(ITIMER_REAL, &it, NULL);
+
+  /* Read cov_status from the forkserver. */
+
+  if (read(min_fsrv_fds[min][0], &cov_status[0], 8) != 8) PFATAL("read() failed");
+
+  /* The SIGALRM handler simply kills the child_pid and sets child_timed_out. */
+
+  it.it_value.tv_sec = 0;
+  it.it_value.tv_usec = 0;
+
+  setitimer(ITIMER_REAL, &it, NULL);
+
+  /* Report outcome to caller. */
+
+  if (WIFSIGNALED(cov_status[1]) && !stop_soon) {
+
+    kill_signal = WTERMSIG(cov_status[1]);
+
+    if (child_timed_out && kill_signal == SIGKILL) {
+      return FAULT_TMOUT;
+    }
+
+    return FAULT_CRASH;
+
+  }
+
+  return FAULT_NONE;
 
 }
 
@@ -4476,7 +4558,7 @@ int main(int argc, char** argv) {
   gettimeofday(&tv, &tz);
   srandom(tv.tv_sec ^ tv.tv_usec ^ getpid());
 
-  while ((opt = getopt(argc, argv, "+i:o:f:m:t:T:dnC:S:M:x:Q:g:p:c:")) > 0)
+  while ((opt = getopt(argc, argv, "+i:o:f:m:t:T:dnC:S:M:x:Q:g:p:c:s:")) > 0)
 
     switch (opt) {
 
@@ -4625,7 +4707,7 @@ int main(int argc, char** argv) {
 
         break;
 
-      case 'g': /* generated file (gFuzz mode) */
+      case 'g': /* generated file */
 
         if (gen_file) FATAL("Multiple -g options not supported");
         gen_file = optarg;
@@ -4637,6 +4719,12 @@ int main(int argc, char** argv) {
         read_min_targets(optarg);
         break;
 
+      case 's': /* avg exec/s slow threshold */
+
+        if (slow_threshold) FATAL("Multiple -s options not supported");
+        slow_threshold = atoi(optarg);
+        break;
+
       default:
 
         usage(argv[0]);
@@ -4644,6 +4732,8 @@ int main(int argc, char** argv) {
     }
 
   if (!mem_limit_given) mem_limit = MEM_LIMIT;
+
+  if (!slow_threshold) slow_threshold = 100;
 
   if (optind == argc || !in_dir || !out_dir) usage(argv[0]);
 
@@ -4733,7 +4823,7 @@ int main(int argc, char** argv) {
     for(i = 0; i < num_min_targets; i++)
       min_fsrv_fds[i] = (int *)malloc(2 * sizeof(int));
 
-    min_cur_coverage = (int *)malloc(num_min_targets * sizeof(int));
+    cur_coverage = (int *)malloc(num_min_targets * sizeof(int));
 
     for (i = 0; i < num_min_targets; ++i)
       init_min_fsrv(i);
@@ -4760,8 +4850,6 @@ int main(int argc, char** argv) {
 
   queue_cur = queue;
   
-  u8  tmp[4];
-
   u32 i = 0;
   u8  fault;
 
@@ -4774,7 +4862,15 @@ int main(int argc, char** argv) {
   if (!__gfz_plot_file) PFATAL("fopen() failed");
 
   fprintf(__gfz_plot_file, "# unix_time, generated, unique, coverage, "
-                           "execs, crashes, tmouts, execs_sec, cmdline, havoc\n");
+                           "execs, crashes, tmouts, execs_sec, cmdline, havoc");
+
+  if (num_min_targets) {
+    int i = 0;
+    for (i = 0; i < num_min_targets; ++i)
+      fprintf(__gfz_plot_file, ", coverage%d", i);
+  }
+
+  fprintf(__gfz_plot_file, "\n");
 
   if (gen_file) {
     /* Make generated dirs in the same file system where
@@ -4823,9 +4919,14 @@ int main(int argc, char** argv) {
     u32 loc = 0;
     u8  min = 0;
 
-    u8 skipped_loc = 0;
+    u64 time_before_mutating = 0;
+    u64 cur_time = 0;
+
+    u64 num_max_dry_time = (double)GFZ_NUM_DRY_NUMERIC / slow_threshold * 1000;
+    u64 ptr_max_dry_time = (double)(GFZ_NUM_DRY_NUMERIC + __gfz_dict_len) / slow_threshold * 1000;
 
     u8  new_coverage = 0;
+    u8  min_faults = 0;
 
     for ( cmd = 0; cmd < __gfz_num_cmdlines; ++cmd ) {
 
@@ -4844,6 +4945,8 @@ int main(int argc, char** argv) {
           
           __gfz_num_active++;
 
+          time_before_mutating = get_cur_time();
+
           for ( i = 0; i < GFZ_NUM_DRY_NUMERIC; ++i ) {
 
             show_stats();
@@ -4855,18 +4958,25 @@ int main(int argc, char** argv) {
             if (branch > -1) __gfz_bnc_dry_execs[branch]++;
             __gfz_num_dry_execs[loc]++;
 
-            // Ask min forkservers for coverage
+            // Ask min forkservers for coverage and status
 
             for (min = 0; min < num_min_targets; ++min) {
-              
-              u32 bytes = 0;
+              get_cov_status(min, exec_tmout);
 
-              if (write(min_fsrv_fds[min][1], &tmp, 4) != 4) PFATAL("write() failed");
-              if (read(min_fsrv_fds[min][0], &bytes, 4) != 4) PFATAL("read() failed");
-
-              if (bytes > min_cur_coverage[min]) {
-                min_cur_coverage[min] = bytes;
+              if (cov_status[0] > cur_coverage[min]) {
+                cur_coverage[min] = cov_status[0];
                 new_coverage = 1;
+              }
+
+              switch (cov_status[1]) {
+                case FAULT_TMOUT:
+                  ++parser_tmouts;
+                  ++min_faults;
+                  break;
+                case FAULT_CRASH:
+                  ++parser_crashes;
+                  ++min_faults;
+                  break;
               }
 
             }
@@ -4878,9 +4988,11 @@ int main(int argc, char** argv) {
               
               ++gen_total;
 
-              if (new_coverage) {
+              if ( new_coverage || min_faults || !num_min_targets ) {
                 // Save output in gen_dir
-                u8 *fn = alloc_printf("%s/dry_%u_%s_num%u_%u", gen_dir, cmd, branch > -1 ? DI(branch) : (u8*)"_", loc, __gfz_num_map[loc]);
+                u8 *fn = alloc_printf("%s/dry_%u_%s_num%u_%u_%d", gen_dir, cmd,
+                  branch > -1 ? DI(branch) : (u8*)"_",
+                  loc, __gfz_num_map[loc], min_faults);
                 rename(gen_file, fn);
                 ck_free(fn);
                 ++gen_unique;
@@ -4890,6 +5002,7 @@ int main(int argc, char** argv) {
             }
 
             new_coverage = 0;
+            min_faults = 0;
 
             switch (fault) {
               case FAULT_TMOUT:
@@ -4913,38 +5026,36 @@ int main(int argc, char** argv) {
               goto stop_fuzzing;
             }
 
-            // Convoluted skipping mechanism
+            cur_time = get_cur_time();
 
-            if ( avg_exec < 100 ) {
+            // Branch skipping
+
+            if ( avg_exec < slow_threshold ) {
               if (!slow_since) {
-                slow_since = get_cur_time();
-              } else if ( get_cur_time() > (slow_since + (GFZ_TMOUT_SEC * 1000)) ) {
+                slow_since = cur_time;
+              } else if ( cur_time > (slow_since + (GFZ_TMOUT_SEC * 1000)) ) {
                 slow_since = 0;
-
-                if (skipped_loc_streak < GFZ_SKIP_LOC_STREAK) {
-                  skipped_loc_streak++;
-                  skipped_loc = 1;
-                  break; // skip location
-                } else {
-                  skipped_loc_streak = 0;
-
-                  __gfz_num_map[loc] = GFZ_KEEP_ORIGINAL;
-                  __gfz_num_active--;
-
-                  goto skip_branch;
-                }
+                // Deactivate location
+                __gfz_num_map[loc] = GFZ_KEEP_ORIGINAL;
+                __gfz_num_active--;
+                __gfz_bnc_skipped++;
+                goto skip_branch;
               }
             } else {
               slow_since = 0;
+            }
+
+            // Location skipping
+
+            if ( cur_time - time_before_mutating > num_max_dry_time ) {
+              __gfz_num_skipped++;
+              break;
             }
 
           } // end mutation loop
 
           __gfz_num_map[loc] = GFZ_KEEP_ORIGINAL;
           __gfz_num_active--;
-
-          if (!skipped_loc) skipped_loc_streak = 0;
-          skipped_loc = 0;
 
         } // end location loop (numeric phase)
 
@@ -4955,6 +5066,8 @@ int main(int argc, char** argv) {
           sprintf(stage_buf, "dry %s/%u (ptr)", branch > -1 ? DI(branch) : (u8*)"-", loc);
           
           __gfz_ptr_active++;
+
+          time_before_mutating = get_cur_time();
 
           for ( i = 0; i < GFZ_NUM_DRY_POINTERS + __gfz_dict_len; ++i ) {
 
@@ -4976,20 +5089,26 @@ int main(int argc, char** argv) {
             if (branch > -1) __gfz_bnc_dry_execs[branch]++;
             __gfz_ptr_dry_execs[loc]++;
 
-            // Ask min forkservers for coverage
+            // Ask min forkservers for coverage and status
 
             for (min = 0; min < num_min_targets; ++min) {
-              
-              u32 bytes = 0;
+              get_cov_status(min, exec_tmout);
 
-              if (write(min_fsrv_fds[min][1], &tmp, 4) != 4) PFATAL("write() failed");
-              if (read(min_fsrv_fds[min][0], &bytes, 4) != 4) PFATAL("read() failed");
-
-              if (bytes > min_cur_coverage[min]) {
-                min_cur_coverage[min] = bytes;
+              if (cov_status[0] > cur_coverage[min]) {
+                cur_coverage[min] = cov_status[0];
                 new_coverage = 1;
               }
 
+              switch (cov_status[1]) {
+                case FAULT_TMOUT:
+                  ++parser_tmouts;
+                  ++min_faults;
+                  break;
+                case FAULT_CRASH:
+                  ++parser_crashes;
+                  ++min_faults;
+                  break;
+              }
             }
 
             if (    gen_file
@@ -4999,12 +5118,13 @@ int main(int argc, char** argv) {
               
               ++gen_total;
 
-              if (new_coverage) {
+              if ( new_coverage || min_faults || !num_min_targets ) {
                 // Save output in gen_dir
-                u8 *fn = alloc_printf("%s/dry_%u_%s_ptr%u_%s%u", gen_dir, cmd,
+                u8 *fn = alloc_printf("%s/dry_%u_%s_ptr%u_%s%u_%d", gen_dir, cmd,
                   branch > -1 ? DI(branch) : (u8*)"_",
                   loc, i < GFZ_NUM_DRY_POINTERS ? "" : "dict",
-                  i < GFZ_NUM_DRY_POINTERS ? __gfz_ptr_map[loc] : i - GFZ_NUM_DRY_POINTERS);
+                  i < GFZ_NUM_DRY_POINTERS ? __gfz_ptr_map[loc] : i - GFZ_NUM_DRY_POINTERS,
+                  min_faults);
                 rename(gen_file, fn);
                 ck_free(fn);
                 ++gen_unique;
@@ -5012,6 +5132,9 @@ int main(int argc, char** argv) {
               }
               
             }
+
+            new_coverage = 0;
+            min_faults = 0;
 
             switch (fault) {
               case FAULT_TMOUT:
@@ -5035,38 +5158,36 @@ int main(int argc, char** argv) {
               goto stop_fuzzing;
             }
 
-            // Convoluted skipping mechanism
+            cur_time = get_cur_time();
 
-            if ( avg_exec < 100 ) {
+            // Branch skipping
+
+            if ( avg_exec < slow_threshold ) {
               if (!slow_since) {
-                slow_since = get_cur_time();
-              } else if ( get_cur_time() > (slow_since + (GFZ_TMOUT_SEC * 1000)) ) {
+                slow_since = cur_time;
+              } else if ( cur_time > (slow_since + (GFZ_TMOUT_SEC * 1000)) ) {
                 slow_since = 0;
-
-                if (skipped_loc_streak < GFZ_SKIP_LOC_STREAK) {
-                  skipped_loc_streak++;
-                  skipped_loc = 1;
-                  break; // skip location
-                } else {
-                  skipped_loc_streak = 0;
-
-                  __gfz_ptr_map[loc] = GFZ_KEEP_ORIGINAL;
-                  __gfz_ptr_active--;
-
-                  goto skip_branch;
-                }
+                // Deactivate location
+                __gfz_ptr_map[loc] = GFZ_KEEP_ORIGINAL;
+                __gfz_ptr_active--;
+                __gfz_bnc_skipped++;
+                goto skip_branch;
               }
             } else {
               slow_since = 0;
+            }
+
+            // Location skipping
+
+            if ( cur_time - time_before_mutating > ptr_max_dry_time ) {
+              __gfz_ptr_skipped++;
+              break;
             }
 
           } // end mutation loop
 
           __gfz_ptr_map[loc] = GFZ_KEEP_ORIGINAL;
           __gfz_ptr_active--;
-
-          if (!skipped_loc) skipped_loc_streak = 0;
-          skipped_loc = 0;
 
         } // end location loop (pointers phase)
 
@@ -5103,12 +5224,14 @@ skip_branch:
   u32 branch = 0;
   u32 loc = 0;
   u8  min = 0;
-  u8  new_coverage = 0;
 
   u32 is_ptr_loc = 0;
 
   u32 branch_execs = 0;
   u32 cmdline_execs = 0;
+
+  u8  new_coverage = 0;
+  u8  min_faults = 0;
   
   stage_name = "havoc";
   gfz_is_havoc = 1;
@@ -5224,18 +5347,25 @@ skip_branch:
     
     }
 
-    // Ask min forkservers for coverage
+    // Ask min forkservers for coverage and status
 
     for (min = 0; min < num_min_targets; ++min) {
-      
-      u32 bytes = 0;
+      get_cov_status(min, exec_tmout);
 
-      if (write(min_fsrv_fds[min][1], &tmp, 4) != 4) PFATAL("write() failed");
-      if (read(min_fsrv_fds[min][0], &bytes, 4) != 4) PFATAL("read() failed");
-
-      if (bytes > min_cur_coverage[min]) {
-        min_cur_coverage[min] = bytes;
+      if (cov_status[0] > cur_coverage[min]) {
+        cur_coverage[min] = cov_status[0];
         new_coverage = 1;
+      }
+
+      switch (cov_status[1]) {
+        case FAULT_TMOUT:
+          ++parser_tmouts;
+          ++min_faults;
+          break;
+        case FAULT_CRASH:
+          ++parser_crashes;
+          ++min_faults;
+          break;
       }
 
     }
@@ -5247,9 +5377,9 @@ skip_branch:
       
       ++gen_total;
 
-      if (new_coverage) {
+      if ( new_coverage || min_faults || !num_min_targets ) {
         // Save output in gen_dir
-        u8 *fn = alloc_printf("%s/%d", gen_dir, i);
+        u8 *fn = alloc_printf("%s/%d_%d", gen_dir, i, min_faults);
         rename(gen_file, fn);
         ck_free(fn);
         ++gen_unique;
@@ -5269,6 +5399,9 @@ skip_branch:
     
     }
 
+    new_coverage = 0;
+    min_faults = 0;
+
     switch (fault) {
       case FAULT_TMOUT:
         ++total_tmouts;
@@ -5287,7 +5420,7 @@ skip_branch:
       goto stop_fuzzing;
     }
 
-    if ( avg_exec < 100 ) {
+    if ( avg_exec < slow_threshold ) {
       if (!slow_since) {
         slow_since = get_cur_time();
       } else if ( get_cur_time() > (slow_since + (GFZ_TMOUT_SEC * 1000)) ) {

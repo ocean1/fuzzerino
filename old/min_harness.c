@@ -10,11 +10,12 @@
 int main(int argc, char **argv) {
 
   uint8_t  tmp[4];
-  uint32_t pid;
+  int32_t pid;
+  int32_t child_pid;
   uint8_t* min_target = argv[1];
   uint8_t* gen_file = argv[2];
   uint8_t* arguments[] = { min_target, gen_file, NULL };
-  uint32_t bytes = 0;
+  uint32_t cov_status[2];
 
   int st_pipe[2], ctl_pipe[2];
   
@@ -62,9 +63,13 @@ int main(int argc, char **argv) {
 
         if (write(ctl_pipe[1], &tmp, 4) != 4) { printf("write() failed"); exit(-1); }
 
-        if (read(st_pipe[0], &bytes, 4) != 4) { printf("read() failed"); exit(-1); }
+        if (read(st_pipe[0], &child_pid, 4) != 4) { printf("read() failed"); exit(-1); }
 
-        printf("\ngot bytes: %u", bytes);
+        printf("\nchild pid: %d", child_pid);
+        
+        if (read(st_pipe[0], &cov_status[0], 8) != 8) { printf("read() failed"); exit(-1); }
+
+        printf("\ngot cov: %u, status: %d", cov_status[0], cov_status[1]);
 
       }
 
