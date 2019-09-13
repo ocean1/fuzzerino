@@ -5210,7 +5210,8 @@ skip_branch:
 
   } // if (!skip_deterministic)
 
-  if (__gfz_num_ban_locs >= __gfz_num_locs || __gfz_ptr_ban_locs >= __gfz_ptr_locs)
+  if (    ( __gfz_num_locs && (__gfz_num_ban_locs >= __gfz_num_locs) )
+       || ( __gfz_ptr_locs && (__gfz_ptr_ban_locs >= __gfz_ptr_locs) ) )
     FATAL("Every numeric or pointer location is banned! Skipping havoc.\n"
           "Please consider tweaking GFZ_FTE_BAN_RATIO.\n"
           "(current value: %.2f)", GFZ_FTE_BAN_RATIO);
