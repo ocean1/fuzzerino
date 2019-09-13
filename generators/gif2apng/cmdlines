@@ -1,3 +1,2 @@
 ./gif2apng -z0 giftest
 ./gif2apng -z1 giftest
-./gif2apng -z2 giftest

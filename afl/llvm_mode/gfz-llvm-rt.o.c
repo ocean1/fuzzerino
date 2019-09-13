@@ -123,7 +123,7 @@ char **__original_argv;
 u8 __gfz_num_cmdlines = 0,
    __gfz_cur_cmdline = 0;
 
-struct gen_cmdline gen_cmdlines[GFZ_MAX_GEN_CMDLINES];
+struct cmdline gen_cmdlines[GFZ_MAX_GEN_CMDLINES];
 
 /* Random file descriptor for populating __gfz_rand_area. */
 

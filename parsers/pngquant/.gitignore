@@ -1,0 +1,14 @@
+*.dylib
+*.mode1v3
+*.o
+*.lo
+*.pbxproj
+*.pbxuser
+build
+DerivedData
+pngquant
+lib/libimagequant.a
+*.obj
+*.lib
+test/test
+target/
