@@ -1,3 +1,3 @@
-../../parsers/libpng/contrib/libtests/readpng
-../../parsers/lodepng/pngdetail -z -c -f -b -B -7 -r --mode=hex -l -i -p -h
-../../parsers/pngquant/pngquant -o-
+../../../../parsers/libpng/contrib/libtests/readpng
+../../../../parsers/lodepng/pngdetail -z -c -f -b -B -7 -r --mode=hex -l -i -p -h
+../../../../parsers/pngquant/pngquant -o-
