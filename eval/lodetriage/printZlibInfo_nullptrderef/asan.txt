@@ -1,0 +1,16 @@
+Ignoring the error: enabling ignore_adler32
+This error is unrecoverable
+ASAN:DEADLYSIGNAL
+=================================================================
+==2530==ERROR: AddressSanitizer: SEGV on unknown address 0x000000000000 (pc 0x559e5697e82b bp 0x7ffefe6009e0 sp 0x7ffefe600670 T0)
+==2530==The signal is caused by a READ memory access.
+==2530==Hint: address points to the zero page.
+    #0 0x559e5697e82a in printZlibInfo(Data&, Options const&) /home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail.cpp:743
+    #1 0x559e56989828 in showInfos(Data&, Options const&) /home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail.cpp:1292
+    #2 0x559e5698afa8 in main /home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail.cpp:1407
+    #3 0x7f1e8448fb96 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x21b96)
+    #4 0x559e56914409 in _start (/home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail+0xa409)
+
+AddressSanitizer can not provide additional info.
+SUMMARY: AddressSanitizer: SEGV /home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail.cpp:743 in printZlibInfo(Data&, Options const&)
+==2530==ABORTING

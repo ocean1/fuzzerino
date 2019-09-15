@@ -1,0 +1,66 @@
+This error is unrecoverable
+=================================================================
+==27478==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x6020000002ba at pc 0x559b36739ddd bp 0x7ffc2c562410 sp 0x7ffc2c562400
+READ of size 1 at 0x6020000002ba thread T0
+    #0 0x559b36739ddc in lodepng::ExtractZlib::readBitFromStream(unsigned long&, unsigned char const*) /home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/lodepng_util.cpp:1396
+    #1 0x559b3673c399 in lodepng::ExtractZlib::huffmanDecodeSymbol(unsigned char const*, unsigned long&, lodepng::ExtractZlib::HuffmanTree const&, unsigned long) (/home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail+0x59399)
+    #2 0x559b3673e242 in lodepng::ExtractZlib::inflateHuffmanBlock(std::vector<unsigned char, std::allocator<unsigned char> >&, unsigned char const*, unsigned long&, unsigned long&, unsigned long, unsigned long) (/home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail+0x5b242)
+    #3 0x559b3673bb9f in lodepng::ExtractZlib::inflate(std::vector<unsigned char, std::allocator<unsigned char> >&, std::vector<unsigned char, std::allocator<unsigned char> > const&, unsigned long) (/home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail+0x58b9f)
+    #4 0x559b3673f6aa in lodepng::ExtractZlib::decompress(std::vector<unsigned char, std::allocator<unsigned char> >&, std::vector<unsigned char, std::allocator<unsigned char> > const&) (/home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail+0x5c6aa)
+    #5 0x559b3673fed0 in lodepng::ExtractPNG::decode(unsigned char const*, unsigned long) (/home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail+0x5ced0)
+    #6 0x559b36739aba in lodepng::extractZlibInfo(std::vector<lodepng::ZlibBlockInfo, std::allocator<lodepng::ZlibBlockInfo> >&, std::vector<unsigned char, std::allocator<unsigned char> > const&) /home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/lodepng_util.cpp:1702
+    #7 0x559b3675678f in printZlibInfo(Data&, Options const&) /home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail.cpp:665
+    #8 0x559b36762828 in showInfos(Data&, Options const&) /home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail.cpp:1292
+    #9 0x559b36763fa8 in main /home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail.cpp:1407
+    #10 0x7f08357b1b96 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x21b96)
+    #11 0x559b366ed409 in _start (/home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail+0xa409)
+
+0x6020000002ba is located 0 bytes to the right of 10-byte region [0x6020000002b0,0x6020000002ba)
+allocated by thread T0 here:
+    #0 0x7f08365a0458 in operator new(unsigned long) (/usr/lib/x86_64-linux-gnu/libasan.so.4+0xe0458)
+    #1 0x559b367281c0 in __gnu_cxx::new_allocator<unsigned char>::allocate(unsigned long, void const*) /usr/include/c++/7/ext/new_allocator.h:111
+    #2 0x559b36727df4 in __gnu_cxx::__alloc_traits<std::allocator<unsigned char> >::allocate(std::allocator<unsigned char>&, unsigned long) /usr/include/c++/7/ext/alloc_traits.h:130
+    #3 0x559b3672701d in std::_Vector_base<unsigned char, std::allocator<unsigned char> >::_M_allocate(unsigned long) /usr/include/c++/7/bits/stl_vector.h:172
+    #4 0x559b3674cf33 in void std::vector<unsigned char, std::allocator<unsigned char> >::_M_range_insert<unsigned char const*>(__gnu_cxx::__normal_iterator<unsigned char*, std::vector<unsigned char, std::allocator<unsigned char> > >, unsigned char const*, unsigned char const*, std::forward_iterator_tag) (/home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail+0x69f33)
+    #5 0x559b36748afa in void std::vector<unsigned char, std::allocator<unsigned char> >::_M_insert_dispatch<unsigned char const*>(__gnu_cxx::__normal_iterator<unsigned char*, std::vector<unsigned char, std::allocator<unsigned char> > >, unsigned char const*, unsigned char const*, std::__false_type) (/home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail+0x65afa)
+    #6 0x559b36742957 in void std::vector<unsigned char, std::allocator<unsigned char> >::insert<unsigned char const*>(__gnu_cxx::__normal_iterator<unsigned char*, std::vector<unsigned char, std::allocator<unsigned char> > >, unsigned char const*, unsigned char const*) (/home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail+0x5f957)
+    #7 0x559b3673fcc4 in lodepng::ExtractPNG::decode(unsigned char const*, unsigned long) (/home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail+0x5ccc4)
+    #8 0x559b36739aba in lodepng::extractZlibInfo(std::vector<lodepng::ZlibBlockInfo, std::allocator<lodepng::ZlibBlockInfo> >&, std::vector<unsigned char, std::allocator<unsigned char> > const&) /home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/lodepng_util.cpp:1702
+    #9 0x559b3675678f in printZlibInfo(Data&, Options const&) /home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail.cpp:665
+    #10 0x559b36762828 in showInfos(Data&, Options const&) /home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail.cpp:1292
+    #11 0x559b36763fa8 in main /home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail.cpp:1407
+    #12 0x7f08357b1b96 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x21b96)
+
+SUMMARY: AddressSanitizer: heap-buffer-overflow /home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/lodepng_util.cpp:1396 in lodepng::ExtractZlib::readBitFromStream(unsigned long&, unsigned char const*)
+Shadow bytes around the buggy address:
+  0x0c047fff8000: fa fa fd fd fa fa fd fa fa fa fd fa fa fa fd fa
+  0x0c047fff8010: fa fa fd fa fa fa fd fa fa fa fd fd fa fa fd fa
+  0x0c047fff8020: fa fa fd fa fa fa fd fa fa fa fd fa fa fa fd fd
+  0x0c047fff8030: fa fa fd fa fa fa fd fa fa fa fd fa fa fa fd fa
+  0x0c047fff8040: fa fa fd fd fa fa fd fa fa fa fd fa fa fa fd fa
+=>0x0c047fff8050: fa fa fd fa fa fa 00[02]fa fa fd fa fa fa fd fa
+  0x0c047fff8060: fa fa fd fa fa fa fd fa fa fa fd fa fa fa fd fa
+  0x0c047fff8070: fa fa fd fa fa fa fd fa fa fa fd fa fa fa fd fa
+  0x0c047fff8080: fa fa fd fa fa fa fd fa fa fa fd fa fa fa fd fa
+  0x0c047fff8090: fa fa fd fd fa fa fd fd fa fa fd fd fa fa fd fd
+  0x0c047fff80a0: fa fa fd fd fa fa fd fd fa fa fd fa fa fa fd fa
+Shadow byte legend (one shadow byte represents 8 application bytes):
+  Addressable:           00
+  Partially addressable: 01 02 03 04 05 06 07 
+  Heap left redzone:       fa
+  Freed heap region:       fd
+  Stack left redzone:      f1
+  Stack mid redzone:       f2
+  Stack right redzone:     f3
+  Stack after return:      f5
+  Stack use after scope:   f8
+  Global redzone:          f9
+  Global init order:       f6
+  Poisoned by user:        f7
+  Container overflow:      fc
+  Array cookie:            ac
+  Intra object redzone:    bb
+  ASan internal:           fe
+  Left alloca redzone:     ca
+  Right alloca redzone:    cb
+==27478==ABORTING

@@ -1,0 +1,20 @@
+This error is unrecoverable
+ASAN:DEADLYSIGNAL
+=================================================================
+==9162==ERROR: AddressSanitizer: SEGV on unknown address 0x610ffffffe18 (pc 0x55920240b168 bp 0x7ffdebe46c20 sp 0x7ffdebe467e0 T0)
+==9162==The signal is caused by a READ memory access.
+    #0 0x55920240b167 in lodepng::ExtractZlib::getTreeInflateDynamic(lodepng::ExtractZlib::HuffmanTree&, lodepng::ExtractZlib::HuffmanTree&, unsigned char const*, unsigned long&, unsigned long) (/home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail+0x5a167)
+    #1 0x55920240c1c8 in lodepng::ExtractZlib::inflateHuffmanBlock(std::vector<unsigned char, std::allocator<unsigned char> >&, unsigned char const*, unsigned long&, unsigned long&, unsigned long, unsigned long) (/home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail+0x5b1c8)
+    #2 0x559202409b9f in lodepng::ExtractZlib::inflate(std::vector<unsigned char, std::allocator<unsigned char> >&, std::vector<unsigned char, std::allocator<unsigned char> > const&, unsigned long) (/home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail+0x58b9f)
+    #3 0x55920240d6aa in lodepng::ExtractZlib::decompress(std::vector<unsigned char, std::allocator<unsigned char> >&, std::vector<unsigned char, std::allocator<unsigned char> > const&) (/home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail+0x5c6aa)
+    #4 0x55920240ded0 in lodepng::ExtractPNG::decode(unsigned char const*, unsigned long) (/home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail+0x5ced0)
+    #5 0x559202407aba in lodepng::extractZlibInfo(std::vector<lodepng::ZlibBlockInfo, std::allocator<lodepng::ZlibBlockInfo> >&, std::vector<unsigned char, std::allocator<unsigned char> > const&) /home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/lodepng_util.cpp:1702
+    #6 0x55920242478f in printZlibInfo(Data&, Options const&) /home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail.cpp:665
+    #7 0x559202430828 in showInfos(Data&, Options const&) /home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail.cpp:1292
+    #8 0x559202431fa8 in main /home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail.cpp:1407
+    #9 0x7f643338fb96 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x21b96)
+    #10 0x5592023bb409 in _start (/home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail+0xa409)
+
+AddressSanitizer can not provide additional info.
+SUMMARY: AddressSanitizer: SEGV (/home/ocean/projects/fuzzerino/fuzzerino/eval/2coverage/lodepng-cov/pngdetail+0x5a167) in lodepng::ExtractZlib::getTreeInflateDynamic(lodepng::ExtractZlib::HuffmanTree&, lodepng::ExtractZlib::HuffmanTree&, unsigned char const*, unsigned long&, unsigned long)
+==9162==ABORTING
