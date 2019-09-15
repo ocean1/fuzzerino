@@ -5390,6 +5390,9 @@ skip_branch:
 
       __gfz_ptr_map[loc] = UR(65536);
 
+      if (__gfz_ptr_map[loc] & GFZ_CUSTOM_BUF)
+        memcpy(__gfz_ptr_buf, __gfz_dict_entries[UR(__gfz_dict_len)], GFZ_PTR_BUF_SIZE);
+
       if ( prev_loc == GFZ_KEEP_ORIGINAL && __gfz_ptr_map[loc] != GFZ_KEEP_ORIGINAL )
         __gfz_ptr_active++;
       else if ( prev_loc != GFZ_KEEP_ORIGINAL && __gfz_ptr_map[loc] == GFZ_KEEP_ORIGINAL )

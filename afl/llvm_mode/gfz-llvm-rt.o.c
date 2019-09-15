@@ -92,23 +92,23 @@ struct gfz_data __gfz_data;
 
 /* Numeric locations bitmap SHM */
 
-u16* __gfz_num_map;
+u16* __gfz_num_map = NULL;
 
 /* Pointer locations bitmap SHM */
 
-u16* __gfz_ptr_map;
+u16* __gfz_ptr_map = NULL;
 
 /* Branch locations bitmap SHM */
 
-u8* __gfz_branch_map;
+u8* __gfz_branch_map = NULL;
 
 /* Buffer for ptr dict instrumentation (custom buffer) */
 
-u8* __gfz_ptr_buf;
+u8* __gfz_ptr_buf = NULL;
 
 /* Map for generator coverage */
 
-u8* __gfz_cov_map;
+u8* __gfz_cov_map = NULL;
 
 /* gfz argc, argv */
 
@@ -268,7 +268,7 @@ static void __gfz_map_shm(void) {
 
   if (id_str) {
     u32 shm_id = atoi(id_str);
-    __gfz_num_map = shmat(shm_id, NULL, 0);
+    __gfz_num_map = shmat(shm_id, NULL, SHM_RDONLY);
 
     // Whooooops.
     if (__gfz_num_map == (void *)-1) {
@@ -284,7 +284,7 @@ static void __gfz_map_shm(void) {
 
   if (id_str) {
     u32 shm_id = atoi(id_str);
-    __gfz_ptr_map = shmat(shm_id, NULL, 0);
+    __gfz_ptr_map = shmat(shm_id, NULL, SHM_RDONLY);
 
     // Whooooops.
     if (__gfz_ptr_map == (void *)-1) {
@@ -300,7 +300,7 @@ static void __gfz_map_shm(void) {
 
   if (id_str) {
     u32 shm_id = atoi(id_str);
-    __gfz_branch_map = shmat(shm_id, NULL, 0);
+    __gfz_branch_map = shmat(shm_id, NULL, SHM_RDONLY);
 
     // Whooooops.
     if (__gfz_branch_map == (void *)-1) {
@@ -316,7 +316,7 @@ static void __gfz_map_shm(void) {
 
   if (id_str) {
     u32 shm_id = atoi(id_str);
-    __gfz_ptr_buf = shmat(shm_id, NULL, 0);
+    __gfz_ptr_buf = shmat(shm_id, NULL, SHM_RDONLY);
 
     // Whooooops.
     if (__gfz_ptr_buf == (void *)-1) {
