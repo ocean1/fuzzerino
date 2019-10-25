@@ -186,7 +186,7 @@ void read_gen_cmdlines(char *file) {
   u8 *tmp, *pch;
 
   FILE *fp = fopen(file, "r");
-  if (!fp) return; //PFATAL("error: file open failed '%s'.\n", file);
+  if (!fp) return;
 
   while ( readline(fp, &tmp) ) {
 
@@ -419,11 +419,6 @@ static void __gfz_start_forkserver(void) {
     
       ssize_t n_bytes = fread(__gfz_num_map, GFZ_NUM_MAP_SIZE, 1, gfz_num_file);
     
-      if (n_bytes <= 0)
-        printf("[-] Error reading gfz_num. (%ld)\n", n_bytes);
-      else
-        printf("[+] gfz_num read.");
-
       /* When a custom map is present, make the whole process
          memory writable, just as if we were fuzzing. */
 
@@ -453,11 +448,6 @@ static void __gfz_start_forkserver(void) {
     
       ssize_t n_bytes = fread(__gfz_ptr_map, GFZ_PTR_MAP_SIZE, 1, gfz_ptr_file);
     
-      if (n_bytes <= 0)
-        printf("[-] Error reading gfz_ptr. (%ld)\n", n_bytes);
-      else
-        printf("[+] gfz_ptr read.");
-
       /* When a custom map is present, make the whole process
          memory writable, just as if we were fuzzing. */
 
@@ -488,11 +478,6 @@ static void __gfz_start_forkserver(void) {
 
       ssize_t n_bytes = fread(__gfz_branch_map, GFZ_BNC_MAP_SIZE, 1, gfz_bnc_file);
     
-      if (n_bytes <= 0)
-        printf("[-] Error reading gfz_bnc. (%ld)\n", n_bytes);
-      else
-        printf("[+] gfz_bnc read.");
-
       /* When a custom map is present, make the whole process
          memory writable, just as if we were fuzzing. */
 

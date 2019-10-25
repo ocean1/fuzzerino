@@ -9,7 +9,7 @@ rm -rf cov*
 for seedfolder in $1/*; do
     lcov --directory . --zerocounters
     for seed in $seedfolder/*; do
-        cat $seed | ./contrib/libtests/readpng > /dev/null 2> /dev/null
+        cat "$seed" | ./contrib/libtests/readpng > /dev/null 2> /dev/null
     done
     lcov --directory . --capture --output-file cov-${seedfolder##*/}.info
     genhtml cov-${seedfolder##*/}.info -o cov-${seedfolder##*/}

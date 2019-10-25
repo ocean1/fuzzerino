@@ -1,12 +1,10 @@
 .PHONY: FORCE all clean generators parsers
 
-all: gfz dogen generators cov parsers
+all: gfz generators cov parsers
 
 gfz: afl
 	cd afl && ./mk.sh
-
-dogen:
-	cd tests && ./dotests.sh
+	make -C test
 
 generators:
 	make -C generators/gif2apng
@@ -28,7 +26,7 @@ parsers:
 
 clean:
 	make -C afl clean
-	make -C tests clean
+	make -C test clean
 	make -C generators/gif2apng clean
 	make -C generators/libpng-wpng clean
 	make -C generators/libpng-wpng/contrib/gregbook clean
@@ -40,9 +38,3 @@ clean:
 	make -C parsers/picopng clean
 	make -C parsers/lodepng clean
 	make -C parsers/pngquant clean
-
-emit:
-	cd tests && ./emitall.sh
-
-cleanll: clean
-	make -C tests cleanll

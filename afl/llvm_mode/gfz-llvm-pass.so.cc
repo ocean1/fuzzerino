@@ -355,7 +355,7 @@ Value* AFLCoverage::emitInstrumentation(LLVMContext &C, IRBuilder<> &IRB,
 
     IRB.CreateMemCpy(Original,
                      IRB.CreateLoad(GFZPtrBufPtr),
-                     DL->getTypeStoreSize(PointeeTy), 0);
+                     DL->getTypeStoreSize(PointeeTy)-1, 0);
 
     // "else" block - every other ptr mutation
     IRB.SetInsertPoint(ElseTerm);
