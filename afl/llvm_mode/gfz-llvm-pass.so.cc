@@ -50,6 +50,7 @@
 #include "llvm/IR/Type.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/Alignment.h"
 #include "llvm/Support/raw_os_ostream.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
@@ -338,8 +339,8 @@ Value* AFLCoverage::emitInstrumentation(LLVMContext &C, IRBuilder<> &IRB,
     Value *CustomBufEnabled = IRB.CreateICmpNE(CustomBuf,
                                                ConstantInt::get(IntegerType::getInt16Ty(C), 0));
 
-    TerminatorInst *ThenTerm = NULL;
-    TerminatorInst *ElseTerm = NULL;
+    Instruction *ThenTerm = NULL;
+    Instruction *ElseTerm = NULL;
 
     SplitBlockAndInsertIfThenElse(CustomBufEnabled, &(*(IRB.GetInsertPoint())),
       &ThenTerm, &ElseTerm, MDBuilder(C).createBranchWeights(1, (1<<20)-1));
@@ -349,9 +350,11 @@ Value* AFLCoverage::emitInstrumentation(LLVMContext &C, IRBuilder<> &IRB,
 
     Type *PointeeTy = getPointeeTy(Original);
 
-    IRB.CreateMemCpy(Original,
-                     IRB.CreateLoad(GFZPtrBufPtr),
-                     DL->getTypeStoreSize(PointeeTy), 0);
+    const Align align = Align(8);
+
+    IRB.CreateMemCpy(Original, align,
+                     IRB.CreateLoad(GFZPtrBufPtr), align,
+                     DL->getTypeStoreSize(PointeeTy), false);
 
     // "else" block - every other ptr mutation
     IRB.SetInsertPoint(ElseTerm);
@@ -633,7 +636,7 @@ void AFLCoverage::instrumentOperands(Instruction *I) {
     // if ( MutationFlags != 1 )
     Value *InstEnabled = IRB.CreateICmpNE(MutationFlags, ConstantInt::get(Int16Ty, 1));
 
-    TerminatorInst *CheckStatus = SplitBlockAndInsertIfThen(InstEnabled, I, false,
+    Instruction *CheckStatus = SplitBlockAndInsertIfThen(InstEnabled, I, false,
             MDBuilder(C).createBranchWeights(1, (1<<20)-1));
 
     // "then" block - executed if location is active
@@ -709,7 +712,7 @@ void AFLCoverage::instrumentResult(Instruction *I) {
   // if ( MutationFlags != 1 )
   Value *InstEnabled = IRB.CreateICmpNE(MutationFlags, ConstantInt::get(Int16Ty, 1));
 
-  TerminatorInst *CheckStatus = SplitBlockAndInsertIfThen(InstEnabled, NI, false,
+  Instruction *CheckStatus = SplitBlockAndInsertIfThen(InstEnabled, NI, false,
           MDBuilder(C).createBranchWeights(1, (1<<20)-1));
 
   // "then" block - executed if location is active
@@ -770,7 +773,7 @@ void AFLCoverage::instrumentBranch(Instruction *I) {
   // if ( MutationFlags != 1 )
   Value *InstEnabled = IRB.CreateICmpNE(MutationFlags, ConstantInt::get(Int8Ty, 1));
 
-  TerminatorInst *CheckStatus = SplitBlockAndInsertIfThen(InstEnabled, BI, false,
+  Instruction *CheckStatus = SplitBlockAndInsertIfThen(InstEnabled, BI, false,
           MDBuilder(C).createBranchWeights(1, (1<<20)-1));
 
   // "then" block - executed if location is active

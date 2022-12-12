@@ -3,7 +3,7 @@
 all: afl gfz dogen generators
 
 afl:
-	CC=clang-6.0 make -C afl
+	CC=clang make -C afl
 
 gfz: afl
 	cd afl && ./mk.sh
