@@ -1,6 +1,6 @@
 .PHONY: FORCE all clean
 
-LLVM_CONFIG=llvm-config-6.0
+LLVM_CONFIG=llvm-config
 CC=clang-6.0
 AFL_DONT_OPTIMIZE?=true
 DEBUG ?= 0
